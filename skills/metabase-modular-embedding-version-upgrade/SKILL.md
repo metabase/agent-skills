@@ -57,8 +57,10 @@ Each step section MUST end with a status line:
 
 This skill handles upgrades for:
 
-- `@metabase/embedding-sdk-react` (React SDK) — uses primary or fallback path
-- EmbedJS / Modular Embedding — always uses fallback path (no npm types available)
+- `@metabase/embedding-sdk-react` (React SDK, v52+) — uses primary or fallback path
+- EmbedJS / Modular Embedding (v56+) — always uses fallback path (no npm types available)
+  - v56–v57: docs are at `embedded-analytics-js.md`
+  - v58+: docs split into `components.md`, `appearance.md`, `authentication.md`
 
 ## Allowed documentation sources — STRICT URL POLICY (hard)
 
@@ -73,20 +75,32 @@ STRICTLY FORBIDDEN:
 
 ### Allowed URL patterns (ONLY these)
 
+IMPORTANT: All versioned docs URLs use the `v0.XX` format (e.g., `v0.58`), NOT `vXX`.
+
 1. SDK package changelog:
    `https://raw.githubusercontent.com/metabase/metabase/master/enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md`
 
-2. Version-specific SDK component docs (raw GitHub markdown — use curl, NOT WebFetch):
+For embedding SDK upgrade (v0.52+):
+- All versions (v0.52+):
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/collections.md`
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/questions.md`
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/dashboards.md`
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/config.md`
+- v0.52–v0.57 only (removed in v0.58):
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/appearance.md`
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/authentication.md`
 
-- `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v{VERSION}/embedding/sdk/collections.md`
-- `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v{VERSION}/embedding/sdk/questions.md`
-- `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v{VERSION}/embedding/sdk/dashboards.md`
-- `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v{VERSION}/embedding/sdk/appearance.md`
-- `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v{VERSION}/embedding/sdk/authentication.md`
+For EmbedJS / Modular Embedding upgrade:
+- v0.56–v0.57:
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/embedded-analytics-js.md`
+- v0.58+:
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/components.md`
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/appearance.md`
+  - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/authentication.md`
 
 3. Props/Options snippet files auto-discovered from doc pages (use curl):
 
-- `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v{VERSION}/embedding/sdk/api/snippets/{SnippetName}.md`
+- `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/api/snippets/{SnippetName}.md`
 
 Do NOT fetch base landing pages.
 
@@ -211,18 +225,20 @@ Then use `Read` on `/tmp/sdk-changelog.md` to extract entries between {CURRENT} 
 Reason: WebFetch summarizes raw markdown and drops `{% include_file %}` directives. Use curl to preserve the full content.
 
 ```bash
-DOC_BASE="https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v{TARGET}/embedding/sdk"
+DOC_BASE="https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{TARGET}/embedding/sdk"
 
-# Step 1: Fetch all 5 doc pages in parallel
+# Step 1: Fetch doc pages in parallel (adjust based on target version)
 curl -sL "${DOC_BASE}/collections.md"    -o /tmp/sdk-doc-collections.md &
 curl -sL "${DOC_BASE}/questions.md"      -o /tmp/sdk-doc-questions.md &
 curl -sL "${DOC_BASE}/dashboards.md"     -o /tmp/sdk-doc-dashboards.md &
+curl -sL "${DOC_BASE}/config.md"         -o /tmp/sdk-doc-config.md &
+# For v52–v57 only (these files don't exist in v58+):
 curl -sL "${DOC_BASE}/appearance.md"     -o /tmp/sdk-doc-appearance.md &
 curl -sL "${DOC_BASE}/authentication.md" -o /tmp/sdk-doc-authentication.md &
 wait
 
 # Step 2: Extract all Props/Options snippet names from include_file directives
-grep -h 'include_file.*api/snippets/.*\.md.*snippet="properties"' /tmp/sdk-doc-*.md \
+grep -h 'include_file.*api/snippets/.*\.md.*snippet="properties"' /tmp/sdk-doc-*.md 2>/dev/null \
   | sed 's/.*api\/snippets\/\([^"]*\)\.md.*/\1/' | sort -u > /tmp/sdk-snippet-names.txt
 
 # Step 3: Fetch each Props/Options snippet in parallel
