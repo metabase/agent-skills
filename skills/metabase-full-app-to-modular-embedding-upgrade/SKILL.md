@@ -5,12 +5,11 @@ model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
 
-## Non-negotiable execution contract (anti-skip)
+## Execution contract
 
-You MUST follow the workflow steps in order and MUST NOT skip any step.
-You MUST create a checklist first, then execute each step, and explicitly mark it done with evidence.
-You MUST NOT cut corners or skip steps. Always re-evaluate the proper order of your steps.
-If you cannot complete a step due to missing info or tool failure, you must:
+Follow the workflow steps in order — do not skip any step. Create the checklist first, then execute each step and explicitly mark it done with evidence. Each step's output feeds into the next, so skipping steps produces wrong migrations.
+
+If you cannot complete a step due to missing info or tool failure:
 
 1. record the step as ❌ blocked,
 2. explain exactly what is missing / what failed,
@@ -18,7 +17,7 @@ If you cannot complete a step due to missing info or tool failure, you must:
 
 ### Required output structure
 
-Your response MUST contain these sections in this exact order:
+Your response should contain these sections in this order:
 
 1. **Step 0 Results: Metabase Version Detection**
 2. **Migration Plan Checklist**
@@ -29,39 +28,51 @@ Your response MUST contain these sections in this exact order:
 7. **Step 5: Validation**
 8. **Step 6: Final Summary**
 
-Each step section MUST end with a status line:
+Each step section should end with a status line:
 
 - `Status: ✅ complete` or `Status: ❌ blocked`
 
 Steps are sequential — do not start a step until the previous one is ✅ complete.
 
-## Architectural conformance (hard)
+## Architectural conformance
 
 Follow the app's existing architecture, template engine, layout/partial system, code style, and route patterns. Do not switch paradigms (e.g., templates to inline HTML or vice versa). If the app has middleware for shared template variables, prefer that over duplicating across route handlers.
 
 ## Important performance notes
 
 - Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in single messages wherever possible.
-- Do NOT use sub-agents for project scanning — results MUST remain in the main context for cross-referencing.
-- Do NOT parse repo branches, commits, PRs, or issues.
+- Do not use sub-agents for project scanning — results need to stay in the main context for cross-referencing in later steps.
+- Do not parse repo branches, commits, PRs, or issues.
 
 ## Scope
 
 This skill converts Full App / Interactive Embedding (iframe-based) to Modular Embedding (web-component-based via `embed.js`).
 
-**The consumer's app may be written in ANY backend language** (Node.js, Python, Ruby, PHP, Java, Go, .NET, etc.) with ANY template engine. All instructions MUST be language-agnostic unless a specific language is detected in Step 1.
+**The consumer's app may be written in any backend language** (Node.js, Python, Ruby, PHP, Java, Go, .NET, etc.) with any template engine. Keep instructions language-agnostic unless a specific language is detected in Step 1.
 
 ### What this skill handles
 
 - Replacing `<iframe>` elements pointing to Metabase with appropriate web components
-- Adding the `embed.js` script tag (EXACTLY ONCE at app layout level)
-- Adding `window.metabaseConfig` setup code (EXACTLY ONCE at app layout level)
+- Adding the `embed.js` script tag (exactly once at app layout level)
+- Adding `window.metabaseConfig` setup code (exactly once at app layout level)
 - Modifying SSO/JWT endpoints to support modular embedding's JSON response format
 - Mapping iframe URL customization parameters to theme config and component attributes
 
-## AskUserQuestion triggers (hard — you MUST ask before proceeding)
+### Migration Plan Checklist
 
-You MUST use AskUserQuestion and halt until answered if:
+Create a TODO list using the TaskCreate tool with these items. Mark each task as `in_progress` (via TaskUpdate) before starting it and `completed` when done:
+
+- Step 0: Detect Metabase version
+- Step 1: Scan project
+- Step 2: Analyze iframes and map to web components
+- Step 3: Plan migration changes
+- Step 4: Apply code changes
+- Step 5: Validate changes
+- Step 6: Final summary
+
+## AskUserQuestion triggers
+
+Use AskUserQuestion and halt until answered if:
 
 - The Metabase instance URL cannot be determined from project code or environment variables
 - An iframe URL pattern does not match any known content type (dashboard, question, collection, home)
@@ -82,7 +93,7 @@ Before anything else, determine the Metabase version. Grep the project for Docke
 
 ### Step 1: Scan the project (NO sub-agent)
 
-Perform ALL of the following scans. Use parallel tool calls within a single message wherever there are no dependencies.
+Perform all of the following scans. Use parallel tool calls within a single message wherever there are no dependencies.
 
 #### 1a: Identify backend language and framework
 
@@ -91,17 +102,17 @@ Perform ALL of the following scans. Use parallel tool calls within a single mess
 
 #### 1b: Find ALL Metabase iframes
 
-Use Grep to search for ALL of these patterns (in parallel):
+Use Grep to search for all of these patterns (in parallel):
 
 - `<iframe` in all template/HTML/JSX/view files
 - `iframe` in all server-side code files (JS/TS/Python/Ruby/Go/Java/PHP) — catches iframes built via string concatenation or template literals
 - `auth/sso` adjacent to `iframe` or `src` attributes
 
-For EACH file with a match, Read the ENTIRE file.
+For each file with a match, read the entire file.
 
 #### 1c: Find SSO/JWT authentication code
 
-Use Grep to search for ALL of these patterns (in parallel):
+Use Grep to search for all of these patterns (in parallel):
 
 - `/auth/sso`
 - `/sso/metabase` or similar SSO route patterns
@@ -110,11 +121,11 @@ Use Grep to search for ALL of these patterns (in parallel):
 - `return_to` (Metabase SSO redirect parameter)
 - `redirect` near `auth/sso` (catches the SSO redirect logic)
 
-For EACH matching file, Read the ENTIRE file.
+For each matching file, read the entire file.
 
 #### 1d: Find the layout/head file(s)
 
-Find the SINGLE file (or common code path) where the HTML `<head>` section is defined — this is where `embed.js` and `window.metabaseConfig` will be injected.
+Find the single file (or common code path) where the HTML `<head>` section is defined — this is where `embed.js` and `window.metabaseConfig` will be injected.
 
 Search for:
 
@@ -176,7 +187,7 @@ Extract from the iframe `src` attribute (which may be a template expression, var
 | `/collection/{id}` or `/collection/entity/{eid}` | `<metabase-browser>` | `initial-collection="{id or eid}"` |
 | `/` (Metabase home / root) | `<metabase-browser>` | `initial-collection="root"` |
 
-If the iframe path is built dynamically from a variable, the web component attribute MUST use the same variable/expression.
+If the iframe path is built dynamically from a variable, the web component attribute should use the same variable/expression.
 
 If an iframe path does not match any known pattern → AskUserQuestion.
 
@@ -228,9 +239,9 @@ iframe #{n}: {file}:{line}
 
 ### Step 3: Plan migration changes (ONLY after Step 2 ✅)
 
-Create a COMPLETE file-by-file change plan covering ALL areas below. Every change MUST be specified with the target file, the old code, and the new code.
+Create a complete file-by-file change plan covering all areas below. Every change should be specified with the target file, the old code, and the new code.
 
-#### 3a: embed.js script injection — EXACTLY ONCE per app
+#### 3a: embed.js script injection — exactly once per app
 
 - **Target**: the layout/head file identified in Step 1d
 - **Location**: inside `<head>` (or as close as possible to other `<script>` tags)
@@ -238,16 +249,16 @@ Create a COMPLETE file-by-file change plan covering ALL areas below. Every chang
   ```html
   <script defer src="{METABASE_SITE_URL}/app/embed.js"></script>
   ```
-- `{METABASE_SITE_URL}` MUST be rendered dynamically using the project's existing template expression syntax.
+- `{METABASE_SITE_URL}` should be rendered dynamically using the project's existing template expression syntax.
 - If the Metabase URL variable is only available in specific routes, pass it to the layout via middleware or template context.
-- **CRITICAL**: Verify this will appear EXACTLY ONCE in the rendered HTML regardless of which page the user visits.
+- Verify this will appear exactly once in the rendered HTML regardless of which page the user visits — if it loads twice, the SDK reinitializes and breaks auth state.
 
-#### 3b: metabaseConfig — EXACTLY ONCE per app
+#### 3b: metabaseConfig — exactly once per app
 
-Modular embedding reads its configuration from `window.metabaseConfig`. There is no `defineMetabaseConfig()` function — you must assign the config object directly.
+Modular embedding reads its configuration from `window.metabaseConfig`. There is no `defineMetabaseConfig()` function — assign the config object directly.
 
 - **Target**: same layout/head file as 3a
-- **Location**: BEFORE the embed.js script tag (must be set before embed.js loads)
+- **Location**: before the embed.js script tag (the config must be set before embed.js loads, otherwise the SDK has no config to read)
 - **Code to add** (minimum required config):
   ```html
   <script>
@@ -258,27 +269,27 @@ Modular embedding reads its configuration from `window.metabaseConfig`. There is
   </script>
   ```
 - **Locale**: If a `locale` parameter was found on any iframe in Step 2c, add `locale: "{code}"` to the config object. If multiple iframes had different locale values, the user will have already been asked which one to use (per AskUserQuestion trigger).
-- Both `instanceUrl` and `jwtProviderUri` MUST be rendered dynamically using the project's template expression syntax.
-- **`jwtProviderUri`** MUST be a **full absolute URL** including protocol and host (e.g., `http://localhost:9090/sso/metabase`). Relative paths will NOT work. Pass the app's origin as a template variable (e.g., via middleware) and render: `jwtProviderUri: "{APP_URL}/sso/metabase"`.
+- Both `instanceUrl` and `jwtProviderUri` should be rendered dynamically using the project's template expression syntax.
+- **`jwtProviderUri`** must be a **full absolute URL** including protocol and host (e.g., `http://localhost:9090/sso/metabase`). Relative paths do not work because the browser needs the full origin to send the auth request. Pass the app's origin as a template variable (e.g., via middleware) and render: `jwtProviderUri: "{APP_URL}/sso/metabase"`.
   - **Version-dependent behavior** (use the version detected in Step 0):
     - **v59+**: Include `jwtProviderUri` in `window.metabaseConfig` (preferred approach).
-    - **v53–v58**: Do NOT include `jwtProviderUri` in `window.metabaseConfig` — it is not supported. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3g).
-- **CRITICAL**: `window.metabaseConfig` MUST be set EXACTLY ONCE. It must NOT appear inside any per-iframe replacement code.
+    - **v53–v58**: Do not include `jwtProviderUri` in `window.metabaseConfig` — it is not supported on these versions. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3g).
+- `window.metabaseConfig` should be set exactly once — if it appears in per-iframe code instead of the layout, each component will re-initialize the SDK.
 
 #### 3c: SSO endpoint modification
 
-The existing SSO endpoint currently REDIRECTS the browser to Metabase's `/auth/sso?jwt={token}&return_to={path}`.
+The existing SSO endpoint currently redirects the browser to Metabase's `/auth/sso?jwt={token}&return_to={path}`.
 
-For modular embedding, the embed.js SDK sends requests to the JWT Identity Provider URI and expects a JSON response. The endpoint MUST be converted to return JSON only — do NOT keep a fallback to the old redirect-based auth flow.
+For modular embedding, the embed.js SDK sends a fetch request to the JWT Identity Provider URI and expects a JSON response. The endpoint should be converted to return JSON only — do not keep a fallback to the old redirect-based auth flow.
 
 This is a full migration, not a gradual one. The old iframe-based embedding is being completely replaced, so the redirect behavior is no longer needed.
 
 Refer to the Metabase authentication documentation for the expected endpoint behavior: https://www.metabase.com/docs/latest/embedding/authentication
 
-**CRITICAL constraints:**
-- Do NOT modify the JWT signing logic — only change how the response is delivered
-- REMOVE the old redirect behavior entirely — the endpoint should ONLY return JSON
-- The JSON response body MUST be exactly `{ "jwt": "<token>" }` — no other fields
+**Constraints:**
+- Do not modify the JWT signing logic — only change how the response is delivered
+- Remove the old redirect behavior entirely — the endpoint should only return JSON
+- The JSON response body should be exactly `{ "jwt": "<token>" }` — no other fields, because the SDK parses this exact shape
 - Remove any code that builds the redirect URL (e.g., `new URL("/auth/sso", ...)`, `searchParams.set("return_to", ...)`) as it is now dead code
 
 #### 3d: iframe replacement plan
@@ -286,21 +297,21 @@ Refer to the Metabase authentication documentation for the expected endpoint beh
 For EACH iframe from Step 2d's Migration Mapping Table:
 
 - Specify: file path, exact old code to replace, exact new code
-- The new web component MUST preserve any dynamic ID expressions from the original iframe URL
+- The new web component should preserve any dynamic ID expressions from the original iframe URL
 - If the iframe had explicit `width`/`height` attributes, wrap the web component in a `<div>` with equivalent CSS dimensions (web components expand to fill their container)
 - If the iframe was inside a container element with styles, keep that container
-- Remove any server-side SSO URL construction that was used ONLY for the iframe src (e.g., building `/sso/metabase?return_to=...`). But do NOT remove the SSO endpoint itself — it is still needed.
+- Remove any server-side SSO URL construction that was used only for the iframe src (e.g., building `/sso/metabase?return_to=...`). But do not remove the SSO endpoint itself — it is still needed for modular embedding auth.
 - If the iframe src was built via a server-side route handler that sends inline HTML (e.g., Express `res.send('<iframe ...')`), replace the iframe HTML within that handler's response string
 
 #### 3e: Dead code removal
 
 After replacing iframes and converting the SSO endpoint, identify and remove:
 
-- Variables that built the iframe `src` URL (e.g., `iframeUrl`, `mbUrl`) IF they are no longer used anywhere
-- URL parameter/modifier strings that were appended to iframe URLs (e.g., `mods = "logo=false"`) IF they are no longer referenced anywhere (check the SSO endpoint — if the redirect logic was removed, these strings may now be dead code too)
+- Variables that built the iframe `src` URL (e.g., `iframeUrl`, `mbUrl`) if they are no longer used anywhere
+- URL parameter/modifier strings that were appended to iframe URLs (e.g., `mods = "logo=false"`) if they are no longer referenced anywhere (check the SSO endpoint — if the redirect logic was removed, these strings may now be dead code too)
 - Redirect-related code removed from the SSO endpoint (e.g., URL construction for `/auth/sso`, `return_to` parameter handling) — this is already handled as part of Step 3c
-- Helper functions that constructed Metabase iframe URLs IF they are no longer called
-- Do NOT remove: the SSO endpoint itself, JWT signing function, environment variable reads, or any code that is used by other parts of the application
+- Helper functions that constructed Metabase iframe URLs if they are no longer called
+- Do not remove: the SSO endpoint itself, JWT signing function, environment variable reads, or any code that is used by other parts of the application
 
 #### 3g: Metabase admin configuration notes (manual steps for the user)
 
@@ -309,38 +320,37 @@ List these as part of the plan — they will be included in the final summary:
 1. **Enable modular embedding**: Admin > Embedding > toggle "Enable modular embedding"
 2. **Configure CORS origins**: Admin > Embedding > Modular embedding > add the host app's domain (e.g., `http://localhost:9090`)
 3. **Configure JWT Identity Provider URI** (use the version detected in Step 0):
-   - **v53–v58 (REQUIRED)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint (e.g., `http://localhost:9090/sso/metabase`). This is the ONLY way to configure JWT auth on these versions.
-   - **v59+ (optional if `jwtProviderUri` is set in `window.metabaseConfig`)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint. This is a fallback — if `jwtProviderUri` was added to `window.metabaseConfig` in Step 3b, this admin setting is not strictly required but can serve as a backup.
+   - **v53–v58 (required)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint (e.g., `http://localhost:9090/sso/metabase`). This is the only way to configure JWT auth on these versions since `jwtProviderUri` in config is not supported.
+   - **v59+ (optional if `jwtProviderUri` is set in `window.metabaseConfig`)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint. If `jwtProviderUri` was added to `window.metabaseConfig` in Step 3b, this admin setting is not strictly required but can serve as a backup.
 4. **JWT shared secret**: No change needed — reuse the existing shared secret from Full App embedding setup
 
 ---
 
 ### Step 4: Apply code changes (ONLY after Step 3 ✅)
 
-Apply ALL changes from Step 3 in this EXACT order:
+Apply all changes from Step 3 in this order (backend changes first to minimize the window where things are broken):
 
-1. **First**: Modify the SSO endpoint to add JSON response support (Step 3c)
-   - This is backend-only and does not break existing functionality
-2. **Second**: Add `window.metabaseConfig` assignment and embed.js script tag to the layout/head file (Step 3b + 3a, config BEFORE embed.js)
+1. **First**: Modify the SSO endpoint to return JSON (Step 3c) — this is backend-only
+2. **Second**: Add `window.metabaseConfig` assignment and embed.js script tag to the layout/head file (Step 3b + 3a, config before embed.js)
 3. **Third**: Replace each iframe with its web component (Step 3d), one file at a time
 4. **Fourth**: Remove dead code (Step 3e)
 
-**IMPORTANT constraints:**
+**Constraints:**
 
 - Use the Edit tool with precise `old_string` / `new_string` for every change
-- Do NOT add new package dependencies — modular embedding requires ONLY the embed.js script served by the Metabase instance
-- Do NOT change environment variable names
+- Do not add new package dependencies — modular embedding requires only the embed.js script served by the Metabase instance
+- Do not change environment variable names
 - If a file requires multiple edits, apply them top-to-bottom to avoid offset issues
 
 ---
 
 ### Step 5: Validate changes (ONLY after Step 4 ✅)
 
-Perform ALL of these checks. Each check MUST have an explicit pass/fail result.
+Perform all of these checks. Each check should have an explicit pass/fail result.
 
 #### 5a: No remaining Metabase iframes
 
-Use Grep to search for `<iframe` and `iframe` across ALL project files (excluding `node_modules`, `.git`, lockfiles).
+Use Grep to search for `<iframe` and `iframe` across all project files (excluding `node_modules`, `.git`, lockfiles).
 Verify that NO iframes pointing to Metabase URLs remain.
 Non-Metabase iframes (if any) should be untouched.
 
@@ -348,12 +358,12 @@ Non-Metabase iframes (if any) should be untouched.
 
 #### 5b: embed.js appears exactly once
 
-Use Grep to search for `embed.js` across ALL project files (excluding `node_modules`, `.git`).
+Use Grep to search for `embed.js` across all project files (excluding `node_modules`, `.git`).
 **Pass criteria**: exactly ONE occurrence in the layout/head file.
 
 #### 5c: window.metabaseConfig is set exactly once
 
-Use Grep to search for `window.metabaseConfig` across ALL project files (excluding `node_modules`, `.git`).
+Use Grep to search for `window.metabaseConfig` across all project files (excluding `node_modules`, `.git`).
 **Pass criteria**: exactly ONE occurrence (the assignment in the layout/head file).
 
 #### 5d: SSO endpoint returns JSON only
