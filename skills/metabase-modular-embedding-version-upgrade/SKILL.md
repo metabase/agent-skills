@@ -45,7 +45,7 @@ Each step depends on the results of previous steps — starting early produces w
 
 ### Evidence requirements
 
-- Step 1 evidence: list every matched file path, every import/reference (from `@metabase/embedding-sdk-react` for SDK, or embed script tags/init calls for EmbedJS), every used component/hook/type, every prop/config option used per component, and every dot-subcomponent used (e.g., `InteractiveQuestion.FilterBar`).
+- Step 1 evidence: list every matched file path, every import/reference (from `@metabase/embedding-sdk-react` for SDK, or embed script tags/init calls for EmbedJS), every used component/hook/type, every prop/config option used per component, every dot-subcomponent used (e.g., `InteractiveQuestion.FilterBar`), and for callback props — where the callback parameter data flows in the project (e.g., `onClick: (item) => setSelectedId(item.id)` where `setSelectedId` is `useState<number>`).
 - Step 2 evidence (primary path): show the diff output between d.ts files. (fallback path): list each fetched URL for both current and target versions + include raw extracted sections that contain prop tables / type definitions / migration sections from both. Do not summarize away details — Step 3 needs the full text to cross-reference both sides.
 - Step 3 evidence: for each used prop/config option, show the target type (from d.ts for SDK, or from docs for EmbedJS) AND the current usage from the project side-by-side. Example format: `fetchRequestToken: project uses (url: string) => Promise<any>, target type is () => Promise<{jwt: string}> → BREAKING (arity change)`.
 - Step 4 evidence: show the exact diffs applied (or file edits described precisely).
@@ -73,53 +73,19 @@ This skill handles upgrades for:
 
 ## Allowed documentation sources
 
-Only fetch URLs that exactly match the patterns listed below. This applies to you and to all sub-agents. Other sources (GitHub PRs/issues, npm pages, metabase.com) contain rendered HTML or unstructured data that produces unreliable results.
+Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
 
-Do not:
-- Fetch GitHub PR/issue URLs or use `gh`
-- Follow changelog links to GitHub
-- Fetch npm pages
-- Guess docs URLs not listed below
-
-For component docs, always use `raw.githubusercontent.com` (not `www.metabase.com`) — the raw files preserve `include_file` directives needed for snippet expansion.
-
-### Allowed URL patterns
-
-All versioned docs URLs use the `v0.XX` format (e.g., `v0.58`), not `vXX`.
-
-1. **SDK package changelog:**
-   `https://raw.githubusercontent.com/metabase/metabase/master/enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md`
-
-2. **Embedding SDK doc pages (v0.52+):**
-   - All versions (v0.52+):
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/collections.md`
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/questions.md`
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/dashboards.md`
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/config.md`
-   - v0.52–v0.57 only (removed in v0.58):
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/appearance.md`
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/authentication.md`
-
-3. **EmbedJS / Modular Embedding doc pages:**
-   - v0.56–v0.57:
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/embedded-analytics-js.md`
-   - v0.58+:
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/modular-embedding.md`
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/components.md`
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/appearance.md`
-     - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/authentication.md`
-
-4. **Props/Options snippet files** (v0.54+ only — v0.52–v0.53 have props inline in doc pages, no snippets directory):
-   - `https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VERSION}/embedding/sdk/api/snippets/{SnippetName}.md`
-
-Do not fetch base landing pages.
+Other constraints:
+- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com` (preserves `include_file` directives needed for snippet expansion)
+- Do not follow changelog links to GitHub or guess URLs not handled by the script
 
 ## Detecting versions
 
-- Current version: read from the project's `package.json` dependency on `@metabase/embedding-sdk-react`.
+- Current version: read from the project's `package.json` (check `dependencies` and `devDependencies`) for `@metabase/embedding-sdk-react`. In monorepos, also check workspace-level `package.json` files.
 - Target version:
   - If user specifies, use it.
   - Otherwise run `npm view @metabase/embedding-sdk-react version` in the terminal to get the latest.
+- Package manager: detect from lock files — `yarn.lock` → yarn, `pnpm-lock.yaml` → pnpm, `package-lock.json` → npm. Use the matching install command in Step 4 (e.g., `yarn install`, `pnpm install`).
 
 If package not present OR user is upgrading EmbedJS/Modular Embedding:
 
@@ -174,6 +140,7 @@ Keep scan results in the main context (not delegated to a sub-agent) — Step 3 
   - imports, components, hooks, types, helpers
   - every prop used per component
   - every dot-subcomponent used
+  - for callback props (`onClick`, `onCreate`, `onNavigate`, etc.): what fields are accessed from the callback parameter and where those values flow in the project (state setters, variables, API calls, route params). This is critical — Step 3 needs this to catch data-flow breaking changes.
 - Output a structured "Usage Inventory".
 
 **For EmbedJS / Modular Embedding upgrades:**
@@ -198,39 +165,15 @@ Step 2 has two phases. Phase 1 runs concurrently with Step 1. Phase 2 runs after
 
 Launch these in parallel with Step 1 — they're all network calls that don't need project scan results.
 
-**For SDK upgrades** — npm pack both versions + changelog:
+**For SDK upgrades** — run the probe script to download both versions, fetch the changelog, and check d.ts availability:
 
 ```bash
-SDK_TMPDIR=$(node -e "
-  const path = require('path');
-  const fs = require('fs');
-  const dir = path.join(require('os').tmpdir(), 'sdk-diff-' + Date.now());
-  fs.mkdirSync(dir, { recursive: true });
-  console.log(dir);
-")
-
-mkdir -p "$SDK_TMPDIR/current" "$SDK_TMPDIR/target"
-
-(cd "$SDK_TMPDIR/current" && npm pack @metabase/embedding-sdk-react@{CURRENT} --quiet 2>/dev/null && tar xzf *.tgz)
-(cd "$SDK_TMPDIR/target"  && npm pack @metabase/embedding-sdk-react@{TARGET}  --quiet 2>/dev/null && tar xzf *.tgz)
-
-echo "SDK_TMPDIR=$SDK_TMPDIR"
+bash <skill-path>/scripts/probe-versions.sh {CURRENT} {TARGET}
 ```
 
-Also always fetch the changelog — it's one file but gives valuable migration instructions that type diffs alone don't provide:
+This outputs `SDK_TMPDIR`, `CHANGELOG`, and d.ts availability (`current_dts=yes/no`, `target_dts=yes/no`). Record the d.ts availability — it determines Phase 2's strategy.
 
-```bash
-curl -sL "https://raw.githubusercontent.com/metabase/metabase/master/enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md" -o /tmp/sdk-changelog.md
-```
-
-After npm pack completes, check d.ts availability for **each** version independently:
-
-```bash
-[ -f "$SDK_TMPDIR/current/package/dist/index.d.ts" ] && echo "current: has d.ts" || echo "current: no d.ts"
-[ -f "$SDK_TMPDIR/target/package/dist/index.d.ts" ] && echo "target: has d.ts" || echo "target: no d.ts"
-```
-
-Record which versions have d.ts — this determines Phase 2's strategy.
+If the script isn't available, the equivalent steps are: `npm pack` both versions into a temp directory, `tar xzf` each, `curl` the changelog, and check for `package/dist/index.d.ts` in each.
 
 **For EmbedJS / Modular Embedding upgrades** — no npm pack, just fetch the changelog:
 
@@ -268,84 +211,19 @@ Also read the changelog for migration instructions.
 
 **Targeted doc fetching** (for versions that need docs):
 
-Only fetch docs for the components the project actually uses (from Step 1's Usage Inventory). This avoids loading docs for unused components.
-
-Fetch via `curl` directly (not through a web-fetching AI tool that may summarize content) — the doc pages contain `{% include_file %}` directives that get stripped by HTML-to-markdown converters, and results need to stay in the main context for Step 3. In Claude Code, use the Bash tool with curl.
-
-Use the output prefix `current` or `target` to keep files separate. Fetch all needed URLs in parallel.
-
-**For SDK versions — map components to doc pages:**
-
-| Used component (from Step 1) | Doc page to fetch |
-|---|---|
-| `MetabaseDashboard`, dashboard-related hooks | `dashboards.md` |
-| `InteractiveQuestion`, `StaticQuestion`, question-related hooks | `questions.md` |
-| `CollectionBrowser` | `collections.md` |
-| Auth config (`MetabaseProvider`, `fetchRequestToken`, etc.) | `authentication.md` (v0.52–v0.57) or `config.md` (v0.52+) |
-| Appearance/theme props | `appearance.md` (v0.52–v0.57) or `config.md` (v0.52+) |
-
-Always fetch `config.md` (it covers auth + appearance for v0.58+). Only fetch the component-specific pages that Step 1 found usage for.
+Use `scripts/fetch-docs.sh` to discover and fetch all available doc pages for each version. The script uses the GitHub Contents API to find what exists — no hardcoded page lists. It also automatically discovers and fetches snippet files referenced via `include_file` directives.
 
 ```bash
-# Replace {VER} with the version number and {PREFIX} with "current" or "target"
-DOC_BASE="https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VER}/embedding/sdk"
+# Fetch target SDK docs (any version format works: 58, 0.58, v0.58, 0.58.1)
+bash <skill-path>/scripts/fetch-docs.sh \
+  --version {VER} --type sdk --prefix target --outdir /tmp/sdk-docs
 
-# Always fetch config:
-curl -sL "${DOC_BASE}/config.md" -o /tmp/sdk-doc-{PREFIX}-config.md &
-
-# Only fetch pages for components found in Step 1:
-# (include/exclude based on Usage Inventory)
-curl -sL "${DOC_BASE}/dashboards.md"     -o /tmp/sdk-doc-{PREFIX}-dashboards.md &   # if dashboards used
-curl -sL "${DOC_BASE}/questions.md"      -o /tmp/sdk-doc-{PREFIX}-questions.md &     # if questions used
-curl -sL "${DOC_BASE}/collections.md"    -o /tmp/sdk-doc-{PREFIX}-collections.md &   # if collections used
-# v0.52–v0.57 only:
-curl -sL "${DOC_BASE}/appearance.md"     -o /tmp/sdk-doc-{PREFIX}-appearance.md &    # if theme/appearance used
-curl -sL "${DOC_BASE}/authentication.md" -o /tmp/sdk-doc-{PREFIX}-authentication.md & # if auth config used
-wait
-
-# v0.54+ only — extract and fetch snippet files for the pages you fetched:
-grep -h 'include_file.*api/snippets/.*\.md.*snippet="properties"' /tmp/sdk-doc-{PREFIX}-*.md 2>/dev/null \
-  | sed 's/.*api\/snippets\/\([^"]*\)\.md.*/\1/' | sort -u > /tmp/sdk-snippet-{PREFIX}-names.txt
-
-SNIP_BASE="${DOC_BASE}/api/snippets"
-while IFS= read -r name; do
-  curl -sL "${SNIP_BASE}/${name}.md" -o "/tmp/sdk-snippet-{PREFIX}-${name}.md" &
-done < /tmp/sdk-snippet-{PREFIX}-names.txt
-wait
+# Fetch current EmbedJS docs
+bash <skill-path>/scripts/fetch-docs.sh \
+  --version {VER} --type embedjs --prefix current --outdir /tmp/embedjs-docs
 ```
 
-Then read all fetched `/tmp/sdk-doc-{PREFIX}-*.md` and `/tmp/sdk-snippet-{PREFIX}-*.md` files.
-
-For v0.54+: each doc page has sections headed `#### Props` or `#### Options`. The `{% include_file %}` line indicates which snippet was fetched. The snippet file contains the full prop table between `<!-- [<snippet properties>] -->` and `<!-- [<endsnippet properties>] -->` markers — include this verbatim (no summarizing away props).
-
-For v0.52–v0.53: there are no `api/snippets/` files. Props are documented inline in the markdown pages themselves (look for `## ... props` headings and the tables/lists that follow). Extract these directly.
-
-**For EmbedJS / Modular Embedding versions — map components to doc pages:**
-
-| Used component (from Step 1) | v0.56–v0.57 doc | v0.58+ doc |
-|---|---|---|
-| Any embed component | `embedded-analytics-js.md` (single file) | `components.md` |
-| Auth/JWT config | (same file) | `authentication.md` |
-| Appearance/theme | (same file) | `appearance.md` |
-
-For v0.56–v0.57 there's only one doc page, so always fetch it. For v0.58+, fetch only the relevant pages + always fetch `modular-embedding.md` (overview).
-
-```bash
-# Replace {VER} and {PREFIX} as above
-EMBED_BASE="https://raw.githubusercontent.com/metabase/docs.metabase.github.io/master/_docs/v0.{VER}/embedding"
-
-# v0.56–v0.57: single file
-curl -sL "${EMBED_BASE}/embedded-analytics-js.md" -o /tmp/embedjs-doc-{PREFIX}-main.md
-
-# v0.58+: targeted
-curl -sL "${EMBED_BASE}/modular-embedding.md" -o /tmp/embedjs-doc-{PREFIX}-modular-embedding.md &
-curl -sL "${EMBED_BASE}/components.md"        -o /tmp/embedjs-doc-{PREFIX}-components.md &   # if any components used
-curl -sL "${EMBED_BASE}/appearance.md"        -o /tmp/embedjs-doc-{PREFIX}-appearance.md &   # if theme/appearance used
-curl -sL "${EMBED_BASE}/authentication.md"    -o /tmp/embedjs-doc-{PREFIX}-authentication.md & # if auth used
-wait
-```
-
-Then read all fetched `/tmp/embedjs-doc-{PREFIX}-*.md` files.
+Then read all fetched files from the output directory. The LLM focuses on pages relevant to the Usage Inventory from Step 1 — the script fetches everything available, and the analysis step filters by relevance.
 
 #### What to extract from Phase 2 results
 
@@ -366,45 +244,98 @@ Cross-reference the project's actual usage (Step 1) against the API changes foun
 
 For every prop identified in Step 1, resolve its type in the target d.ts **all the way down to the concrete signature**. Do not stop at type alias names — alias names can stay the same while the underlying type changes, which is a common source of missed breaking changes.
 
-Specifically:
+**Step A — Resolve the prop's own type:**
 1. For each prop used in the project, search the target d.ts for that prop name and note its type.
 2. If the type is a **type alias** (e.g., `MetabaseFetchRequestTokenFn`, `SdkDashboardId`, `SdkCollectionId`), search the target d.ts for that alias's definition and expand it to its concrete type (e.g., `() => Promise<{jwt: string}>`, `number | string`).
 3. Compare the **fully resolved concrete type** against the project's current usage (argument counts, argument types, return types, value types).
 4. A prop can have the same name but a completely different type signature — this is a breaking change. Renaming is not the only kind of breaking change.
 
-Example of what this catches: `fetchRequestToken` kept its name but changed from `(url: string) => Promise<any>` to `() => Promise<{jwt: string}>` — different arity, different return type.
+Example: `fetchRequestToken` kept its name but changed from `(url: string) => Promise<any>` to `() => Promise<{jwt: string}>` — different arity, different return type.
+
+**Step B — Trace callback data flow into project code:**
+
+A callback prop can be "compatible" at the interface level but still break the project. The SDK sends data INTO the project through callback parameters — if the types of that data widened, the project code receiving it may not handle the new variants.
+
+For every callback prop (e.g., `onClick`, `onCreate`, `onNavigate`):
+1. Resolve the types of the callback's **parameters** in the target d.ts — not just the callback signature, but the fields accessed inside. For example, if `onClick` receives `(item) => void`, resolve what `item.id`, `item.model`, etc. are in the target.
+2. In the project code, trace where those fields **flow to**: state setters (`useState<number>`), function arguments, variable assignments, API calls, route parameters.
+3. Check if the project's receiving type is compatible with the target's widened type. For example, if `item.id` widened from `number` to `number | string | "personal" | "root"`, but the project assigns it to `useState<number>`, that's a breaking change — even though the callback signature itself is fine.
+
+This matters because SDK type widenings (especially ID types like `SdkCollectionId`, `SdkDashboardId`, `SdkEntityId`) often add string union members to what was previously a plain `number`. Project code that stores these IDs in `number`-typed state, passes them to APIs expecting `number`, or uses them in arithmetic will break.
 
 For each used symbol, output:
 
 - breaking change (with evidence: diff line or doc section, AND the fully resolved type)
+- downstream data flow impact (where the value ends up in project code and why it's incompatible)
 - exact migration
 - deprecated APIs
 - new relevant features
 
-#### Version-specific auth config changes
+#### Auth config changes
 
-**v0.52–v0.54**: Auth config uses `MetabaseAuthConfigWithProvider` shape. The `fetchRequestToken` prop signature is `(url: string) => Promise<any>`.
+Auth configuration is a common source of breaking changes across Metabase versions — pay special attention to it during cross-referencing. The changelog and docs fetched in Step 2 contain the specifics. Look for: type renames, `fetchRequestToken` signature changes, and new properties like `jwtProviderUri`.
 
-**v0.55–v0.57**: Auth config types renamed to `MetabaseAuthConfigWithJwt` and `MetabaseAuthConfigWithSaml`. The `fetchRequestToken` signature changed to `() => Promise<{jwt: string}>` — this is a **breaking change** (different arity AND different return type). Code using `(url) => fetch(url)...` must be migrated to `() => fetch(YOUR_AUTH_ENDPOINT)...`.
+#### Step 3 output example
 
-**v0.58+**: Added `jwtProviderUri` property on `MetabaseProvider`'s `authConfig`. If the full URL to the application SSO endpoint for Metabase (including host and port) can be determined from existing constants or environment variables, set `jwtProviderUri` using those values — this replaces the need for a manual `fetchRequestToken` function.
+Each breaking change entry should look like this:
+
+```
+### fetchRequestToken (BREAKING — signature change)
+- **Current usage** (v0.54): `fetchRequestToken: (url) => fetch(url).then(r => r.json())`
+  Signature: `(url: string) => Promise<any>`
+- **Target type** (v0.58): `() => Promise<{jwt: string}>`
+  Resolved from: `MetabaseFetchRequestTokenFn` → `() => Promise<{jwt: string}>`
+- **What changed**: arity (1 arg → 0 args), return type (`any` → `{jwt: string}`)
+- **Migration**: Remove the `url` parameter. Hardcode the auth endpoint URL in the callback body.
+  Also consider replacing with `jwtProviderUri` if the endpoint URL is known.
+- **Severity**: 🔴 Breaking — will cause runtime error if not migrated
+
+### CollectionBrowser.onClick (BREAKING — downstream data flow)
+- **Current usage**: `onClick: (item) => setSelectedId(item.id)`
+  where `setSelectedId` is `useState<number | undefined>[1]`
+- **Target type**: callback param `item.id` is `SdkCollectionId`
+  Resolved: `SdkCollectionId` → `number | "personal" | "root" | "tenant" | SdkEntityId`
+- **What changed**: `item.id` widened from `number` to a union including strings.
+  The callback signature `(item) => void` is still compatible, but `item.id` now
+  includes string values that don't fit the project's `useState<number>`.
+- **Data flow**: `item.id` → `setSelectedId()` → `selectedId: number | undefined`
+  The string variants ("personal", "root") would cause a type error at the setter.
+- **Migration**: Widen state type to `useState<SdkCollectionId | undefined>`,
+  or narrow with a runtime guard: `if (typeof item.id === 'number') setSelectedId(item.id)`
+- **Severity**: 🔴 Breaking — type error in state setter
+
+### questionHeight (NON-BREAKING — new optional prop)
+- **Current usage**: not used
+- **Target type** (v0.58): `number | undefined`
+- **What changed**: new optional prop added to `StaticQuestion`
+- **Migration**: none required
+- **Severity**: 🟢 Info — available if needed
+```
 
 ### Step 4: Apply changes
 
-- Update package.json version
-- Update code usage per Step 3
-- Update Metabase instance version in docker files if present
-- Install dependencies (do not delete lockfiles or node_modules — only run the install command)
+- Update package.json version (for the SDK package, or embed script version for EmbedJS)
+- Update code usage per Step 3 — apply all migrations identified. In Claude Code, issue all Edit calls in a single message where possible.
+- Update Metabase instance version in docker files if present (docker-compose.yml, Dockerfile, .env)
+- Install dependencies using the detected package manager (do not delete lockfiles or node_modules — only run the install command)
 
 ### Step 5: Validate typecheck (batch fix)
 
-**For SDK upgrades:**
+**For SDK upgrades (TypeScript projects):**
 
-1. **Run typecheck once** — run the project's typecheck command (e.g., `npm run typecheck` or `tsc --noEmit`).
+1. **Run typecheck once** — run the project's typecheck command (e.g., `npm run typecheck`, `tsc --noEmit`, or the equivalent for the project's build tool).
 2. **Analyze ALL errors at once** — read the full error output and categorize every SDK-related error by root cause (e.g., "removed prop", "changed type signature", "renamed export"). Errors that share a root cause get fixed together.
 3. **Look up expected types** — for each distinct failing symbol, search `node_modules/@metabase/embedding-sdk-react/dist/index.d.ts` to understand the target type. Do all lookups before making any fixes — this prevents back-and-forth between reading and editing.
 4. **Apply ALL fixes in one batch** — fix every error across all files before re-running typecheck. In Claude Code, issue all Edit calls in a single message where possible.
 5. **Verify with one final typecheck run** — re-run the typecheck command. If new errors appear (e.g., a fix introduced a secondary issue), apply another batch and re-run. If errors remain after 3 batch rounds, mark Step 5 ❌ blocked and report which errors could not be resolved.
+
+**For SDK upgrades (plain JavaScript projects):**
+
+- No typechecker available. Instead, manually review each change from Step 4 against the target SDK's API:
+  - Verify function signatures match (argument count, return types)
+  - Verify prop names and values match the target version's expectations
+  - Check for renamed imports or removed exports
+- Mark Step 5 ✅ complete with a note that validation was manual (no TypeScript).
 
 **For EmbedJS / Modular Embedding upgrades:**
 
@@ -415,20 +346,25 @@ For each used symbol, output:
 
 ### Step 6: Output summary
 
-Organize into:
+Organize into these sections:
 
-1. Breaking changes fixed
-2. Deprecations
-3. Notes (notable architecture changes, instance version requirement)
-4. Path used (primary d.ts diff / fallback docs)
+**1. Breaking changes fixed** — list each breaking change with severity and what was done:
+- 🔴 **Breaking** (would cause build/runtime errors): e.g., "Migrated `fetchRequestToken` from 1-arg to 0-arg signature"
+- 🟡 **Deprecation** (works now, will break later): e.g., "`appearance` prop renamed to `theme` — updated"
+
+**2. Deprecation warnings** — APIs that still work but are marked deprecated in the target version. Include the recommended replacement so the user can plan future changes.
+
+**3. New features available** — relevant new APIs or options in the target version that the project could benefit from (e.g., `jwtProviderUri` replacing manual `fetchRequestToken`). Keep brief — just flag them, don't advocate.
+
+**4. Instance requirements** — minimum Metabase instance version needed for the target SDK/EmbedJS version. If the project has docker-compose or similar files, note whether the instance version was also updated.
+
+**5. Technical details** — path used (primary d.ts diff / hybrid / fallback docs), versions upgraded (from → to), package manager used.
 
 ## Retry policy
 
-If any URL fetch or curl fails:
+**URL fetches:**
+- The `fetch-docs.sh` script handles 404 skipping automatically. If you need to fetch manually: 404 on a version-specific page means it doesn't exist for that version — skip silently.
+- For other errors (5xx, timeout, network): retry once immediately. If still failing, mark that step ❌ blocked and stop.
 
-- retry once immediately (same URL)
-- if still failing, mark that step ❌ blocked and stop.
-
-If the `npm pack` command fails for a specific version:
-
-- This likely means the version doesn't exist on npm. Mark as ❌ blocked and inform the user.
+**npm pack:**
+- If `npm pack` fails for a version, the version likely doesn't exist on npm. Mark as ❌ blocked and inform the user.
