@@ -161,8 +161,9 @@ if [[ -n "$SNIPPET_NAMES" ]]; then
     if [[ "$STATUS" == "200" ]]; then
       echo "OK   ${SNIP_FILES[$i]}"
     else
-      echo "SKIP $STATUS ${SNIP_URLS[$i]}"
+      echo "FAIL $STATUS ${SNIP_URLS[$i]}"
       rm -f "${SNIP_FILES[$i]}"
+      FAILED=1
     fi
   done
 fi

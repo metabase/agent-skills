@@ -20,11 +20,11 @@ If you cannot complete a step due to missing info or tool failure, you must:
 Your response should contain these sections in this order:
 
 1. **Upgrade Plan Checklist** (Step 0)
-2. **Parallel Plan (Single Launch)** (Step 0.1)
+2. **Pipeline Plan** (Step 0.1)
 3. **Step 1 Results: Project Scan**
 4. **Step 2 Results: d.ts Diff / Target Docs** (primary or fallback)
-5. **Step 3: Combined Breaking Changes + Migrations**
-6. **Step 4: Applied Code Changes**
+5. **Step 3: Change Catalog**
+6. **Step 4: Per-File Migration** (one subsection per file)
 7. **Step 5: Typecheck Validation**
 8. **Step 6: Final Summary**
 
@@ -34,31 +34,42 @@ Each step section should end with a status line:
 
 ### Step gating rules
 
-Each step depends on the results of previous steps — starting early produces wrong output:
-
-- Step 1 and Step 2 Phase 1 run concurrently (they're independent).
-- Step 2 Phase 2 starts after BOTH Step 1 and Phase 1 are complete (it uses Step 1's usage inventory to target fetching).
-- Do not start Step 3 until Steps 1–2 are ✅ complete (Step 3 cross-references their outputs).
-- Do not start Step 4 until Step 3 is ✅ complete (Step 4 applies the changes Step 3 identified).
-- Do not start Step 5 until Step 4 is ✅ complete.
-- Do not output Step 6 until Step 5 is ✅ complete (or explicitly ❌ blocked).
+- Step 1 and Step 2 Phase 1 run concurrently (independent).
+- Step 2 Phase 2 starts after BOTH Step 1 and Phase 1 complete.
+- Step 3 starts after Steps 1–2 are ✅ complete (builds catalog from Step 2 data + Step 1 inventory).
+- Step 4 starts after Step 3 is ✅ complete. **Per-file migration tasks run in parallel** — each file's analysis + fix is independent.
+- Step 5 starts after ALL Step 4 file tasks are ✅ complete.
+- Step 6 after Step 5 is ✅ complete (or explicitly ❌ blocked).
 
 ### Evidence requirements
 
-- Step 1 evidence: list every matched file path, every import/reference (from `@metabase/embedding-sdk-react` for SDK, or embed script tags/init calls for EmbedJS), every used component/hook/type, every prop/config option used per component, every dot-subcomponent used (e.g., `InteractiveQuestion.FilterBar`), and for callback props — where the callback parameter data flows in the project (e.g., `onClick: (item) => setSelectedId(item.id)` where `setSelectedId` is `useState<number>`).
-- Step 2 evidence (primary path): show the diff output between d.ts files. (fallback path): list each fetched URL for both current and target versions + include raw extracted sections that contain prop tables / type definitions / migration sections from both. Do not summarize away details — Step 3 needs the full text to cross-reference both sides.
-- Step 3 evidence: for each used prop/config option, show the target type (from d.ts for SDK, or from docs for EmbedJS) AND the current usage from the project side-by-side. Example format: `fetchRequestToken: project uses (url: string) => Promise<any>, target type is () => Promise<{jwt: string}> → BREAKING (arity change)`.
-- Step 4 evidence: show the exact diffs applied (or file edits described precisely).
-- Step 5 evidence: show the exact command run (e.g., `npm run typecheck` or `tsc --noEmit`) and summarize errors if any remain.
+- Step 1: list every matched file path, every import/reference, every used component/hook/type, every prop/config option per component, every dot-subcomponent (e.g., `InteractiveQuestion.FilterBar`), and for callback props — where the callback parameter data flows in the project (e.g., `onClick: (item) => setSelectedId(item.id)` where `setSelectedId` is `useState<number>`).
+- Step 2 (primary path): show the diff output between d.ts files. (fallback path): list each fetched URL + include raw extracted sections. Do not summarize away details.
+- Step 3: the structured change catalog — every changed/removed/added symbol with its fully resolved concrete type.
+- Step 4: per file — which catalog entries affect this file, data flow analysis for callbacks, exact diffs applied.
+- Step 5: the exact command run and error summary if any remain.
 
 ## Performance
 
-Step 2 is split into two phases to balance parallelism with precision:
+The workflow is designed as a pipeline that maximizes parallelism:
 
-- **Phase 1 (parallel with Step 1)**: Run `npm pack` for both versions + curl the changelog. These are network calls that don't need project scan results.
-- **Phase 2 (after Step 1 completes)**: Targeted doc/type fetching based on which components the project actually uses. This avoids fetching docs for unused components.
+```
+Step 1 (scan) ──────────────────┐
+                                ├──► Step 3 (change catalog) ──► Step 4 per-file parallel:
+Step 2 Phase 1 (probe) ─┐      │    (fast, version-level)       ├── FileA: analyze + fix
+                         ├──────┘                                ├── FileB: analyze + fix
+Step 2 Phase 2 (fetch) ──┘                                      └── FileC: analyze + fix
+                                                                       │
+                                                                 Step 5 (typecheck) ──► Step 6
+```
 
-In Claude Code, launch Step 1 and Step 2 Phase 1 as parallel tool calls in the same message, or use `run_in_background: true` for one of them.
+- **Steps 1 + 2 Phase 1**: concurrent (independent network + file operations).
+- **Step 2 Phase 2**: after both complete.
+- **Step 3**: fast — just organizes Step 2 data into a structured catalog. No per-file work.
+- **Step 4**: the main parallelization point — each project file is analyzed and fixed independently.
+- **Step 5**: sequential (needs all files done).
+
+In Claude Code, use parallel tool calls or `run_in_background: true` for sub-agents. For Step 4, issue all file edits in a single message or spawn per-file sub-agents.
 
 Do not parse repo branches, commits, PRs, or issues — they're noisy and irrelevant to version diffing.
 
@@ -100,22 +111,24 @@ When the upgrade spans a major structural boundary (e.g., v0.54 → v0.58 crosse
 
 ### Upgrade Plan Checklist (required before any other work)
 
-Create a checklist to track progress through these steps. In Claude Code, use the TaskCreate/TaskUpdate tools to track each step's status:
+Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate tools:
 
 - Step 1: Scan project usage
-- Step 2: Extract d.ts diff or fallback to docs
-- Step 3: Compile breaking changes + migrations
-- Step 4: Apply code changes
-- Step 5: Run typecheck and fix until clean
+- Step 2: Extract d.ts diff or fetch docs
+- Step 3: Build change catalog
+- Step 4: Per-file migrate (one sub-task per file)
+- Step 5: Typecheck and fix
 - Step 6: Final summary
 
-### Parallel Plan (required)
+### Pipeline Plan (required)
 
-State which steps will run in parallel:
+State the execution plan:
 
-- **Concurrent**: Step 1 (project scan) + Step 2 Phase 1 (npm pack both versions + curl changelog)
-- **After both complete**: Step 2 Phase 2 (targeted doc/type fetching based on Step 1 results)
-- **Sequential**: Steps 3 → 4 → 5 → 6
+- **Concurrent**: Step 1 (project scan) + Step 2 Phase 1 (npm pack + changelog)
+- **After both**: Step 2 Phase 2 (fetch docs)
+- **Sequential**: Step 3 (build catalog from Step 2 data)
+- **Parallel**: Step 4 — list each file and note they'll be processed concurrently
+- **Sequential**: Steps 5 → 6
 
 If your agent supports parallel execution or background tasks, plan accordingly. In Claude Code, you can use `run_in_background: true` for sub-agents or issue multiple tool calls in the same message.
 
@@ -233,91 +246,99 @@ After reading all fetched data (d.ts files, docs, changelog), build the API chan
 - **Full docs comparison**: for each component used in the project, compare props/options/types between current and target docs
 - In all cases: identify added, removed, renamed, or type-changed props/options, and note migration instructions from changelog or target docs
 
-### Step 3: Summarize changes (after Steps 1–2 are ✅ complete)
+### Step 3: Build change catalog (after Steps 1–2 are ✅ complete)
 
-Cross-reference the project's actual usage (Step 1) against the API changes found in Step 2:
+This step is fast — it organizes Step 2 data into a structured catalog of ALL API changes between versions. No per-file project analysis here.
 
-- **Primary path** (d.ts diff available): compare each used prop/subcomponent/type from Step 1 against the d.ts diff
-- **Fallback path** (docs comparison): compare each used prop/subcomponent/type from Step 1 against the differences between current-version docs and target-version docs, supplemented by the changelog
+From the d.ts diff, docs comparison, and changelog, extract every change into a catalog:
 
-#### Deep type resolution
+- **Removed** exports/props/types
+- **Renamed** symbols (old name → new name)
+- **Type-changed** props — resolve every type alias to its **concrete type**. Do not stop at alias names — aliases can stay the same while the underlying type changes. For example, `SdkCollectionId` may have been `number` in the current version but `number | "personal" | "root" | "tenant" | SdkEntityId` in the target.
+- **Signature-changed** functions/callbacks (arity, argument types, return types)
+- **Added** props/exports (optional, for informational output)
+- **Deprecated** APIs (with recommended replacements)
+- **Auth config changes** — pay special attention. The changelog and docs contain the specifics. Look for: type renames, `fetchRequestToken` signature changes, and new properties like `jwtProviderUri`.
 
-For every prop identified in Step 1, resolve its type in the target d.ts **all the way down to the concrete signature**. Do not stop at type alias names — alias names can stay the same while the underlying type changes, which is a common source of missed breaking changes.
-
-**Step A — Resolve the prop's own type:**
-1. For each prop used in the project, search the target d.ts for that prop name and note its type.
-2. If the type is a **type alias** (e.g., `MetabaseFetchRequestTokenFn`, `SdkDashboardId`, `SdkCollectionId`), search the target d.ts for that alias's definition and expand it to its concrete type (e.g., `() => Promise<{jwt: string}>`, `number | string`).
-3. Compare the **fully resolved concrete type** against the project's current usage (argument counts, argument types, return types, value types).
-4. A prop can have the same name but a completely different type signature — this is a breaking change. Renaming is not the only kind of breaking change.
-
-Example: `fetchRequestToken` kept its name but changed from `(url: string) => Promise<any>` to `() => Promise<{jwt: string}>` — different arity, different return type.
-
-**Step B — Trace callback data flow into project code:**
-
-A callback prop can be "compatible" at the interface level but still break the project. The SDK sends data INTO the project through callback parameters — if the types of that data widened, the project code receiving it may not handle the new variants.
-
-For every callback prop (e.g., `onClick`, `onCreate`, `onNavigate`):
-1. Resolve the types of the callback's **parameters** in the target d.ts — not just the callback signature, but the fields accessed inside. For example, if `onClick` receives `(item) => void`, resolve what `item.id`, `item.model`, etc. are in the target.
-2. In the project code, trace where those fields **flow to**: state setters (`useState<number>`), function arguments, variable assignments, API calls, route parameters.
-3. Check if the project's receiving type is compatible with the target's widened type. For example, if `item.id` widened from `number` to `number | string | "personal" | "root"`, but the project assigns it to `useState<number>`, that's a breaking change — even though the callback signature itself is fine.
-
-This matters because SDK type widenings (especially ID types like `SdkCollectionId`, `SdkDashboardId`, `SdkEntityId`) often add string union members to what was previously a plain `number`. Project code that stores these IDs in `number`-typed state, passes them to APIs expecting `number`, or uses them in arithmetic will break.
-
-For each used symbol, output:
-
-- breaking change (with evidence: diff line or doc section, AND the fully resolved type)
-- downstream data flow impact (where the value ends up in project code and why it's incompatible)
-- exact migration
-- deprecated APIs
-- new relevant features
-
-#### Auth config changes
-
-Auth configuration is a common source of breaking changes across Metabase versions — pay special attention to it during cross-referencing. The changelog and docs fetched in Step 2 contain the specifics. Look for: type renames, `fetchRequestToken` signature changes, and new properties like `jwtProviderUri`.
-
-#### Step 3 output example
-
-Each breaking change entry should look like this:
+#### Catalog format
 
 ```
-### fetchRequestToken (BREAKING — signature change)
-- **Current usage** (v0.54): `fetchRequestToken: (url) => fetch(url).then(r => r.json())`
-  Signature: `(url: string) => Promise<any>`
-- **Target type** (v0.58): `() => Promise<{jwt: string}>`
-  Resolved from: `MetabaseFetchRequestTokenFn` → `() => Promise<{jwt: string}>`
-- **What changed**: arity (1 arg → 0 args), return type (`any` → `{jwt: string}`)
-- **Migration**: Remove the `url` parameter. Hardcode the auth endpoint URL in the callback body.
-  Also consider replacing with `jwtProviderUri` if the endpoint URL is known.
-- **Severity**: 🔴 Breaking — will cause runtime error if not migrated
+## Change Catalog (v0.54 → v0.58)
 
-### CollectionBrowser.onClick (BREAKING — downstream data flow)
-- **Current usage**: `onClick: (item) => setSelectedId(item.id)`
-  where `setSelectedId` is `useState<number | undefined>[1]`
-- **Target type**: callback param `item.id` is `SdkCollectionId`
-  Resolved: `SdkCollectionId` → `number | "personal" | "root" | "tenant" | SdkEntityId`
-- **What changed**: `item.id` widened from `number` to a union including strings.
-  The callback signature `(item) => void` is still compatible, but `item.id` now
-  includes string values that don't fit the project's `useState<number>`.
-- **Data flow**: `item.id` → `setSelectedId()` → `selectedId: number | undefined`
-  The string variants ("personal", "root") would cause a type error at the setter.
-- **Migration**: Widen state type to `useState<SdkCollectionId | undefined>`,
-  or narrow with a runtime guard: `if (typeof item.id === 'number') setSelectedId(item.id)`
-- **Severity**: 🔴 Breaking — type error in state setter
+### fetchRequestToken
+- Change: signature changed
+- Old: `(url: string) => Promise<any>`
+- New: `() => Promise<{jwt: string}>` (resolved from `MetabaseFetchRequestTokenFn`)
+- Severity: 🔴 Breaking
 
-### questionHeight (NON-BREAKING — new optional prop)
-- **Current usage**: not used
-- **Target type** (v0.58): `number | undefined`
-- **What changed**: new optional prop added to `StaticQuestion`
-- **Migration**: none required
-- **Severity**: 🟢 Info — available if needed
+### SdkCollectionId (type widening)
+- Change: type widened
+- Old: `number`
+- New: `number | "personal" | "root" | "tenant" | SdkEntityId`
+- Affects: any prop/callback param typed as `SdkCollectionId`, including `item.id` in CollectionBrowser callbacks
+- Severity: 🔴 Breaking for code storing in `number`-typed variables
+
+### SdkDashboardId (type widening)
+- Change: type widened
+- Old: `number`
+- New: `number | string | SdkEntityId`
+- Affects: any prop/callback param typed as `SdkDashboardId`
+- Severity: 🔴 Breaking for code storing in `number`-typed variables
+
+### jwtProviderUri
+- Change: new property added to `MetabaseProvider` authConfig
+- Severity: 🟢 Info — can replace manual `fetchRequestToken`
+
+### questionHeight
+- Change: new optional prop on `StaticQuestion`
+- Severity: 🟢 Info
 ```
 
-### Step 4: Apply changes
+The catalog is the input for Step 4. It must include fully resolved concrete types — Step 4 sub-agents need them to assess compatibility without re-reading the d.ts.
 
-- Update package.json version (for the SDK package, or embed script version for EmbedJS)
-- Update code usage per Step 3 — apply all migrations identified. In Claude Code, issue all Edit calls in a single message where possible.
-- Update Metabase instance version in docker files if present (docker-compose.yml, Dockerfile, .env)
-- Install dependencies using the detected package manager (do not delete lockfiles or node_modules — only run the install command)
+### Step 4: Per-file migrate (parallel)
+
+Each project file is analyzed and fixed independently against the change catalog. This is the main parallelization point.
+
+**Before per-file work:** update package.json version and install dependencies. Also update Metabase instance version in docker files if present (docker-compose.yml, Dockerfile, .env). These are done once, not per-file.
+
+**Per-file task** (run in parallel for each file from the Usage Inventory):
+
+For each file, a single pass that combines analysis + fix:
+
+1. **Match catalog entries** — which changes from the catalog affect this file's usage?
+2. **Deep analysis** — for each affected prop:
+   - Compare the file's current usage against the catalog's target type
+   - For callback props: trace where callback parameter fields flow in THIS file (state setters, variables, API calls, route params). Check if the receiving type is compatible with the target's potentially widened type. For example, if `onClick: (item) => setSelectedId(item.id)` and the catalog says `item.id` widened from `number` to `SdkCollectionId`, and `setSelectedId` is `useState<number>`, flag it as breaking.
+3. **Apply fixes** — edit the file to migrate all breaking changes identified above.
+4. **Report** — output what was found and changed for this file.
+
+**Parallelization strategy** — choose based on the number of files in the Usage Inventory:
+
+- **< 15 files**: process all files in a single agent. Analyze each file against the catalog sequentially, then issue all Edit calls in one message. Sub-agent overhead is not worth it for small projects.
+- **15+ files**: spawn per-file sub-agents with `run_in_background: true`. Each sub-agent receives: the file path, the file's Usage Inventory entry, and the full change catalog.
+
+#### Per-file output example
+
+```
+## src/components/CollectionPage.tsx
+
+### Catalog matches:
+- SdkCollectionId type widening → affects `onClick` callback
+- (no other catalog entries match this file)
+
+### Analysis:
+- `onClick: (item) => setSelectedId(item.id)`
+  - `item.id` is now `SdkCollectionId` (number | "personal" | "root" | "tenant" | SdkEntityId)
+  - `setSelectedId` is `useState<number | undefined>[1]`
+  - 🔴 BREAKING: string variants won't fit `number` state
+
+### Fix applied:
+- Widened state: `useState<number | undefined>` → `useState<SdkCollectionId | undefined>`
+- Added import: `import type { SdkCollectionId } from '@metabase/embedding-sdk-react'`
+
+Status: ✅ complete
+```
 
 ### Step 5: Validate typecheck (batch fix)
 
