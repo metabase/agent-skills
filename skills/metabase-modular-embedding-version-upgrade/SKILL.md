@@ -1,6 +1,6 @@
 ---
 name: metabase-modular-embedding-version-upgrade
-description: Helps to provide info about breaking changes between different Metabase versions. Use when the user wants to upgrade a Metabase Embedding SDK or Metabase EmbedJS/Modular Embedding version.
+description: Upgrades a project's Metabase modular embedding SDK (@metabase/embedding-sdk-react) or EmbedJS/Modular embedding version. Use when the user wants to upgrade their Metabase modular embedding integration to a newer version.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
@@ -35,7 +35,7 @@ Each step section should end with a status line:
 ### Step gating rules
 
 - Step 1 and Step 2 Phase 1 run concurrently (independent).
-- Step 2 Phase 2 starts after BOTH Step 1 and Phase 1 complete.
+- Step 2 Phase 2 starts after BOTH Step 1 and Step 2 Phase 1 complete.
 - Step 3 starts after Steps 1–2 are ✅ complete (builds catalog from Step 2 data + Step 1 inventory).
 - Step 4 starts after Step 3 is ✅ complete. **Per-file migration tasks run in parallel** — each file's analysis + fix is independent.
 - Step 5 starts after ALL Step 4 file tasks are ✅ complete.
@@ -54,13 +54,13 @@ Each step section should end with a status line:
 The workflow is designed as a pipeline that maximizes parallelism:
 
 ```
-Step 1 (scan) ──────────────────┐
-                                ├──► Step 3 (change catalog) ──► Step 4 per-file parallel:
-Step 2 Phase 1 (probe) ─┐      │    (fast, version-level)       ├── FileA: analyze + fix
-                         ├──────┘                                ├── FileB: analyze + fix
-Step 2 Phase 2 (fetch) ──┘                                      └── FileC: analyze + fix
-                                                                       │
-                                                                 Step 5 (typecheck) ──► Step 6
+Step 1 (scan) ──────────┐
+                         ├──► Step 2 Phase 2 (fetch) ──► Step 3 (catalog) ──► Step 4 per-file:
+Step 2 Phase 1 (probe) ──┘                                                    ├── FileA: analyze + fix
+                                                                              ├── FileB: analyze + fix
+                                                                              └── FileC: analyze + fix
+                                                                                    │
+                                                                              Step 5 (typecheck) ──► Step 6
 ```
 
 - **Steps 1 + 2 Phase 1**: concurrent (independent network + file operations).
@@ -100,7 +100,7 @@ Other constraints:
 
 If package not present OR user is upgrading EmbedJS/Modular Embedding:
 
-- Ask the user for the current Metabase instance version and current EmbedJS/Modular Embedding version. In Claude Code, use the AskUserQuestion tool for this.
+- Ask the user for the current and target Metabase instance versions. EmbedJS/Modular Embedding is served from the Metabase instance, so its version matches the instance version. In Claude Code, use the AskUserQuestion tool for this.
 - Mark Step 0 ❌ blocked until answered.
 
 ### Multi-version hops
@@ -172,7 +172,7 @@ Keep scan results in the main context (not delegated to a sub-agent) — Step 3 
 
 ### Step 2: Extract API changes
 
-Step 2 has two phases. Phase 1 runs concurrently with Step 1. Phase 2 runs after Step 1 completes.
+Step 2 has two phases. Phase 1 runs concurrently with Step 1. Phase 2 runs after Step 1 and Step 2 Phase 1 complete.
 
 #### Phase 1: Probe (concurrent with Step 1)
 
@@ -316,7 +316,7 @@ For each file, a single pass that combines analysis + fix:
 **Parallelization strategy** — choose based on the number of files in the Usage Inventory:
 
 - **< 15 files**: process all files in a single agent. Analyze each file against the catalog sequentially, then issue all Edit calls in one message. Sub-agent overhead is not worth it for small projects.
-- **15+ files**: spawn per-file sub-agents with `run_in_background: true`. Each sub-agent receives: the file path, the file's Usage Inventory entry, and the full change catalog.
+- **15+ files**: split files evenly among 3–4 sub-agents. Each sub-agent receives its batch of file paths, their Usage Inventory entries, and the full change catalog. In Claude Code, launch them with `run_in_background: true`.
 
 #### Per-file output example
 
