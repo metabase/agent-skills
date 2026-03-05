@@ -89,10 +89,23 @@ echo "SDK_TMPDIR=$SDK_TMPDIR"
 echo "CHANGELOG=$SDK_TMPDIR/changelog.md"
 echo "DOCS_DIR=$DOCS_DIR"
 
-# Print d.ts paths if available
-if [[ "$CURRENT_DTS" == "yes" ]]; then
+# If both d.ts exist, auto-diff them (saves reading 4k lines of raw d.ts)
+if [[ "$CURRENT_DTS" == "yes" && "$TARGET_DTS" == "yes" ]]; then
+  DIFF_PATH="$SDK_TMPDIR/dts-diff.txt"
+  diff -u \
+    "$SDK_TMPDIR/current/package/dist/index.d.ts" \
+    "$SDK_TMPDIR/target/package/dist/index.d.ts" \
+    > "$DIFF_PATH" || true  # diff exits 1 when files differ
+  DIFF_LINES=$(wc -l < "$DIFF_PATH" | tr -d ' ')
+  echo "DTS_DIFF_PATH=$DIFF_PATH"
+  echo "DTS_DIFF_LINES=$DIFF_LINES"
+fi
+
+# Print d.ts paths only for hybrid mode (one side needs raw d.ts)
+if [[ "$CURRENT_DTS" == "yes" && "$TARGET_DTS" == "no" ]]; then
   echo "CURRENT_DTS_PATH=$SDK_TMPDIR/current/package/dist/index.d.ts"
 fi
-if [[ "$TARGET_DTS" == "yes" ]]; then
+
+if [[ "$TARGET_DTS" == "yes" && "$CURRENT_DTS" == "no" ]]; then
   echo "TARGET_DTS_PATH=$SDK_TMPDIR/target/package/dist/index.d.ts"
 fi

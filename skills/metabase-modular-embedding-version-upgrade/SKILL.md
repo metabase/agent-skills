@@ -33,10 +33,9 @@ Each step section should end with a status line:
 
 ### Step gating rules
 
-- Step 1 and Step 2 Phase 1 run concurrently (independent).
-- Step 2 Phase 2 starts after BOTH Step 1 and Step 2 Phase 1 complete.
-- Step 3 starts after Steps 1–2 are ✅ complete (builds catalog from Step 2 data + Step 1 inventory).
-- Step 4 starts after Step 3 is ✅ complete. **Per-file migration tasks run in parallel** — each file's analysis + fix is independent.
+- Steps 1+2 complete in 3 tool-call rounds (see round budget).
+- Step 3 is produced inline after Round 3 — no separate tool calls, no separate phase.
+- Step 4 starts after Step 3 is ✅ complete. All files run in parallel via sub-agents.
 - Step 5 starts after ALL Step 4 file tasks are ✅ complete.
 - Step 6 after Step 5 is ✅ complete (or explicitly ❌ blocked).
 
@@ -53,19 +52,19 @@ Each step section should end with a status line:
 The workflow is designed as a pipeline that maximizes parallelism:
 
 ```
-Step 1 (scan) ──────────┐
-                         ├──► Step 2 Phase 2 (fetch) ──► Step 3 (catalog) ──► Step 4 per-file:
-Step 2 Phase 1 (probe) ──┘                                                    ├── FileA: analyze + fix
-                                                                              ├── FileB: analyze + fix
-                                                                              └── FileC: analyze + fix
-                                                                                    │
-                                                                              Step 5 (typecheck) ──► Step 6
+Round 1 (grep+glob+pkg) ──► Round 2 (prepare.sh) ──► Round 3 (read-sources.sh) ──► Step 3 (catalog, inline)
+                                                                                          │
+                                                                                    Step 4 per-file (sub-agents):
+                                                                                     ├── FileA: analyze + fix
+                                                                                     ├── FileB: analyze + fix
+                                                                                     └── FileC: analyze + fix
+                                                                                           │
+                                                                                     Step 5 (typecheck) ──► Step 6
 ```
 
-- **Steps 1 + 2 Phase 1**: concurrent (independent network + file operations).
-- **Step 2 Phase 2**: after both complete.
-- **Step 3**: fast — zero tool calls. Works entirely from Step 2 data already in context. Just organizes it into a structured catalog.
-- **Step 4**: the main parallelization point — each project file is analyzed and fixed independently.
+- **Rounds 1–3**: complete Steps 1+2 data gathering in 3 tool-call rounds (~90s).
+- **Step 3**: produced inline immediately after Round 3 — zero tool calls, zero separate thinking phase.
+- **Step 4**: all files in parallel via sub-agents.
 - **Step 5**: sequential (needs all files done).
 
 In Claude Code, use parallel tool calls or `run_in_background: true` for sub-agents. For Step 4, issue all file edits in a single message or spawn per-file sub-agents.
@@ -90,21 +89,23 @@ bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET}
 # or for EmbedJS:
 bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
 ```
-This single script does everything: npm pack both versions, check d.ts, fetch+truncate changelog, and fetch docs for versions without d.ts. It outputs `SDK_TMPDIR`, `CHANGELOG`, `DOCS_DIR`, d.ts availability, and d.ts file paths.
+This single script does everything: npm pack both versions, check d.ts, fetch+truncate changelog, and fetch docs for versions without d.ts. It outputs `SDK_TMPDIR` and d.ts/doc availability.
 
 **No other tool calls in this message.** Bash calls get cancelled if a parallel Read errors.
 
-**Round 3** — read files (all concurrent, single message):
-After Round 2, you know all file paths. Read in one batch:
-- **Only** the files that grep returned in Round 1 (files with SDK imports). Do not read other project files.
-- Store/state files if their paths are visible from imports in the grep output
-- d.ts file in **fixed batches of 1000 lines**: (1–1000), (1001–2000), (2001–3000). Extra batches return less data if file is shorter.
-- **Only relevant doc files** — match doc filenames to components in your Usage Inventory: `authentication.md`/`config.md` for auth, `questions.md` for InteractiveQuestion/StaticQuestion, `dashboards.md` for dashboards, `collections.md` for CollectionBrowser. Skip quickstart, introduction, next-js, plugins, version, appearance docs.
-- Changelog (already truncated to 1000 lines by prepare.sh — safe to read without limit)
+**Round 3** — `read-sources.sh` (single Bash call — reads ALL files at once):
+```bash
+bash <skill-path>/scripts/read-sources.sh {SDK_TMPDIR} <file1> <file2> ...
+```
+Pass the `SDK_TMPDIR` from Round 2 and ALL project file paths from Round 1's grep results. The script `cat`s everything to stdout in one call:
+- All project files (from grep)
+- d.ts diff (or raw d.ts for hybrid mode)
+- Doc files from DOCS_DIR
+- Changelog
 
-**Max 20 Read calls per message.** If you have more, split into two messages of ~15 each — too many parallel reads get cancelled.
+**Zero Read calls needed.** Everything comes through one Bash call — no parallel read cancellations.
 
-After Round 3, immediately output Step 1 Results + Step 2 Results + Step 3 catalog with zero additional tool calls.
+After Round 3, immediately output Step 1 Results + Step 2 Results + Step 3 Change Catalog with zero additional tool calls. Do not treat Step 3 as a separate thinking phase — produce it inline right after the data is loaded.
 
 ## Scope
 
@@ -170,10 +171,10 @@ Keep scan results in the main context (not delegated to a sub-agent) — Step 3 
 
 **For SDK upgrades (`@metabase/embedding-sdk-react`):**
 
-Step 1 is a two-phase process: search first (Round 1), then read only matched files (Round 2).
+Step 1 search happens in Round 1; file reading happens in Round 3 via `read-sources.sh`.
 
-- **Round 1 — search**: grep for all imports from `@metabase/embedding-sdk-react`. This returns a list of file paths. Also detect the package manager (glob for lock files). Do not read any files yet — just discover which files to read.
-- **Round 2 — read**: read only the files that the grep matched. In Claude Code, read them in parallel in a single message.
+- **Round 1 — search**: grep for all imports from `@metabase/embedding-sdk-react`. This returns a list of file paths. Also detect the package manager (glob for lock files). Do not read any files yet.
+- **Round 3 — read**: `read-sources.sh` reads all matched project files (passed as args) + SDK data in one Bash call.
 - Extract:
   - imports, components, hooks, types, helpers
   - every prop used per component
@@ -206,30 +207,24 @@ bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
 ```
 
 The script outputs:
-- `SDK_TMPDIR` — temp directory with both SDK packages
-- `CHANGELOG` — path to changelog (truncated to 1000 lines, safe to read)
-- `DOCS_DIR` — directory with fetched doc files
-- `current_dts=yes/no`, `target_dts=yes/no` — d.ts availability
-- `CURRENT_DTS_PATH` / `TARGET_DTS_PATH` — d.ts file paths (if available)
+- `SDK_TMPDIR` — temp directory with both SDK packages (pass this to `read-sources.sh` in Round 3)
+- `current_dts=yes/no`, `target_dts=yes/no` — d.ts availability (for informational output)
+- `DTS_DIFF_PATH` — d.ts diff file (if both versions have d.ts)
+- `CURRENT_DTS_PATH` / `TARGET_DTS_PATH` — raw d.ts paths (hybrid mode only)
 
-#### What to read in Round 3
+You don't need to read these files manually — `read-sources.sh` handles it.
 
-Based on prepare.sh output, read the relevant files:
+#### What Round 3 reads (handled by `read-sources.sh`)
 
-**d.ts strategy:**
+The `read-sources.sh` script automatically reads the right files based on what `prepare.sh` produced:
 
-| Current d.ts | Target d.ts | What to read |
-|---|---|---|
-| ✅ | ✅ | Both d.ts files (for diffing). Or run `diff -u` in a Bash call. |
-| ✅ | ❌ | Current d.ts + target doc files from DOCS_DIR |
-| ❌ | ✅ | Target d.ts + current doc files from DOCS_DIR |
-| ❌ | ❌ | Doc files from DOCS_DIR for both versions |
+- **d.ts diff** (if both versions have d.ts) — compact ~200-500 line unified diff
+- **Raw d.ts** (hybrid mode) — the one version that has d.ts
+- **Doc files** from DOCS_DIR (for versions without d.ts)
+- **Changelog** (already truncated to 1000 lines)
+- **All project files** passed as arguments
 
-**d.ts files**: read in fixed batches of 1000 lines: (1–1000), (1001–2000), (2001–3000). Extra batches return less data if file is shorter. Do not grep incrementally — load the full file so Step 3 can resolve all types from context.
-
-**Doc files**: only read docs relevant to the Usage Inventory — `authentication.md`/`config.md` for auth, `questions.md` for question components, `dashboards.md` for dashboard components, `collections.md` for CollectionBrowser. Skip quickstart, introduction, next-js, plugins, version, appearance docs.
-
-**Changelog**: already truncated by prepare.sh — safe to read without a limit.
+You do NOT need to make any Read calls — `read-sources.sh` outputs everything to stdout.
 
 #### Collect raw data only
 
@@ -237,15 +232,17 @@ Do not analyze, resolve types, or build change summaries during Step 2. Just loa
 
 ### Step 3: Build change catalog (after Steps 1–2 are ✅ complete)
 
-This step is fast — it works entirely from data already loaded in context from Step 2. Do not read any additional files or run any searches. The d.ts content, docs, and changelog are already in your context from Step 2 — just organize them.
+This step is NOT a separate thinking phase — produce it immediately after Round 3 reads, with zero additional tool calls. The d.ts diff, docs, and changelog are already in context.
 
-From the d.ts diff, docs comparison, and changelog, extract every change into a catalog:
+**Scope: only catalog changes that affect symbols from the Usage Inventory** (Step 1). If the project uses `MetabaseProvider`, `InteractiveQuestion`, and `CollectionBrowser`, only catalog changes to those components and their props/types/callbacks. Skip changes to components the project doesn't use.
+
+From the d.ts diff, docs comparison, and changelog, extract changes into a catalog:
 
 - **Removed** exports/props/types
 - **Renamed** symbols (old name → new name)
 - **Type-changed** props — resolve every type alias to its **concrete type**. Do not stop at alias names — aliases can stay the same while the underlying type changes. For example, `SdkCollectionId` may have been `number` in the current version but `number | "personal" | "root" | "tenant" | SdkEntityId` in the target.
 - **Signature-changed** functions/callbacks (arity, argument types, return types)
-- **Added** props/exports (optional, for informational output)
+- **Added** props/exports (only for components in the Usage Inventory, for informational output)
 - **Deprecated** APIs (with recommended replacements)
 - **Auth config changes** — pay special attention. The changelog and docs contain the specifics. Look for: type renames, `fetchRequestToken` signature changes, and new properties like `jwtProviderUri`.
 
@@ -302,10 +299,11 @@ For each file, a single pass that combines analysis + fix:
 3. **Apply fixes** — edit the file to migrate all breaking changes identified above.
 4. **Report** — output what was found and changed for this file.
 
-**Parallelization strategy** — choose based on the number of files in the Usage Inventory:
+**Parallelization strategy** — always use sub-agents:
 
-- **< 15 files**: process all files in a single agent. Analyze each file against the catalog sequentially, then issue all Edit calls in one message. Sub-agent overhead is not worth it for small projects.
-- **15+ files**: split files evenly among 3–4 sub-agents. Each sub-agent receives its batch of file paths, their Usage Inventory entries, and the full change catalog. In Claude Code, launch them with `run_in_background: true`.
+- Launch one sub-agent per file (or batch 2-3 files per agent if >10 files). Each sub-agent receives its file path(s), the relevant Usage Inventory entries, and the full change catalog.
+- In Claude Code, launch all sub-agents with `run_in_background: true` in a single message — they run concurrently.
+- Each sub-agent reads its file, applies the catalog, and reports what changed. The main agent collects results.
 
 #### Per-file output example
 
