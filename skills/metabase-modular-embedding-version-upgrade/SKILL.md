@@ -20,8 +20,7 @@ If you cannot complete a step due to missing info or tool failure, you must:
 Your response should contain these sections in this order:
 
 1. **Upgrade Plan Checklist** (Step 0)
-2. **Pipeline Plan** (Step 0.1)
-3. **Step 1 Results: Project Scan**
+2. **Step 1 Results: Project Scan**
 4. **Step 2 Results: d.ts Diff / Target Docs** (primary or fallback)
 5. **Step 3: Change Catalog**
 6. **Step 4: Per-File Migration** (one subsection per file)
@@ -44,7 +43,7 @@ Each step section should end with a status line:
 ### Evidence requirements
 
 - Step 1: list every matched file path, every import/reference, every used component/hook/type, every prop/config option per component, every dot-subcomponent (e.g., `InteractiveQuestion.FilterBar`), and for callback props — where the callback parameter data flows in the project (e.g., `onClick: (item) => setSelectedId(item.id)` where `setSelectedId` is `useState<number>`).
-- Step 2 (primary path): show the diff output between d.ts files. (fallback path): list each fetched URL + include raw extracted sections. Do not summarize away details.
+- Step 2 (primary path): show the diff output between d.ts files. (hybrid/fallback path): list each fetched URL + confirm files are loaded in context. Do not analyze or resolve types here — that's Step 3's job.
 - Step 3: the structured change catalog — every changed/removed/added symbol with its fully resolved concrete type.
 - Step 4: per file — which catalog entries affect this file, data flow analysis for callbacks, exact diffs applied.
 - Step 5: the exact command run and error summary if any remain.
@@ -65,13 +64,47 @@ Step 2 Phase 1 (probe) ──┘                                                
 
 - **Steps 1 + 2 Phase 1**: concurrent (independent network + file operations).
 - **Step 2 Phase 2**: after both complete.
-- **Step 3**: fast — just organizes Step 2 data into a structured catalog. No per-file work.
+- **Step 3**: fast — zero tool calls. Works entirely from Step 2 data already in context. Just organizes it into a structured catalog.
 - **Step 4**: the main parallelization point — each project file is analyzed and fixed independently.
 - **Step 5**: sequential (needs all files done).
 
 In Claude Code, use parallel tool calls or `run_in_background: true` for sub-agents. For Step 4, issue all file edits in a single message or spawn per-file sub-agents.
 
 Do not parse repo branches, commits, PRs, or issues — they're noisy and irrelevant to version diffing.
+
+### Tool-call round budget for Steps 1+2
+
+Steps 1+2 must complete in **3 tool-call rounds**. Every extra round adds ~30s of latency.
+
+**Round 1** — discovery (all concurrent, single message):
+- Grep for `@metabase/embedding-sdk-react` imports (returns file paths — do not read files yet)
+- Glob for lock files (`yarn.lock`, `pnpm-lock.yaml`, `package-lock.json`)
+- Read `package.json` (for current version)
+- `npm view @metabase/embedding-sdk-react version` (if target not specified by user)
+
+All four tool calls in ONE message.
+
+**Round 2** — `prepare.sh` ALONE (single Bash call, nothing else):
+```bash
+bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET}
+# or for EmbedJS:
+bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
+```
+This single script does everything: npm pack both versions, check d.ts, fetch+truncate changelog, and fetch docs for versions without d.ts. It outputs `SDK_TMPDIR`, `CHANGELOG`, `DOCS_DIR`, d.ts availability, and d.ts file paths.
+
+**No other tool calls in this message.** Bash calls get cancelled if a parallel Read errors.
+
+**Round 3** — read files (all concurrent, single message):
+After Round 2, you know all file paths. Read in one batch:
+- **Only** the files that grep returned in Round 1 (files with SDK imports). Do not read other project files.
+- Store/state files if their paths are visible from imports in the grep output
+- d.ts file in **fixed batches of 1000 lines**: (1–1000), (1001–2000), (2001–3000). Extra batches return less data if file is shorter.
+- **Only relevant doc files** — match doc filenames to components in your Usage Inventory: `authentication.md`/`config.md` for auth, `questions.md` for InteractiveQuestion/StaticQuestion, `dashboards.md` for dashboards, `collections.md` for CollectionBrowser. Skip quickstart, introduction, next-js, plugins, version, appearance docs.
+- Changelog (already truncated to 1000 lines by prepare.sh — safe to read without limit)
+
+**Max 20 Read calls per message.** If you have more, split into two messages of ~15 each — too many parallel reads get cancelled.
+
+After Round 3, immediately output Step 1 Results + Step 2 Results + Step 3 catalog with zero additional tool calls.
 
 ## Scope
 
@@ -92,10 +125,12 @@ Other constraints:
 
 ## Detecting versions
 
+Do all version detection in Round 1 (see tool-call round budget) — not as a separate pre-step.
+
 - Current version: read from the project's `package.json` (check `dependencies` and `devDependencies`) for `@metabase/embedding-sdk-react`. In monorepos, also check workspace-level `package.json` files.
 - Target version:
   - If user specifies, use it.
-  - Otherwise run `npm view @metabase/embedding-sdk-react version` in the terminal to get the latest.
+  - Otherwise run `npm view @metabase/embedding-sdk-react version` — include this in Round 1's concurrent tool calls.
 - Package manager: detect from lock files — `yarn.lock` → yarn, `pnpm-lock.yaml` → pnpm, `package-lock.json` → npm. Use the matching install command in Step 4 (e.g., `yarn install`, `pnpm install`).
 
 If package not present OR user is upgrading EmbedJS/Modular Embedding:
@@ -120,18 +155,6 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 - Step 5: Typecheck and fix
 - Step 6: Final summary
 
-### Pipeline Plan (required)
-
-State the execution plan:
-
-- **Concurrent**: Step 1 (project scan) + Step 2 Phase 1 (npm pack + changelog)
-- **After both**: Step 2 Phase 2 (fetch docs)
-- **Sequential**: Step 3 (build catalog from Step 2 data)
-- **Parallel**: Step 4 — list each file and note they'll be processed concurrently
-- **Sequential**: Steps 5 → 6
-
-If your agent supports parallel execution or background tasks, plan accordingly. In Claude Code, you can use `run_in_background: true` for sub-agents or issue multiple tool calls in the same message.
-
 ### Path Selection
 
 Determine which path to use:
@@ -147,13 +170,15 @@ Keep scan results in the main context (not delegated to a sub-agent) — Step 3 
 
 **For SDK upgrades (`@metabase/embedding-sdk-react`):**
 
-- Search the codebase for all imports from `@metabase/embedding-sdk-react`. In Claude Code, use the Grep tool; in other agents, use your codebase search or `grep -r`.
-- Read all matching files. In Claude Code, read them in parallel in a single message for speed.
+Step 1 is a two-phase process: search first (Round 1), then read only matched files (Round 2).
+
+- **Round 1 — search**: grep for all imports from `@metabase/embedding-sdk-react`. This returns a list of file paths. Also detect the package manager (glob for lock files). Do not read any files yet — just discover which files to read.
+- **Round 2 — read**: read only the files that the grep matched. In Claude Code, read them in parallel in a single message.
 - Extract:
   - imports, components, hooks, types, helpers
   - every prop used per component
   - every dot-subcomponent used
-  - for callback props (`onClick`, `onCreate`, `onNavigate`, etc.): what fields are accessed from the callback parameter and where those values flow in the project (state setters, variables, API calls, route params). This is critical — Step 3 needs this to catch data-flow breaking changes.
+  - for callback props (`onClick`, `onCreate`, `onNavigate`, etc.): what fields are accessed from the callback parameter and where those values flow in the project (state setters, variables, API calls, route params). **Fully resolve the receiving type** — if `onClick: (item) => setQuestionId(item.id)`, follow `setQuestionId` to its definition (e.g., a Jotai atom, useState, Zustand store) and record the concrete type (e.g., `atom<number | undefined>`). Read the store/state files during this step — do not leave type resolution for later. All project-level reading and searching must finish in Step 1.
 - Output a structured "Usage Inventory".
 
 **For EmbedJS / Modular Embedding upgrades:**
@@ -172,83 +197,47 @@ Keep scan results in the main context (not delegated to a sub-agent) — Step 3 
 
 ### Step 2: Extract API changes
 
-Step 2 has two phases. Phase 1 runs concurrently with Step 1. Phase 2 runs after Step 1 and Step 2 Phase 1 complete.
-
-#### Phase 1: Probe (concurrent with Step 1)
-
-Launch these in parallel with Step 1 — they're all network calls that don't need project scan results.
-
-**For SDK upgrades** — run the probe script to download both versions, fetch the changelog, and check d.ts availability:
+Run `prepare.sh` in Round 2 (see tool-call budget). This single script handles everything: npm pack, d.ts check, changelog fetch+truncate, and doc fetching for versions without d.ts.
 
 ```bash
-bash <skill-path>/scripts/probe-versions.sh {CURRENT} {TARGET}
+bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET}
+# or for EmbedJS:
+bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
 ```
 
-This outputs `SDK_TMPDIR`, `CHANGELOG`, and d.ts availability (`current_dts=yes/no`, `target_dts=yes/no`). Record the d.ts availability — it determines Phase 2's strategy.
+The script outputs:
+- `SDK_TMPDIR` — temp directory with both SDK packages
+- `CHANGELOG` — path to changelog (truncated to 1000 lines, safe to read)
+- `DOCS_DIR` — directory with fetched doc files
+- `current_dts=yes/no`, `target_dts=yes/no` — d.ts availability
+- `CURRENT_DTS_PATH` / `TARGET_DTS_PATH` — d.ts file paths (if available)
 
-If the script isn't available, the equivalent steps are: `npm pack` both versions into a temp directory, `tar xzf` each, `curl` the changelog, and check for `package/dist/index.d.ts` in each.
+#### What to read in Round 3
 
-**For EmbedJS / Modular Embedding upgrades** — no npm pack, just fetch the changelog:
+Based on prepare.sh output, read the relevant files:
 
-```bash
-curl -sL "https://raw.githubusercontent.com/metabase/metabase/master/enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md" -o /tmp/sdk-changelog.md
-```
+**d.ts strategy:**
 
-#### Phase 2: Targeted fetch (after Step 1 + Phase 1 complete)
-
-Now you have the project's Usage Inventory from Step 1 (which components/props are actually used) and the d.ts availability from Phase 1. Use both to minimize work.
-
-**Determine the strategy based on d.ts availability:**
-
-| Current d.ts | Target d.ts | Strategy |
+| Current d.ts | Target d.ts | What to read |
 |---|---|---|
-| ✅ | ✅ | **Full d.ts diff** — diff both files, read changelog for migration instructions. Fastest path. |
-| ✅ | ❌ | **Hybrid** — read current d.ts for type info, fetch target docs (targeted). |
-| ❌ | ✅ | **Hybrid** — fetch current docs (targeted), read target d.ts for type info. |
-| ❌ | ❌ | **Full docs comparison** — fetch docs for both versions (targeted). |
-| EmbedJS | EmbedJS | **Full docs comparison** — always fetch docs for both versions (targeted). |
+| ✅ | ✅ | Both d.ts files (for diffing). Or run `diff -u` in a Bash call. |
+| ✅ | ❌ | Current d.ts + target doc files from DOCS_DIR |
+| ❌ | ✅ | Target d.ts + current doc files from DOCS_DIR |
+| ❌ | ❌ | Doc files from DOCS_DIR for both versions |
 
-**Full d.ts diff** (both versions have d.ts):
+**d.ts files**: read in fixed batches of 1000 lines: (1–1000), (1001–2000), (2001–3000). Extra batches return less data if file is shorter. Do not grep incrementally — load the full file so Step 3 can resolve all types from context.
 
-```bash
-diff -u "$SDK_TMPDIR/current/package/dist/index.d.ts" "$SDK_TMPDIR/target/package/dist/index.d.ts" || true
-```
+**Doc files**: only read docs relevant to the Usage Inventory — `authentication.md`/`config.md` for auth, `questions.md` for question components, `dashboards.md` for dashboard components, `collections.md` for CollectionBrowser. Skip quickstart, introduction, next-js, plugins, version, appearance docs.
 
-Read the changelog and extract entries between {CURRENT} and {TARGET} for migration instructions.
+**Changelog**: already truncated by prepare.sh — safe to read without a limit.
 
-**Hybrid path** (one version has d.ts, the other doesn't):
+#### Collect raw data only
 
-For the version WITH d.ts: read the full `index.d.ts` file — it contains all type definitions.
-For the version WITHOUT d.ts: fetch docs using the targeted approach below.
-Also read the changelog for migration instructions.
-
-**Targeted doc fetching** (for versions that need docs):
-
-Use `scripts/fetch-docs.sh` to discover and fetch all available doc pages for each version. The script uses the GitHub Contents API to find what exists — no hardcoded page lists. It also automatically discovers and fetches snippet files referenced via `include_file` directives.
-
-```bash
-# Fetch target SDK docs (any version format works: 58, 0.58, v0.58, 0.58.1)
-bash <skill-path>/scripts/fetch-docs.sh \
-  --version {VER} --type sdk --prefix target --outdir /tmp/sdk-docs
-
-# Fetch current EmbedJS docs
-bash <skill-path>/scripts/fetch-docs.sh \
-  --version {VER} --type embedjs --prefix current --outdir /tmp/embedjs-docs
-```
-
-Then read all fetched files from the output directory. The LLM focuses on pages relevant to the Usage Inventory from Step 1 — the script fetches everything available, and the analysis step filters by relevance.
-
-#### What to extract from Phase 2 results
-
-After reading all fetched data (d.ts files, docs, changelog), build the API change summary:
-- **Full d.ts diff**: the diff output shows all type changes; supplement with changelog for migration instructions
-- **Hybrid**: compare the d.ts types from one side against the doc-described API from the other
-- **Full docs comparison**: for each component used in the project, compare props/options/types between current and target docs
-- In all cases: identify added, removed, renamed, or type-changed props/options, and note migration instructions from changelog or target docs
+Do not analyze, resolve types, or build change summaries during Step 2. Just load the raw files into context. All analysis happens in Step 3 — working from context avoids extra tool-call round-trips.
 
 ### Step 3: Build change catalog (after Steps 1–2 are ✅ complete)
 
-This step is fast — it organizes Step 2 data into a structured catalog of ALL API changes between versions. No per-file project analysis here.
+This step is fast — it works entirely from data already loaded in context from Step 2. Do not read any additional files or run any searches. The d.ts content, docs, and changelog are already in your context from Step 2 — just organize them.
 
 From the d.ts diff, docs comparison, and changelog, extract every change into a catalog:
 

@@ -23,8 +23,10 @@ echo "Downloading SDK packages..."
 (cd "$SDK_TMPDIR/target"  && npm pack "@metabase/embedding-sdk-react@${TARGET}"  --quiet 2>/dev/null && tar xzf *.tgz) &
 
 echo "Fetching changelog..."
+# Truncate to first 1000 lines — the full changelog is 5000+ lines and too large
+# for a single Read call. The first 1000 lines contain all recent version entries.
 curl -sL "https://raw.githubusercontent.com/metabase/metabase/master/enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md" \
-  -o "$SDK_TMPDIR/changelog.md" &
+  | head -1000 > "$SDK_TMPDIR/changelog.md" &
 
 wait
 
