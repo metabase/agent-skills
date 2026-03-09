@@ -41,10 +41,10 @@ Each step section should end with a status line:
 
 ### Evidence requirements
 
-- Step 1: list every matched file path and the SDK imports visible from grep output. Full file analysis happens in Step 4.
+- Step 1: list every matched file path and the matching grep lines (SDK imports or EmbedJS API calls/script tags). Full file analysis happens in Step 4.
 - Step 2 (primary path): show the diff output between d.ts files. (hybrid/fallback path): list each fetched URL + confirm files are loaded in context. Do not analyze or resolve types here — that's Step 3's job.
 - Step 3: the structured change catalog — every changed/removed/added symbol with its fully resolved concrete type.
-- Step 4: per file — SDK usage found (components, props, callbacks, data flows), which catalog entries affect this file, invalid usages found, exact diffs applied.
+- Step 4: per file — SDK/EmbedJS usage found (components, props, config options, callbacks, data flows), which catalog entries affect this file, invalid usages found, exact diffs applied.
 - Step 5: the exact command run and error summary if any remain.
 
 ## Performance
@@ -54,10 +54,10 @@ The workflow is designed as a pipeline that maximizes parallelism:
 ```
 Round 1 (grep+glob+pkg) ──► Round 2 (prepare.sh) ──► Round 3 (read-sources.sh) ──► Step 3 (catalog, inline)
                                                                                           │
-                                                                                    Step 4 per-file (sub-agents):
-                                                                                     ├── FileA: analyze + fix
-                                                                                     ├── FileB: analyze + fix
-                                                                                     └── FileC: analyze + fix
+                                                                                    Step 4 per-file:
+                                                                                     ├── Read FileA → match catalog → validate → fix
+                                                                                     ├── Read FileB → match catalog → validate → fix
+                                                                                     └── Read FileC → match catalog → validate → fix
                                                                                            │
                                                                                      Step 5 (typecheck) ──► Step 6
 ```
@@ -73,7 +73,7 @@ Do not parse repo branches, commits, PRs, or issues — they're noisy and irrele
 
 ### Tool-call round budget for Steps 1+2
 
-Steps 1+2 must complete in **3 tool-call rounds**. Every extra round adds ~30s of latency.
+Steps 1+2 must complete in **3 tool-call rounds**.
 
 **Round 1** — discovery (all concurrent, single message):
 - Grep for `@metabase/embedding-sdk-react` imports (returns file paths — do not read files yet)
