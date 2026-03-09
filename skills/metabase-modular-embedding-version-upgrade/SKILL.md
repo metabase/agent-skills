@@ -225,7 +225,7 @@ From the d.ts diff, docs comparison, and changelog, extract changes into a catal
 - **Renamed** symbols (old name → new name)
 - **Type-changed** props — resolve every type alias to its **concrete type**. Do not stop at alias names — aliases can stay the same while the underlying type changes. For example, `SdkCollectionId` may have been `number` in the current version but `number | "personal" | "root" | "tenant" | SdkEntityId` in the target.
 - **Signature-changed** functions/callbacks (arity, argument types, return types)
-- **Added** props/exports (only for components in the Usage Inventory, for informational output)
+- **Added** props/exports (only for components in Step 1's grep output, for informational output)
 - **Deprecated** APIs (with recommended replacements)
 - **Auth config changes** — pay special attention. The changelog and docs contain the specifics. Look for: type renames, `fetchRequestToken` signature changes, and new properties like `jwtProviderUri`.
 
