@@ -293,11 +293,12 @@ Each project file is analyzed and fixed independently against the change catalog
 For each file, a single pass that combines analysis + fix:
 
 1. **Match catalog entries** — which changes from the catalog affect this file's usage?
-2. **Deep analysis** — for each affected prop:
+2. **Validate current usage against target API** — even if there are no breaking changes between the two versions, the file may already be using invalid prop names, wrong attribute names, non-existent component names, or incorrect signatures. Compare every usage in the file against the **target version's** API (d.ts or docs) and flag anything that doesn't match. This catches pre-existing errors that the upgrade won't fix automatically — especially common in JS-only projects and EmbedJS integrations where there's no typechecker to catch mistakes.
+3. **Deep analysis** — for each catalog match or invalid usage:
    - Compare the file's current usage against the catalog's target type
    - For callback props: trace where callback parameter fields flow in THIS file (state setters, variables, API calls, route params). Check if the receiving type is compatible with the target's potentially widened type. For example, if `onClick: (item) => setSelectedId(item.id)` and the catalog says `item.id` widened from `number` to `SdkCollectionId`, and `setSelectedId` is `useState<number>`, flag it as breaking.
-3. **Apply fixes** — edit the file to migrate all breaking changes identified above.
-4. **Report** — output what was found and changed for this file.
+4. **Apply fixes** — edit the file to migrate all breaking changes and correct any invalid usages.
+5. **Report** — output what was found and changed for this file.
 
 **Parallelization strategy** — always use sub-agents:
 
