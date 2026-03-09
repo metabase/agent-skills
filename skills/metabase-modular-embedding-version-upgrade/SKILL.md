@@ -21,11 +21,11 @@ Your response should contain these sections in this order:
 
 1. **Upgrade Plan Checklist** (Step 0)
 2. **Step 1 Results: Project Scan**
-4. **Step 2 Results: d.ts Diff / Target Docs** (primary or fallback)
-5. **Step 3: Change Catalog**
-6. **Step 4: Per-File Migration** (one subsection per file)
-7. **Step 5: Typecheck Validation**
-8. **Step 6: Final Summary**
+3. **Step 2 Results: d.ts Diff / Target Docs** (primary or fallback)
+4. **Step 3: Change Catalog**
+5. **Step 4: Per-File Migration** (one subsection per file)
+6. **Step 5: Typecheck Validation**
+7. **Step 6: Final Summary**
 
 Each step section should end with a status line:
 
@@ -35,16 +35,16 @@ Each step section should end with a status line:
 
 - Steps 1+2 complete in 3 tool-call rounds (see round budget).
 - Step 3 is produced inline after Round 3 — no separate tool calls, no separate phase.
-- Step 4 starts after Step 3 is ✅ complete. All files run in parallel via sub-agents.
+- Step 4 starts after Step 3 is ✅ complete. Files are processed per-file (sequentially or batched into sub-agents for >10 files).
 - Step 5 starts after ALL Step 4 file tasks are ✅ complete.
 - Step 6 after Step 5 is ✅ complete (or explicitly ❌ blocked).
 
 ### Evidence requirements
 
-- Step 1: list every matched file path, every import/reference, every used component/hook/type, every prop/config option per component, every dot-subcomponent (e.g., `InteractiveQuestion.FilterBar`), and for callback props — where the callback parameter data flows in the project (e.g., `onClick: (item) => setSelectedId(item.id)` where `setSelectedId` is `useState<number>`).
+- Step 1: list every matched file path and the SDK imports visible from grep output. Full file analysis happens in Step 4.
 - Step 2 (primary path): show the diff output between d.ts files. (hybrid/fallback path): list each fetched URL + confirm files are loaded in context. Do not analyze or resolve types here — that's Step 3's job.
 - Step 3: the structured change catalog — every changed/removed/added symbol with its fully resolved concrete type.
-- Step 4: per file — which catalog entries affect this file, data flow analysis for callbacks, exact diffs applied.
+- Step 4: per file — SDK usage found (components, props, callbacks, data flows), which catalog entries affect this file, invalid usages found, exact diffs applied.
 - Step 5: the exact command run and error summary if any remain.
 
 ## Performance
@@ -64,7 +64,7 @@ Round 1 (grep+glob+pkg) ──► Round 2 (prepare.sh) ──► Round 3 (read-s
 
 - **Rounds 1–3**: complete Steps 1+2 data gathering in 3 tool-call rounds (~90s).
 - **Step 3**: produced inline immediately after Round 3 — zero tool calls, zero separate thinking phase.
-- **Step 4**: all files in parallel via sub-agents.
+- **Step 4**: per-file (read → match catalog → validate → fix). Sub-agents for >10 files.
 - **Step 5**: sequential (needs all files done).
 
 In Claude Code, use parallel tool calls or `run_in_background: true` for sub-agents. For Step 4, issue all file edits in a single message or spawn per-file sub-agents.
@@ -93,19 +93,13 @@ This single script does everything: npm pack both versions, check d.ts, fetch+tr
 
 **No other tool calls in this message.** Bash calls get cancelled if a parallel Read errors.
 
-**Round 3** — `read-sources.sh` (single Bash call — reads ALL files at once):
+**Round 3** — `read-sources.sh` (single Bash call — reference data only, no project files):
 ```bash
-bash <skill-path>/scripts/read-sources.sh {SDK_TMPDIR} <file1> <file2> ...
+bash <skill-path>/scripts/read-sources.sh {SDK_TMPDIR}
 ```
-Pass the `SDK_TMPDIR` from Round 2 and ALL project file paths from Round 1's grep results. The script `cat`s everything to stdout in one call:
-- All project files (from grep)
-- d.ts diff (or raw d.ts for hybrid mode)
-- Doc files from DOCS_DIR
-- Changelog
+Dumps SDK reference data (d.ts diff or raw d.ts, doc files, changelog) to stdout. **Does not read project files** — those are read one by one in Step 4.
 
-**Zero Read calls needed.** Everything comes through one Bash call — no parallel read cancellations.
-
-After Round 3, immediately output Step 1 Results + Step 2 Results + Step 3 Change Catalog with zero additional tool calls. Do not treat Step 3 as a separate thinking phase — produce it inline right after the data is loaded.
+After Round 3, output Step 1 Results (file list from grep) + Step 2 Results + Step 3 Change Catalog with zero additional tool calls. Do not treat Step 3 as a separate thinking phase — produce it inline right after the data is loaded.
 
 ## Scope
 
@@ -171,30 +165,20 @@ Keep scan results in the main context (not delegated to a sub-agent) — Step 3 
 
 **For SDK upgrades (`@metabase/embedding-sdk-react`):**
 
-Step 1 search happens in Round 1; file reading happens in Round 3 via `read-sources.sh`.
+Step 1 happens in Round 1 — grep only, no file reading.
 
-- **Round 1 — search**: grep for all imports from `@metabase/embedding-sdk-react`. This returns a list of file paths. Also detect the package manager (glob for lock files). Do not read any files yet.
-- **Round 3 — read**: `read-sources.sh` reads all matched project files (passed as args) + SDK data in one Bash call.
-- Extract:
-  - imports, components, hooks, types, helpers
-  - every prop used per component
-  - every dot-subcomponent used
-  - for callback props (`onClick`, `onCreate`, `onNavigate`, etc.): what fields are accessed from the callback parameter and where those values flow in the project (state setters, variables, API calls, route params). **Fully resolve the receiving type** — if `onClick: (item) => setQuestionId(item.id)`, follow `setQuestionId` to its definition (e.g., a Jotai atom, useState, Zustand store) and record the concrete type (e.g., `atom<number | undefined>`). Read the store/state files during this step — do not leave type resolution for later. All project-level reading and searching must finish in Step 1.
-- Output a structured "Usage Inventory".
+- Grep for all imports from `@metabase/embedding-sdk-react`. This returns file paths + matching import lines.
+- Also detect the package manager (glob for lock files).
+- Do not read project files yet — that happens in Step 4 when fixing each file.
+- Output: a file list with the SDK imports visible from grep output.
 
 **For EmbedJS / Modular Embedding upgrades:**
 
-- There is no npm package to scan. Instead, search the codebase for:
+- There is no npm package to grep. Instead, search the codebase for:
   - Metabase embed `<script>` tags (e.g., patterns like `metabase.js`, `embed.js`, `embedding-sdk`, or the Metabase instance URL)
   - Any JS calls to Metabase embedding APIs (e.g., `MetabaseEmbed`, `Metabase.embed`, `window.MetabaseEmbed`, `initMetabase`, component init calls)
-  - Configuration objects passed to embed init functions (auth config, appearance, theme, component options)
-- Read all matching files.
-- Extract:
-  - which components are embedded (dashboard, question, query builder, collection browser)
-  - all configuration options / props passed to each component
-  - authentication setup (JWT endpoint URL, auth config shape)
-  - appearance / theme customizations
-- Output a structured "Usage Inventory".
+- Do not read project files yet — that happens in Step 4 when fixing each file.
+- Output: a file list with the matching grep lines.
 
 ### Step 2: Extract API changes
 
@@ -222,9 +206,8 @@ The `read-sources.sh` script automatically reads the right files based on what `
 - **Raw d.ts** (hybrid mode) — the one version that has d.ts
 - **Doc files** from DOCS_DIR (for versions without d.ts)
 - **Changelog** (already truncated to 1000 lines)
-- **All project files** passed as arguments
 
-You do NOT need to make any Read calls — `read-sources.sh` outputs everything to stdout.
+Project files are NOT read here — they are read per-file in Step 4.
 
 #### Collect raw data only
 
@@ -234,7 +217,7 @@ Do not analyze, resolve types, or build change summaries during Step 2. Just loa
 
 This step is NOT a separate thinking phase — produce it immediately after Round 3 reads, with zero additional tool calls. The d.ts diff, docs, and changelog are already in context.
 
-**Scope: only catalog changes that affect symbols from the Usage Inventory** (Step 1). If the project uses `MetabaseProvider`, `InteractiveQuestion`, and `CollectionBrowser`, only catalog changes to those components and their props/types/callbacks. Skip changes to components the project doesn't use.
+**Scope: only catalog changes that affect symbols visible in Step 1's grep output.** If the grep shows imports of `MetabaseProvider`, `InteractiveQuestion`, and `CollectionBrowser`, only catalog changes to those components and their props/types/callbacks. Skip changes to components the project doesn't import.
 
 From the d.ts diff, docs comparison, and changelog, extract changes into a catalog:
 
@@ -288,23 +271,23 @@ Each project file is analyzed and fixed independently against the change catalog
 
 **Before per-file work:** update package.json version and install dependencies. Also update Metabase instance version in docker files if present (docker-compose.yml, Dockerfile, .env). These are done once, not per-file.
 
-**Per-file task** (run in parallel for each file from the Usage Inventory):
+**Per-file task** (for each file from the Step 1 file list):
 
-For each file, a single pass that combines analysis + fix:
+For each file, a single pass that combines read + analysis + fix:
 
-1. **Match catalog entries** — which changes from the catalog affect this file's usage?
-2. **Validate current usage against target API** — even if there are no breaking changes between the two versions, the file may already be using invalid prop names, wrong attribute names, non-existent component names, or incorrect signatures. Compare every usage in the file against the **target version's** API (d.ts or docs) and flag anything that doesn't match. This catches pre-existing errors that the upgrade won't fix automatically — especially common in JS-only projects and EmbedJS integrations where there's no typechecker to catch mistakes.
-3. **Deep analysis** — for each catalog match or invalid usage:
+1. **Read the file** — this is the first time the file content is loaded. Extract SDK components, hooks, types, props used, dot-subcomponents, and callback data flows.
+2. **Match catalog entries** — which changes from the catalog affect this file's usage?
+3. **Validate current usage against target API** — even if there are no breaking changes between the two versions, the file may already be using invalid prop names, wrong attribute names, non-existent component names, or incorrect signatures. Compare every usage in the file against the **target version's** API (d.ts or docs) and flag anything that doesn't match. This catches pre-existing errors that the upgrade won't fix automatically — especially common in JS-only projects and EmbedJS integrations where there's no typechecker to catch mistakes.
+4. **Deep analysis** — for each catalog match or invalid usage:
    - Compare the file's current usage against the catalog's target type
    - For callback props: trace where callback parameter fields flow in THIS file (state setters, variables, API calls, route params). Check if the receiving type is compatible with the target's potentially widened type. For example, if `onClick: (item) => setSelectedId(item.id)` and the catalog says `item.id` widened from `number` to `SdkCollectionId`, and `setSelectedId` is `useState<number>`, flag it as breaking.
-4. **Apply fixes** — edit the file to migrate all breaking changes and correct any invalid usages.
-5. **Report** — output what was found and changed for this file.
+5. **Apply fixes** — edit the file to migrate all breaking changes and correct any invalid usages.
+6. **Report** — output what was found and changed for this file.
 
-**Parallelization strategy** — always use sub-agents:
+**Parallelization strategy:**
 
-- Launch one sub-agent per file (or batch 2-3 files per agent if >10 files). Each sub-agent receives its file path(s), the relevant Usage Inventory entries, and the full change catalog.
-- In Claude Code, launch all sub-agents with `run_in_background: true` in a single message — they run concurrently.
-- Each sub-agent reads its file, applies the catalog, and reports what changed. The main agent collects results.
+- **≤ 10 files**: process all in the main agent — read each file, match catalog, fix, move to next.
+- **> 10 files**: batch files into 3–5 sub-agents (evenly split). Each sub-agent receives its file paths and the full change catalog, reads each file, applies fixes, and reports. In Claude Code, launch with `run_in_background: true`.
 
 #### Per-file output example
 
