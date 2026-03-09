@@ -31,14 +31,6 @@ Each step section should end with a status line:
 
 - `Status: ✅ complete` or `Status: ❌ blocked`
 
-### Step gating rules
-
-- Steps 1+2 complete in 3 tool-call rounds (see round budget).
-- Step 3 is produced inline after Round 3 — no separate tool calls, no separate phase.
-- Step 4 starts after Step 3 is ✅ complete. Files are processed per-file (sequentially or batched into sub-agents for >10 files).
-- Step 5 starts after ALL Step 4 file tasks are ✅ complete.
-- Step 6 after Step 5 is ✅ complete (or explicitly ❌ blocked).
-
 ### Evidence requirements
 
 - Step 1: list every matched file path and the matching grep lines (SDK imports or EmbedJS API calls/script tags). Full file analysis happens in Step 4.
@@ -62,12 +54,7 @@ Round 1 (grep+glob+pkg) ──► Round 2 (prepare.sh) ──► Round 3 (read-s
                                                                                      Step 5 (typecheck) ──► Step 6
 ```
 
-- **Rounds 1–3**: complete Steps 1+2 data gathering in 3 tool-call rounds (~90s).
-- **Step 3**: produced inline immediately after Round 3 — zero tool calls, zero separate thinking phase.
-- **Step 4**: per-file (read → match catalog → validate → fix). Sub-agents for >10 files.
-- **Step 5**: sequential (needs all files done).
-
-In Claude Code, use parallel tool calls or `run_in_background: true` for sub-agents. For Step 4, issue all file edits in a single message or spawn per-file sub-agents.
+In Claude Code, use parallel tool calls or `run_in_background: true` for sub-agents.
 
 Do not parse repo branches, commits, PRs, or issues — they're noisy and irrelevant to version diffing.
 
@@ -169,7 +156,6 @@ Step 1 happens in Round 1 — grep only, no file reading.
 
 - Grep for all imports from `@metabase/embedding-sdk-react`. This returns file paths + matching import lines.
 - Also detect the package manager (glob for lock files).
-- Do not read project files yet — that happens in Step 4 when fixing each file.
 - Output: a file list with the SDK imports visible from grep output.
 
 **For EmbedJS / Modular Embedding upgrades:**
@@ -177,20 +163,11 @@ Step 1 happens in Round 1 — grep only, no file reading.
 - There is no npm package to grep. Instead, search the codebase for:
   - Metabase embed `<script>` tags (e.g., patterns like `metabase.js`, `embed.js`, `embedding-sdk`, or the Metabase instance URL)
   - Any JS calls to Metabase embedding APIs (e.g., `MetabaseEmbed`, `Metabase.embed`, `window.MetabaseEmbed`, `initMetabase`, component init calls)
-- Do not read project files yet — that happens in Step 4 when fixing each file.
 - Output: a file list with the matching grep lines.
 
 ### Step 2: Extract API changes
 
-Run `prepare.sh` in Round 2 (see tool-call budget). This single script handles everything: npm pack, d.ts check, changelog fetch+truncate, and doc fetching for versions without d.ts.
-
-```bash
-bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET}
-# or for EmbedJS:
-bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
-```
-
-The script outputs:
+Run `prepare.sh` in Round 2 (see round budget). The script outputs:
 - `SDK_TMPDIR` — temp directory with both SDK packages (pass this to `read-sources.sh` in Round 3)
 - `current_dts=yes/no`, `target_dts=yes/no` — d.ts availability (for informational output)
 - `DTS_DIFF_PATH` — d.ts diff file (if both versions have d.ts)
@@ -198,24 +175,8 @@ The script outputs:
 
 You don't need to read these files manually — `read-sources.sh` handles it.
 
-#### What Round 3 reads (handled by `read-sources.sh`)
-
-The `read-sources.sh` script automatically reads the right files based on what `prepare.sh` produced:
-
-- **d.ts diff** (if both versions have d.ts) — compact ~200-500 line unified diff
-- **Raw d.ts** (hybrid mode) — the one version that has d.ts
-- **Doc files** from DOCS_DIR (for versions without d.ts)
-- **Changelog** (already truncated to 1000 lines)
-
-Project files are NOT read here — they are read per-file in Step 4.
-
-#### Collect raw data only
-
-Do not analyze, resolve types, or build change summaries during Step 2. Just load the raw files into context. All analysis happens in Step 3 — working from context avoids extra tool-call round-trips.
 
 ### Step 3: Build change catalog (after Steps 1–2 are ✅ complete)
-
-This step is NOT a separate thinking phase — produce it immediately after Round 3 reads, with zero additional tool calls. The d.ts diff, docs, and changelog are already in context.
 
 **Scope: only catalog changes that affect symbols visible in Step 1's grep output.** If the grep shows imports of `MetabaseProvider`, `InteractiveQuestion`, and `CollectionBrowser`, only catalog changes to those components and their props/types/callbacks. Skip changes to components the project doesn't import.
 
