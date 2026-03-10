@@ -46,7 +46,7 @@ Follow the app's existing architecture, template engine, layout/partial system, 
 
 ## Scope
 
-This skill converts Full App / Interactive Embedding (iframe-based) to Modular embedding (web-component-based via `embed.js`).
+This skill converts Full App / Interactive embedding (iframe-based) to Modular embedding (web-component-based via `embed.js`).
 
 **The consumer's app may be written in any backend language** (Node.js, Python, Ruby, PHP, Java, Go, .NET, etc.) with any template engine. Keep instructions language-agnostic unless a specific language is detected in Step 1.
 
