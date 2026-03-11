@@ -73,6 +73,14 @@ This skill converts Full App / Interactive embedding (iframe-based) to Modular e
 - Migrating to the React SDK — use the `metabase-modular-embedding-to-modular-embedding-sdk-upgrade` skill after this one
 - Upgrading the embedding version after migration — use the `metabase-modular-embedding-version-upgrade` skill for future upgrades
 
+## Allowed documentation sources
+
+Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+
+Other constraints:
+- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
+- Do not follow changelog links to GitHub or guess URLs not handled by the script
+
 ## AskUserQuestion triggers
 
 Use AskUserQuestion and halt until answered if:
@@ -105,8 +113,6 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 ### Step 0: Detect Metabase version
 
 Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
-
----
 
 ### Step 1: Scan the project + fetch docs no sub-agent)
 
@@ -186,8 +192,6 @@ Iframes found: {count}
 SSO endpoint: {file}:{line} — {route} ({method})
 ```
 
----
-
 ### Step 2: Analyze iframes and map to web components (only after Step 1 ✅)
 
 Use the documentation fetched in Step 1a as the authoritative reference for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior. The hardcoded tables below are fallbacks — if the docs describe additional attributes or different behavior for the target version, prefer the docs.
@@ -266,8 +270,6 @@ iframe #{n}: {file}:{line}
   Mapped attributes: {list}
   New: {exact replacement web component HTML}
 ```
-
----
 
 ### Step 3: Plan migration changes (only after Step 2 ✅)
 
@@ -357,8 +359,6 @@ List these as part of the plan — they will be included in the final summary:
    - **v59+ (optional if `jwtProviderUri` is set in `window.metabaseConfig`)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint. If `jwtProviderUri` was added to `window.metabaseConfig` in Step 3b, this admin setting is not strictly required but can serve as a backup.
 4. **JWT shared secret**: No change needed — reuse the existing shared secret from Full App embedding setup
 
----
-
 ### Step 4: Apply code changes (only after Step 3 ✅)
 
 Apply all changes from Step 3 in this order (backend changes first to minimize the window where things are broken):
@@ -374,8 +374,6 @@ Apply all changes from Step 3 in this order (backend changes first to minimize t
 - Do not add new package dependencies — modular embedding requires only the embed.js script served by the Metabase instance
 - Do not change environment variable names
 - If a file requires multiple edits, apply them top-to-bottom to avoid offset issues
-
----
 
 ### Step 5: Validate changes (only after Step 4 ✅)
 
@@ -421,8 +419,6 @@ If any check fails:
 - Fix the issue immediately
 - Re-run the specific check
 - If unable to fix after 3 attempts, mark Step 5 ❌ blocked and report which check failed and why
-
----
 
 ### Step 6: Output summary
 

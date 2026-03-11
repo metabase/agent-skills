@@ -97,6 +97,12 @@ This skill handles upgrades for:
   - v56–v57: docs are at `embedded-analytics-js.md`
   - v58+: docs split into `components.md`, `appearance.md`, `authentication.md`
 
+### What this skill does NOT handle
+
+- Migrating between different embedding technologies (e.g., embed.js → React SDK) — use the `metabase-modular-embedding-to-modular-embedding-sdk-upgrade` skill instead
+- Migrating from Full App (iframe-based) embedding — use the `metabase-full-app-to-modular-embedding-upgrade` skill instead
+- Migrating from Static (signed/guest) embedding — use the `metabase-static-embedding-to-modular-guest-embedding-upgrade` skill instead
+
 ## Allowed documentation sources
 
 Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.

@@ -96,6 +96,14 @@ The auth model is the **same** — both use `METABASE_SECRET_KEY` to sign JWTs w
 | **Downloads** | Not available | `with-downloads="true"` attribute (Pro/Enterprise) |
 | **Secret key** | `METABASE_SECRET_KEY` | Same `METABASE_SECRET_KEY` |
 
+## Allowed documentation sources
+
+Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+
+Other constraints:
+- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
+- Do not follow changelog links to GitHub or guess URLs not handled by the script
+
 ## AskUserQuestion triggers
 
 Use AskUserQuestion and halt until answered if:
@@ -125,8 +133,6 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 ### Step 0: Detect Metabase version
 
 Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v53 or older`, `v54–v58`, `v59+`). Abort if < v53 (modular embedding not available). Record the version.
-
----
 
 ### Step 1: Scan the project + fetch docs
 
@@ -207,8 +213,6 @@ JWT payload: resource type={dashboard|question}, params={list or "none"}
 iframeResizer: {present|not present}
 ```
 
----
-
 ### Step 2: Analyze static embeds and map to web components (ONLY after Step 1 ✅)
 
 Use the documentation fetched in Step 1a as the authoritative reference for web component attributes, `window.metabaseConfig` options, and guest embedding behavior. The hardcoded tables below are fallbacks — if the docs describe additional attributes or different behavior for the target version, prefer the docs.
@@ -278,8 +282,6 @@ embed #{n}: {file}:{line}
   Mapped attributes: {list}
   New: {exact replacement web component HTML}
 ```
-
----
 
 ### Step 3: Plan migration changes (ONLY after Step 2 ✅)
 
@@ -367,8 +369,6 @@ List these as part of the plan — they will be included in the final summary:
 2. **Enable guest embedding**: Admin > Embedding > ensure "Guest embedding" (or "Static embedding" in older UI) is enabled. The existing static embedding secret key is reused.
 3. **Configure CORS origins**: Admin > Embedding > Modular embedding > add the host app's domain (e.g., `http://localhost:9090`). This is new — static iframe embedding did not require CORS configuration.
 
----
-
 ### Step 4: Apply code changes (ONLY after Step 3 ✅)
 
 Apply all changes from Step 3 in this order:
@@ -384,8 +384,6 @@ Apply all changes from Step 3 in this order:
 - Do not add new package dependencies — modular embedding requires only the embed.js script served by the Metabase instance
 - Do not change or remove `METABASE_SECRET_KEY` — it is still used for signing
 - If a file requires multiple edits, apply them top-to-bottom to avoid offset issues
-
----
 
 ### Step 5: Validate changes (ONLY after Step 4 ✅)
 
@@ -437,8 +435,6 @@ If ANY check fails:
 - Fix the issue immediately
 - Re-run the specific check
 - If unable to fix after 3 attempts, mark Step 5 ❌ blocked and report which check failed and why
-
----
 
 ### Step 6: Output summary
 
