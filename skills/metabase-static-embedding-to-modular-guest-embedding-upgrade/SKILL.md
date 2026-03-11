@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, 
 
 Follow the workflow steps in order — do not skip any step. Create the checklist first, then execute each step and explicitly mark it done with evidence. Each step's output feeds into the next, so skipping steps produces wrong migrations.
 
-If you cannot complete a step due to missing info or tool failure:
+If you cannot complete a step due to missing info or tool failure, you must:
 
 1. record the step as ❌ blocked,
 2. explain exactly what is missing / what failed,
@@ -34,6 +34,15 @@ Each step section should end with a status line:
 
 Steps are sequential — do not start a step until the previous one is ✅ complete.
 
+### Evidence requirements
+
+- Step 0: Metabase version detected (source: Docker tag, env var, or user answer).
+- Step 1: every matched file path, every static embed location, JWT signing code, layout/head file, Metabase config variables, fetched docs listing.
+- Step 2: per embed — parsed iframe URL, content type, token variable, hash params, mapped web component with attributes.
+- Step 3: the complete file-by-file change plan with exact old/new code.
+- Step 4: per file — what was changed and exact diffs applied.
+- Step 5: each validation check's pass/fail result with evidence.
+
 ## Architectural conformance
 
 Follow the app's existing architecture, template engine, layout/partial system, code style, and route patterns. Do not switch paradigms (e.g., templates to inline HTML or vice versa). If the app has middleware for shared template variables, prefer that over duplicating across route handlers.
@@ -42,7 +51,7 @@ The web component must be rendered using the **same delivery mechanism** as the 
 
 **Token delivery must also stay server-side.** If the original static embedding generated the JWT on the server and rendered it directly into the HTML (e.g., `res.send(\`<iframe src=".../${token}">\`)`), then the migrated web component must receive its token the same way — rendered server-side into the `token` attribute (e.g., `<metabase-dashboard token="${token}">`). Do NOT introduce a client-side `fetch()` call to a new `/api/token` endpoint to deliver the token — `embed.js` may intercept such requests and return HTML instead of JSON, causing `SyntaxError: Unexpected token '<'` errors. Keep the token generation and delivery in the same server-side route handler where the page is rendered.
 
-## Important performance notes
+## Performance
 
 - Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in single messages wherever possible.
 - Do not use sub-agents for project scanning — results need to stay in the main context for cross-referencing in later steps.
@@ -87,18 +96,6 @@ The auth model is the **same** — both use `METABASE_SECRET_KEY` to sign JWTs w
 | **Downloads** | Not available | `with-downloads="true"` attribute (Pro/Enterprise) |
 | **Secret key** | `METABASE_SECRET_KEY` | Same `METABASE_SECRET_KEY` |
 
-### Migration Plan Checklist
-
-Create a TODO list using the TaskCreate tool with these items. Mark each task as `in_progress` (via TaskUpdate) before starting it and `completed` when done:
-
-- Step 0: Detect Metabase version
-- Step 1: Scan project + fetch target version docs
-- Step 2: Analyze static embeds and map to web components (using docs)
-- Step 3: Plan migration changes
-- Step 4: Apply code changes
-- Step 5: Validate changes
-- Step 6: Final summary
-
 ## AskUserQuestion triggers
 
 Use AskUserQuestion and halt until answered if:
@@ -108,6 +105,20 @@ Use AskUserQuestion and halt until answered if:
 - The Metabase instance version cannot be determined from the project code
 - No layout/head file can be identified (unclear where to inject embed.js)
 - Multiple layout files exist and it is unclear which one(s) to use
+
+## Pre-workflow steps
+
+### Migration Plan Checklist
+
+Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate tools:
+
+- Step 0: Detect Metabase version
+- Step 1: Scan project + fetch target version docs
+- Step 2: Analyze static embeds and map to web components (using docs)
+- Step 3: Plan migration changes
+- Step 4: Apply code changes
+- Step 5: Validate changes
+- Step 6: Final summary
 
 ## Workflow
 
@@ -454,3 +465,12 @@ Organize the final output into these sections:
    - Web components expand to fill their container — if the iframe had fixed dimensions, verify the container provides appropriate sizing
    - The `bordered` appearance option is no longer available — web components render without a frame
    - Auto-refresh (`refresh=N`) is no longer controlled per embed — configure it in Metabase instance settings instead
+
+## Retry policy
+
+**Doc fetching:**
+- The `scripts/fetch-docs.sh` script exits with an error if the version's docs directory does not exist. If this happens, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
+
+**Validation:**
+- If any validation check in Step 5 fails after 3 fix attempts, mark Step 5 ❌ blocked and report which check failed and why.
+- If AskUserQuestion is not answered, remain blocked on that step — do not guess or proceed with assumptions.

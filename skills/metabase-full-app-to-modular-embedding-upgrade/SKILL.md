@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, 
 
 Follow the workflow steps in order — do not skip any step. Create the checklist first, then execute each step and explicitly mark it done with evidence. Each step's output feeds into the next, so skipping steps produces wrong migrations.
 
-If you cannot complete a step due to missing info or tool failure:
+If you cannot complete a step due to missing info or tool failure, you must:
 
 1. record the step as ❌ blocked,
 2. explain exactly what is missing / what failed,
@@ -34,11 +34,20 @@ Each step section should end with a status line:
 
 Steps are sequential — do not start a step until the previous one is ✅ complete.
 
+### Evidence requirements
+
+- Step 0: Metabase version detected (source: Docker tag, env var, or user answer).
+- Step 1: every matched file path, every iframe location, SSO endpoint, layout/head file, Metabase config variables.
+- Step 2: per iframe — parsed URL, content type, ID, hash params, mapped web component with attributes.
+- Step 3: the complete file-by-file change plan with exact old/new code.
+- Step 4: per file — what was changed and exact diffs applied.
+- Step 5: each validation check's pass/fail result with evidence.
+
 ## Architectural conformance
 
 Follow the app's existing architecture, template engine, layout/partial system, code style, and route patterns. Do not switch paradigms (e.g., templates to inline HTML or vice versa). If the app has middleware for shared template variables, prefer that over duplicating across route handlers.
 
-## Important performance notes
+## Performance
 
 - Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in a single message wherever possible.
 - Do not use sub-agents for project scanning — results need to stay in the main context for cross-referencing in later steps.
@@ -58,17 +67,11 @@ This skill converts Full App / Interactive embedding (iframe-based) to Modular e
 - Modifying SSO/JWT endpoints to support modular embedding's JSON response format
 - Mapping iframe URL customization parameters to theme config and component attributes
 
-### Migration Plan Checklist
+### What this skill does NOT handle
 
-Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate tools:
-
-- Step 0: Detect Metabase version
-- Step 1: Scan project
-- Step 2: Analyze iframes and map to web components
-- Step 3: Plan migration changes
-- Step 4: Apply code changes
-- Step 5: Validate changes
-- Step 6: Final summary
+- Migrating from Static (signed/guest) embedding — use the `metabase-static-embedding-to-modular-guest-embedding-upgrade` skill instead
+- Migrating to the React SDK — use the `metabase-modular-embedding-to-modular-embedding-sdk-upgrade` skill after this one
+- Upgrading the embedding version after migration — use the `metabase-modular-embedding-version-upgrade` skill for future upgrades
 
 ## AskUserQuestion triggers
 
@@ -83,6 +86,20 @@ Use AskUserQuestion and halt until answered if:
 - The backend language cannot be determined
 - Multiple iframes specify different `locale` values (ask user which locale to set in `window.metabaseConfig`)
 
+## Pre-workflow steps
+
+### Migration Plan Checklist
+
+Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate tools:
+
+- Step 0: Detect Metabase version
+- Step 1: Scan project + fetch target version docs
+- Step 2: Analyze iframes and map to web components (using docs)
+- Step 3: Plan migration changes
+- Step 4: Apply code changes
+- Step 5: Validate changes
+- Step 6: Final summary
+
 ## Workflow
 
 ### Step 0: Detect Metabase version
@@ -91,16 +108,30 @@ Before anything else, determine the Metabase version. Grep the project for Docke
 
 ---
 
-### Step 1: Scan the project (no sub-agent)
+### Step 1: Scan the project + fetch docs no sub-agent)
 
-Perform all of the following scans. Use parallel tool calls within a single message wherever there are no dependencies.
+Perform the project scan and doc fetch concurrently — they are independent. Use parallel tool calls within a single message wherever there are no dependencies.
 
-#### 1a: Identify backend language and framework
+#### 1a: Fetch target version docs
+
+Use `scripts/fetch-docs.sh` to fetch the embedding documentation for the target Metabase version:
+
+```bash
+bash <skill-path>/scripts/fetch-docs.sh {TARGET_VERSION}
+```
+
+The script discovers all available doc pages for that version via the GitHub Contents API — no hardcoded page lists. After it completes, read all fetched files from `/tmp/embedjs-docs/`.
+
+These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+
+Launch this concurrently with the project scan steps below.
+
+#### 1b: Identify backend language and framework
 
 - Check for dependency/build files (`package.json`, `requirements.txt`, `Gemfile`, `pom.xml`, `go.mod`, `composer.json`, etc.).
 - Identify the template engine and record the language and framework.
 
-#### 1b: Find ALL Metabase iframes
+#### 1c: Find ALL Metabase iframes
 
 Use Grep to search for all of these patterns (in parallel):
 
@@ -110,7 +141,7 @@ Use Grep to search for all of these patterns (in parallel):
 
 For each file with a match, read the entire file.
 
-#### 1c: Find SSO/JWT authentication code
+#### 1d: Find SSO/JWT authentication code
 
 Use Grep to search for all of these patterns (in parallel):
 
@@ -123,7 +154,7 @@ Use Grep to search for all of these patterns (in parallel):
 
 For each matching file, read the entire file.
 
-#### 1d: Find the layout/head file(s)
+#### 1e: Find the layout/head file(s)
 
 Find the single file (or common code path) where the HTML `<head>` section is defined — this is where `embed.js` and `window.metabaseConfig` will be injected.
 
@@ -133,7 +164,7 @@ Search for:
 - Layout/wrapper patterns: `include('head')`, `<%- include`, `{% extends`, `{% block`, `layout`, `base.html`, `_layout`, `application.html`
 - If the app builds HTML via inline strings in server code (e.g., `res.send(...)`), identify where the `<head>` content is generated
 
-#### 1e: Find Metabase configuration
+#### 1f: Find Metabase configuration
 
 Grep for `METABASE_` and `MB_` prefixed variables. Record every Metabase-related variable name and where it is read.
 
@@ -158,6 +189,8 @@ SSO endpoint: {file}:{line} — {route} ({method})
 ---
 
 ### Step 2: Analyze iframes and map to web components (only after Step 1 ✅)
+
+Use the documentation fetched in Step 1a as the authoritative reference for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior. The hardcoded tables below are fallbacks — if the docs describe additional attributes or different behavior for the target version, prefer the docs.
 
 For each iframe found in Step 1:
 
@@ -242,7 +275,7 @@ Create a complete file-by-file change plan covering all areas below. Every chang
 
 #### 3a: embed.js script injection — exactly once per app
 
-- **Target**: the layout/head file identified in Step 1d
+- **Target**: the layout/head file identified in Step 1e
 - **Location**: inside `<head>` (or as close as possible to other `<script>` tags)
 - **Code to add**:
   ```html
@@ -408,3 +441,8 @@ Organize the final output into these sections:
    - Users can no longer navigate between dashboards/questions/collections within a single embed (each web component is standalone)
    - The Metabase application shell (nav, sidebar, search) is no longer present
    - Any iframe parameters that could not be mapped
+
+## Retry policy
+
+- If any validation check in Step 5 fails after 3 fix attempts, mark Step 5 ❌ blocked and report which check failed and why.
+- If AskUserQuestion is not answered, remain blocked on that step — do not guess or proceed with assumptions.

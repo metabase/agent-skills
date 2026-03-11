@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, 
 
 Follow the workflow steps in order — do not skip any step. Create the checklist first, then execute each step and explicitly mark it done with evidence. Each step's output feeds into the next, so skipping steps produces wrong migrations.
 
-If you cannot complete a step due to missing info or tool failure:
+If you cannot complete a step due to missing info or tool failure, you must:
 
 1. record the step as ❌ blocked,
 2. explain exactly what is missing / what failed,
