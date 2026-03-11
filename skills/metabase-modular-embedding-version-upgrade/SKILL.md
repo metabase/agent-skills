@@ -99,9 +99,7 @@ This skill handles upgrades for:
 
 ### What this skill does NOT handle
 
-- Migrating between different embedding technologies (e.g., embed.js → React SDK) — use the `metabase-modular-embedding-to-modular-embedding-sdk-upgrade` skill instead
-- Migrating from Full App (iframe-based) embedding — use the `metabase-full-app-to-modular-embedding-upgrade` skill instead
-- Migrating from Static (signed/guest) embedding — use the `metabase-static-embedding-to-modular-guest-embedding-upgrade` skill instead
+- Migrating between different embedding technologies
 
 ## Allowed documentation sources
 

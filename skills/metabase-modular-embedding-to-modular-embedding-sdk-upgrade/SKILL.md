@@ -109,8 +109,6 @@ If the project is not React-based, this skill does not apply. If the project use
 ### What this skill does NOT handle
 
 - Non-React projects using Modular embedding web components in plain HTML/templates
-- Migrating from Full App (iframe-based) embedding — use the `metabase-full-app-to-modular-embedding-upgrade` skill instead
-- Upgrading the SDK version after installation — use the `metabase-modular-embedding-version-upgrade` skill for future upgrades
 
 ## Detecting versions
 

@@ -70,8 +70,6 @@ This skill converts Full App / Interactive embedding (iframe-based) to Modular e
 ### What this skill does NOT handle
 
 - Migrating from Static (signed/guest) embedding — use the `metabase-static-embedding-to-modular-guest-embedding-upgrade` skill instead
-- Migrating to the React SDK — use the `metabase-modular-embedding-to-modular-embedding-sdk-upgrade` skill after this one
-- Upgrading the embedding version after migration — use the `metabase-modular-embedding-version-upgrade` skill for future upgrades
 
 ## Allowed documentation sources
 
