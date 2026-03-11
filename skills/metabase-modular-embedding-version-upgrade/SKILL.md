@@ -1,6 +1,6 @@
 ---
 name: metabase-modular-embedding-version-upgrade
-description: Upgrades a project's Metabase modular embedding SDK (@metabase/embedding-sdk-react) or EmbedJS/Modular embedding version. Use when the user wants to upgrade their Metabase modular embedding integration to a newer version.
+description: Upgrades a project's Metabase Modular embedding SDK (@metabase/embedding-sdk-react) or Modular embedding (embed.js) version. Use when the user wants to upgrade their Metabase modular embedding integration to a newer version.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
@@ -19,7 +19,7 @@ If you cannot complete a step due to missing info or tool failure, you must:
 
 Your response should contain these sections in this order:
 
-1. **Upgrade Plan Checklist** (Step 0)
+1. **Step 0: Upgrade Plan Checklist**
 2. **Step 1 Results: Project Scan**
 3. **Step 2 Results: d.ts Diff / Target Docs** (primary or fallback)
 4. **Step 3: Change Catalog**
@@ -33,10 +33,10 @@ Each step section should end with a status line:
 
 ### Evidence requirements
 
-- Step 1: list every matched file path and the matching grep lines (SDK imports or EmbedJS API calls/script tags). Full file analysis happens in Step 4.
+- Step 1: list every matched file path and the matching grep lines (SDK imports or Modular embedding API calls/script tags). Full file analysis happens in Step 4.
 - Step 2 (primary path): show the diff output between d.ts files. (hybrid/fallback path): list each fetched URL + confirm files are loaded in context. Do not analyze or resolve types here — that's Step 3's job.
 - Step 3: the structured change catalog — every changed/removed/added symbol with its fully resolved concrete type.
-- Step 4: per file — SDK/EmbedJS usage found (components, props, config options, callbacks, data flows), which catalog entries affect this file, invalid usages found, exact diffs applied.
+- Step 4: per file — SDK/Modular embedding usage found (components, props, config options, callbacks, data flows), which catalog entries affect this file, invalid usages found, exact diffs applied.
 - Step 5: the exact command run and error summary if any remain.
 
 ## Performance
@@ -72,11 +72,11 @@ All four tool calls in ONE message.
 
 **Round 2** — `prepare.sh` ALONE (single Bash call, nothing else):
 ```bash
-bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET}
-# or for EmbedJS:
+bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --sdk
+# or for Modular embedding (embed.js):
 bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
 ```
-This single script does everything: npm pack both versions, check d.ts, fetch+truncate changelog, and fetch docs for versions without d.ts. It outputs `SDK_TMPDIR` and d.ts/doc availability.
+Always pass `--sdk` or `--embedjs` to indicate the embedding type. This single script does everything: npm pack both versions (SDK only), check d.ts, fetch+truncate changelog, and fetch docs for versions without d.ts. It outputs `SDK_TMPDIR` and d.ts/doc availability.
 
 **No other tool calls in this message.** Bash calls get cancelled if a parallel Read errors.
 
@@ -93,7 +93,7 @@ After Round 3, output Step 1 Results (file list from grep) + Step 2 Results + St
 This skill handles upgrades for:
 
 - `@metabase/embedding-sdk-react` (React SDK, v52+) — uses primary or fallback path
-- EmbedJS / Modular Embedding (v56+) — always uses fallback path (no npm types available)
+- Modular embedding via embed.js (v56+) — always uses fallback path (no npm types available)
   - v56–v57: docs are at `embedded-analytics-js.md`
   - v58+: docs split into `components.md`, `appearance.md`, `authentication.md`
 
@@ -115,9 +115,9 @@ Do all version detection in Round 1 (see tool-call round budget) — not as a se
   - Otherwise run `npm view @metabase/embedding-sdk-react version` — include this in Round 1's concurrent tool calls.
 - Package manager: detect from lock files — `yarn.lock` → yarn, `pnpm-lock.yaml` → pnpm, `package-lock.json` → npm. Use the matching install command in Step 4 (e.g., `yarn install`, `pnpm install`).
 
-If package not present OR user is upgrading EmbedJS/Modular Embedding:
+If package not present OR user is upgrading Modular embedding (embed.js):
 
-- Ask the user for the current and target Metabase instance versions. EmbedJS/Modular Embedding is served from the Metabase instance, so its version matches the instance version. In Claude Code, use the AskUserQuestion tool for this.
+- Ask the user for the current and target Metabase instance versions. Modular embedding (embed.js) is served from the Metabase instance, so its version matches the instance version. In Claude Code, use the AskUserQuestion tool for this.
 - Mark Step 0 ❌ blocked until answered.
 
 ### Multi-version hops
@@ -142,7 +142,7 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 Determine which path to use:
 
 - If upgrading `@metabase/embedding-sdk-react` → attempt **primary path** (d.ts diff), with fallback if d.ts unavailable (determined during Step 2)
-- If upgrading EmbedJS/Modular Embedding → **fallback path** (skip d.ts extraction entirely)
+- If upgrading Modular embedding (embed.js) → **fallback path** (skip d.ts extraction entirely)
 
 ## Workflow
 
@@ -158,7 +158,7 @@ Step 1 happens in Round 1 — grep only, no file reading.
 - Also detect the package manager (glob for lock files).
 - Output: a file list with the SDK imports visible from grep output.
 
-**For EmbedJS / Modular Embedding upgrades:**
+**For Modular embedding (embed.js) upgrades:**
 
 - There is no npm package to grep. Instead, search the codebase for:
   - Metabase embed `<script>` tags (e.g., patterns like `metabase.js`, `embed.js`, `embedding-sdk`, or the Metabase instance URL)
@@ -178,7 +178,7 @@ You don't need to read these files manually — `read-sources.sh` handles it.
 
 ### Step 3: Build change catalog (after Steps 1–2 are ✅ complete)
 
-**Scope: only catalog changes that affect symbols visible in Step 1's grep output.** If the grep shows imports of `MetabaseProvider`, `InteractiveQuestion`, and `CollectionBrowser`, only catalog changes to those components and their props/types/callbacks. Skip changes to components the project doesn't import.
+**Scope: only catalog changes that affect symbols visible in Step 1's grep output.** For example, if the grep shows imports of `MetabaseProvider`, `InteractiveQuestion`, and `CollectionBrowser`, only catalog changes to those components and their props/types/callbacks. Skip changes to components the project doesn't import.
 
 From the d.ts diff, docs comparison, and changelog, extract changes into a catalog:
 
@@ -236,7 +236,7 @@ Each project file is analyzed and fixed independently against the change catalog
 
 For each file, a single pass that combines read + analysis + fix:
 
-1. **Read the file** — this is the first time the file content is loaded. Extract SDK components, hooks, types, props used, dot-subcomponents, and callback data flows.
+1. **Read the file** — this is the first time the file content is loaded. Extract SDK components, hooks, types, props used, dot-subcomponents (e.g., `<InteractiveQuestion.Title />`, `<InteractiveQuestion.FilterBar />`), and callback data flows.
 2. **Match catalog entries** — which changes from the catalog affect this file's usage?
 3. **Validate current usage against target API** — even if there are no breaking changes between the two versions, the file may already be using invalid prop names, wrong attribute names, non-existent component names, or incorrect signatures. Compare every usage in the file against the **target version's** API (d.ts or docs) and flag anything that doesn't match. This catches pre-existing errors that the upgrade won't fix automatically — especially common in JS-only projects and EmbedJS integrations where there's no typechecker to catch mistakes.
 4. **Deep analysis** — for each catalog match or invalid usage:
@@ -290,7 +290,7 @@ Status: ✅ complete
   - Check for renamed imports or removed exports
 - Mark Step 5 ✅ complete with a note that validation was manual (no TypeScript).
 
-**For EmbedJS / Modular Embedding upgrades:**
+**For Modular embedding (embed.js) upgrades:**
 
 - There are no npm types to typecheck. Instead:
   - If the project uses TypeScript, run the typecheck command to catch any general TS errors introduced by the migration.
@@ -309,7 +309,7 @@ Organize into these sections:
 
 **3. New features available** — relevant new APIs or options in the target version that the project could benefit from (e.g., `jwtProviderUri` replacing manual `fetchRequestToken`). Keep brief — just flag them, don't advocate.
 
-**4. Instance requirements** — minimum Metabase instance version needed for the target SDK/EmbedJS version. If the project has docker-compose or similar files, note whether the instance version was also updated.
+**4. Instance requirements** — minimum Metabase instance version needed for the target SDK version. If the project has docker-compose or similar files, note whether the instance version was also updated.
 
 **5. Technical details** — path used (primary d.ts diff / hybrid / fallback docs), versions upgraded (from → to), package manager used.
 

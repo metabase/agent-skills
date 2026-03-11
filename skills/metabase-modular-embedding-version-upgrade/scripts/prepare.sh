@@ -2,21 +2,27 @@
 # Combined probe + fetch: downloads SDK packages, checks d.ts, fetches changelog,
 # and fetches docs for versions without d.ts — all in one call.
 #
-# Usage: ./prepare.sh <CURRENT_VERSION> <TARGET_VERSION>
+# Usage: ./prepare.sh <CURRENT_VERSION> <TARGET_VERSION> --sdk
 #        ./prepare.sh <CURRENT_VERSION> <TARGET_VERSION> --embedjs
 #
-# For SDK upgrades: probes both versions via npm pack, then fetches docs
+# Requires --sdk or --embedjs flag to specify embedding type.
+# For SDK upgrades (--sdk): probes both versions via npm pack, then fetches docs
 # for whichever version lacks a d.ts file.
-# For EmbedJS upgrades (--embedjs): skips npm pack, fetches docs for both versions.
+# For Modular Embedding upgrades (--embedjs): skips npm pack, fetches docs for both versions.
 #
 # Output: prints SDK_TMPDIR, d.ts availability, and fetched doc/d.ts paths.
 
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
-CURRENT="${1:?Usage: prepare.sh <CURRENT> <TARGET> [--embedjs]}"
-TARGET="${2:?Usage: prepare.sh <CURRENT> <TARGET> [--embedjs]}"
-EMBEDJS="${3:-}"
+CURRENT="${1:?Usage: prepare.sh <CURRENT> <TARGET> --sdk|--embedjs}"
+TARGET="${2:?Usage: prepare.sh <CURRENT> <TARGET> --sdk|--embedjs}"
+MODE="${3:?Usage: prepare.sh <CURRENT> <TARGET> --sdk|--embedjs. Must specify --sdk or --embedjs.}"
+
+if [[ "$MODE" != "--sdk" && "$MODE" != "--embedjs" ]]; then
+  echo "ERROR: Third argument must be --sdk or --embedjs, got: $MODE" >&2
+  exit 1
+fi
 
 SDK_TMPDIR=$(node -e "
   const path = require('path');
@@ -29,9 +35,9 @@ SDK_TMPDIR=$(node -e "
 DOCS_DIR="$SDK_TMPDIR/docs"
 mkdir -p "$SDK_TMPDIR/current" "$SDK_TMPDIR/target" "$DOCS_DIR"
 
-if [[ "$EMBEDJS" == "--embedjs" ]]; then
-  # EmbedJS: no npm pack, fetch docs for both versions
-  echo "EmbedJS mode — fetching docs for both versions..."
+if [[ "$MODE" == "--embedjs" ]]; then
+  # Modular Embedding (embed.js): no npm pack, fetch docs for both versions
+  echo "Modular Embedding mode — fetching docs for both versions..."
 
   echo "Fetching changelog..."
   curl -sL "https://raw.githubusercontent.com/metabase/metabase/master/enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md" \

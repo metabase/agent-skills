@@ -1,6 +1,6 @@
 ---
 name: metabase-full-app-to-modular-embedding-upgrade
-description: Migrates a project from Metabase Full App / Interactive (iframe-based) embedding to Modular (web-component-based) embedding. Use when the user wants to replace Metabase iframes with Modular Embedding web components.
+description: Migrates a project from Metabase Full App / Interactive (iframe-based) embedding to Modular (web-component-based) embedding. Use when the user wants to replace Metabase iframes with Modular embedding web components.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
@@ -20,7 +20,7 @@ If you cannot complete a step due to missing info or tool failure:
 Your response should contain these sections in this order:
 
 1. **Step 0: Metabase Version Detection**
-2. **Migration Plan Checklist** (Step 0.1)
+2. **Step 0.1: Migration Plan Checklist**
 3. **Step 1: Project Scan**
 4. **Step 2: iframe Analysis & Web Component Mapping**
 5. **Step 3: Migration Plan**
@@ -46,7 +46,7 @@ Follow the app's existing architecture, template engine, layout/partial system, 
 
 ## Scope
 
-This skill converts Full App / Interactive Embedding (iframe-based) to Modular Embedding (web-component-based via `embed.js`).
+This skill converts Full App / Interactive Embedding (iframe-based) to Modular embedding (web-component-based via `embed.js`).
 
 **The consumer's app may be written in any backend language** (Node.js, Python, Ruby, PHP, Java, Go, .NET, etc.) with any template engine. Keep instructions language-agnostic unless a specific language is detected in Step 1.
 
@@ -272,7 +272,7 @@ Modular embedding reads its configuration from `window.metabaseConfig`. There is
 - **`jwtProviderUri`** must be a **full absolute URL** including protocol and host (e.g., `http://localhost:9090/sso/metabase`). Relative paths do not work because the browser needs the full origin to send the auth request. Pass the app's origin as a template variable (e.g., via middleware) and render: `jwtProviderUri: "{APP_URL}/sso/metabase"`.
   - **Version-dependent behavior** (use the version detected in Step 0):
     - **v59+**: Include `jwtProviderUri` in `window.metabaseConfig` (preferred approach).
-    - **v53–v58**: Do not include `jwtProviderUri` in `window.metabaseConfig` — it is not supported on these versions. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3g).
+    - **v53–v58**: Do not include `jwtProviderUri` in `window.metabaseConfig` — it is not supported on these versions. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3f).
 - `window.metabaseConfig` should be set exactly once — if it appears in per-iframe code instead of the layout, each component will re-initialize the SDK.
 
 #### 3c: SSO endpoint modification
@@ -297,7 +297,8 @@ For each iframe from Step 2d's Migration Mapping Table:
 
 - Specify: file path, exact old code to replace, exact new code
 - The new web component should preserve any dynamic ID expressions from the original iframe URL
-- If the iframe had explicit `width`/`height` attributes, apply equivalent CSS dimensions to the web component's parent container to control its size
+- If the iframe had explicit `width`/`height` attributes or inline `style`, apply them directly to the web component element (e.g., `<metabase-dashboard dashboard-id="1" style="width:800px;height:600px">`) — do not wrap in a `<div>`
+- If the iframe was styled via CSS classes, apply those classes directly to the web component
 - If the iframe was inside a container element with styles, keep that container
 - Remove any server-side SSO URL construction that was used only for the iframe src (e.g., building `/sso/metabase?return_to=...`). But do not remove the SSO endpoint itself — it is still needed for modular embedding auth.
 - If the iframe src was built via a server-side route handler that sends inline HTML (e.g., Express `res.send('<iframe ...')`), replace the iframe HTML within that handler's response string
@@ -312,7 +313,7 @@ After replacing iframes and converting the SSO endpoint, identify and remove:
 - Helper functions that constructed Metabase iframe URLs if they are no longer called
 - Do not remove: the SSO endpoint itself, JWT signing function, environment variable reads, or any code that is used by other parts of the application
 
-#### 3g: Metabase admin configuration notes (manual steps for the user)
+#### 3f: Metabase admin configuration notes (manual steps for the user)
 
 List these as part of the plan — they will be included in the final summary:
 
@@ -398,7 +399,7 @@ Organize the final output into these sections:
 2. **Web component mapping**: table showing each old iframe → new web component
 3. **Dropped parameters**: list of Full App iframe parameters that were dropped, with brief explanation of why they don't apply to modular embedding
 4. **Theme configuration**: any theme/appearance settings mapped into `window.metabaseConfig`
-5. **Manual steps required** (Metabase admin configuration from Step 3g):
+5. **Manual steps required** (Metabase admin configuration from Step 3f):
    - Enable modular embedding
    - Configure CORS origins
    - Configure JWT Identity Provider URI
