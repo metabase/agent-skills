@@ -316,7 +316,7 @@ Organize into these sections:
 ## Retry policy
 
 **URL fetches:**
-- The `fetch-docs.sh` script handles 404 skipping automatically. If you need to fetch manually: 404 on a version-specific page means it doesn't exist for that version — skip silently.
+- The `scripts/fetch-docs.sh` script handles 404 skipping automatically. If you need to fetch manually: 404 on a version-specific page means it doesn't exist for that version — skip silently.
 - For other errors (5xx, timeout, network): retry once immediately. If still failing, mark that step ❌ blocked and stop.
 
 **npm pack:**
