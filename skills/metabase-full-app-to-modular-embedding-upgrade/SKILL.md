@@ -1,6 +1,6 @@
 ---
 name: metabase-full-app-to-modular-embedding-upgrade
-description: Migrates a project from Metabase Full App / Interactive (iframe-based) embedding to Modular (web-component-based) embedding. Use when the user wants to replace Metabase iframes with Modular Embedding web components.
+description: Migrates a project from Metabase Full App / Interactive (iframe-based) embedding to Modular (web-component-based) embedding. Use when the user wants to replace Metabase iframes with Modular embedding web components.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
@@ -19,10 +19,10 @@ If you cannot complete a step due to missing info or tool failure:
 
 Your response should contain these sections in this order:
 
-1. **Step 0 Results: Metabase Version Detection**
-2. **Migration Plan Checklist**
-3. **Step 1 Results: Project Scan**
-4. **Step 2 Results: iframe Analysis & Web Component Mapping**
+1. **Step 0: Metabase Version Detection**
+2. **Step 0.1: Migration Plan Checklist**
+3. **Step 1: Project Scan**
+4. **Step 2: iframe Analysis & Web Component Mapping**
 5. **Step 3: Migration Plan**
 6. **Step 4: Applied Code Changes**
 7. **Step 5: Validation**
@@ -40,19 +40,19 @@ Follow the app's existing architecture, template engine, layout/partial system, 
 
 ## Important performance notes
 
-- Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in single messages wherever possible.
+- Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in a single message wherever possible.
 - Do not use sub-agents for project scanning — results need to stay in the main context for cross-referencing in later steps.
 - Do not parse repo branches, commits, PRs, or issues.
 
 ## Scope
 
-This skill converts Full App / Interactive Embedding (iframe-based) to Modular Embedding (web-component-based via `embed.js`).
+This skill converts Full App / Interactive Embedding (iframe-based) to Modular embedding (web-component-based via `embed.js`).
 
 **The consumer's app may be written in any backend language** (Node.js, Python, Ruby, PHP, Java, Go, .NET, etc.) with any template engine. Keep instructions language-agnostic unless a specific language is detected in Step 1.
 
 ### What this skill handles
 
-- Replacing `<iframe>` elements pointing to Metabase with appropriate web components
+- Replacing `<iframe>` elements pointing to Metabase with appropriate web components (e.g. `<metabase-question>`, `<metabase-dashboard>`)
 - Adding the `embed.js` script tag (exactly once at app layout level)
 - Adding `window.metabaseConfig` setup code (exactly once at app layout level)
 - Modifying SSO/JWT endpoints to support modular embedding's JSON response format
@@ -60,7 +60,7 @@ This skill converts Full App / Interactive Embedding (iframe-based) to Modular E
 
 ### Migration Plan Checklist
 
-Create a TODO list using the TaskCreate tool with these items. Mark each task as `in_progress` (via TaskUpdate) before starting it and `completed` when done:
+Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate tools:
 
 - Step 0: Detect Metabase version
 - Step 1: Scan project
@@ -75,23 +75,23 @@ Create a TODO list using the TaskCreate tool with these items. Mark each task as
 Use AskUserQuestion and halt until answered if:
 
 - The Metabase instance URL cannot be determined from project code or environment variables
-- An iframe URL pattern does not match any known content type (dashboard, question, collection, home)
+- The Metabase instance version cannot be determined from the project code
+- An iframe URL pattern does not match any known resource type (dashboard, question, collection, home)
 - No SSO/JWT endpoint can be identified in the project
 - No layout/head file can be identified (unclear where to inject embed.js)
 - Multiple layout files exist and it is unclear which one(s) to use
 - The backend language cannot be determined
-- The Metabase instance version cannot be determined from the project code
 - Multiple iframes specify different `locale` values (ask user which locale to set in `window.metabaseConfig`)
 
 ## Workflow
 
 ### Step 0: Detect Metabase version
 
-Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v53 or older`, `v54–v58`, `v59+`). Abort if < v53 (modular embedding not available). Record the version — it controls `jwtProviderUri` placement in later steps.
+Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
 
 ---
 
-### Step 1: Scan the project (NO sub-agent)
+### Step 1: Scan the project (no sub-agent)
 
 Perform all of the following scans. Use parallel tool calls within a single message wherever there are no dependencies.
 
@@ -106,7 +106,7 @@ Use Grep to search for all of these patterns (in parallel):
 
 - `<iframe` in all template/HTML/JSX/view files
 - `iframe` in all server-side code files (JS/TS/Python/Ruby/Go/Java/PHP) — catches iframes built via string concatenation or template literals
-- `auth/sso` adjacent to `iframe` or `src` attributes
+- `auth/sso` adjacent to `iframe` or `src` attributes. Note: the SSO URL may be constructed in a separate variable or function and passed to the iframe `src` — if the iframe `src` is a variable, trace its definition to check for `auth/sso`.
 
 For each file with a match, read the entire file.
 
@@ -135,7 +135,7 @@ Search for:
 
 #### 1e: Find Metabase configuration
 
-Grep for `METABASE_` and `MB_SITE_URL` prefixed variables. Record every Metabase-related variable name and where it is read.
+Grep for `METABASE_` and `MB_` prefixed variables. Record every Metabase-related variable name and where it is read.
 
 #### Output: Structured Project Inventory
 
@@ -157,23 +157,22 @@ SSO endpoint: {file}:{line} — {route} ({method})
 
 ---
 
-### Step 2: Analyze iframes and map to web components (ONLY after Step 1 ✅)
+### Step 2: Analyze iframes and map to web components (only after Step 1 ✅)
 
-For EACH iframe found in Step 1:
+For each iframe found in Step 1:
 
 #### 2a: Parse the iframe URL
 
 Extract from the iframe `src` attribute (which may be a template expression, variable, or literal):
 
 - **Metabase base URL**: may come from env var, constant, or be hardcoded
-- **Content path**: the path after the base URL, e.g., `/dashboard/1`, `/question/entity/abc123`, `/collection/5`
-- **Content type**: `dashboard`, `question`, `collection`, or `home` (if path is `/`)
-- **Entity ID or numeric ID**: the identifier in the path.
-  - An ID may be 
-    - a numeric id, i.e. 123
-    - a numeric id + slug, i.e. 123-slug, in this case you should drop off slug
-    - an entity id
-      - also there may be a case with url like `/question/entity/{entity_id}`
+- **Resource path**: the path after the base URL, e.g., `/dashboard/1`, `/question/entity/abc123`, `/collection/5`
+- **Resource type**: `dashboard`, `question`, `collection`, or `home` (if path is `/`)
+- **Entity ID or numeric ID**: the resource identifier in the path.
+  - An ID may be:
+    - a numeric id, e.g. 123
+    - a numeric id + slug, e.g. 123-slug. You need to remove the slug completely; including the slug will prevent the resource from loading.
+    - an entity id — URLs with pattern `/{resource_type}/entity/{entity_id}` use entity IDs
 - **URL hash/query parameters** used for UI customization (e.g., `#logo=false&top_nav=false`)
 - **SSO wrapping**: whether the iframe goes through an SSO endpoint first (e.g., `/sso/metabase?return_to=...`)
 
@@ -181,10 +180,10 @@ Extract from the iframe `src` attribute (which may be a template expression, var
 
 | Full App iframe path pattern | Modular Web Component | Required Attribute |
 |---|---|---|
-| `/dashboard/{id}` or `/dashboard/entity/{eid}` | `<metabase-dashboard>` | `dashboard-id="{id or eid}"` |
-| `/question/{id}` or `/question/entity/{eid}` | `<metabase-question>` | `question-id="{id or eid}"` |
-| `/model/{id}` or `/model/entity/{eid}` | `<metabase-question>` | `question-id="{id or eid}"` |
-| `/collection/{id}` or `/collection/entity/{eid}` | `<metabase-browser>` | `initial-collection="{id or eid}"` |
+| `/dashboard/{id}` or `/dashboard/entity/{entity_id}` | `<metabase-dashboard>` | `dashboard-id="{id or entity_id}"` |
+| `/question/{id}` or `/question/entity/{entity_id}` | `<metabase-question>` | `question-id="{id or entity_id}"` |
+| `/model/{id}` or `/model/entity/{entity_id}` | `<metabase-question>` | `question-id="{id or entity_id}"` |
+| `/collection/{id}` or `/collection/entity/{entity_id}` | `<metabase-browser>` | `initial-collection="{id or entity_id}"` |
 | `/` (Metabase home / root) | `<metabase-browser>` | `initial-collection="root"` |
 
 If the iframe path is built dynamically from a variable, the web component attribute should use the same variable/expression.
@@ -193,18 +192,18 @@ If an iframe path does not match any known pattern → AskUserQuestion.
 
 #### 2c: Map URL customization parameters
 
-**Parameters to DROP** (not applicable — modular web components do not include Metabase application chrome):
+**Parameters to drop** (not applicable — modular web components do not include Metabase application chrome):
 
 | Full App Parameter | Why it is dropped |
 |---|---|
 | `top_nav` | Web components have no Metabase top navigation bar |
 | `side_nav` | Web components have no Metabase sidebar |
-| `logo` | Web components have no Metabase logo |
+| `logo` | Web components have no Metabase or whitelabel logo |
 | `search` | Web components have no Metabase search bar |
 | `new_button` | No `+ New` button (use `with-new-question` / `with-new-dashboard` on `<metabase-browser>` if applicable) |
 | `breadcrumbs` | Web components have no Metabase breadcrumbs |
 
-**Parameters that map to web component ATTRIBUTES:**
+**Parameters that map to web component attributes:**
 
 | Full App Parameter | Modular Equivalent |
 |---|---|
@@ -218,8 +217,8 @@ If an iframe path does not match any known pattern → AskUserQuestion.
 | `locale={code}` | `locale: "{code}"` |
 
 **Locale migration rules:**
-- If ONE locale value is found across all iframes → add `locale: "{code}"` to `window.metabaseConfig` automatically
-- If MULTIPLE DIFFERENT locale values are found across iframes → AskUserQuestion to let the user decide which single locale to set in `window.metabaseConfig` (modular embedding supports only one global locale)
+- If one locale value is found across all iframes → add `locale: "{code}"` to `window.metabaseConfig` automatically
+- If multiple different locale values are found across iframes → AskUserQuestion to let the user decide which single locale to set in `window.metabaseConfig` (modular embedding supports only one global locale)
 
 #### 2d: Output Migration Mapping Table
 
@@ -237,7 +236,7 @@ iframe #{n}: {file}:{line}
 
 ---
 
-### Step 3: Plan migration changes (ONLY after Step 2 ✅)
+### Step 3: Plan migration changes (only after Step 2 ✅)
 
 Create a complete file-by-file change plan covering all areas below. Every change should be specified with the target file, the old code, and the new code.
 
@@ -273,7 +272,7 @@ Modular embedding reads its configuration from `window.metabaseConfig`. There is
 - **`jwtProviderUri`** must be a **full absolute URL** including protocol and host (e.g., `http://localhost:9090/sso/metabase`). Relative paths do not work because the browser needs the full origin to send the auth request. Pass the app's origin as a template variable (e.g., via middleware) and render: `jwtProviderUri: "{APP_URL}/sso/metabase"`.
   - **Version-dependent behavior** (use the version detected in Step 0):
     - **v59+**: Include `jwtProviderUri` in `window.metabaseConfig` (preferred approach).
-    - **v53–v58**: Do not include `jwtProviderUri` in `window.metabaseConfig` — it is not supported on these versions. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3g).
+    - **v53–v58**: Do not include `jwtProviderUri` in `window.metabaseConfig` — it is not supported on these versions. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3f).
 - `window.metabaseConfig` should be set exactly once — if it appears in per-iframe code instead of the layout, each component will re-initialize the SDK.
 
 #### 3c: SSO endpoint modification
@@ -294,11 +293,12 @@ Refer to the Metabase authentication documentation for the expected endpoint beh
 
 #### 3d: iframe replacement plan
 
-For EACH iframe from Step 2d's Migration Mapping Table:
+For each iframe from Step 2d's Migration Mapping Table:
 
 - Specify: file path, exact old code to replace, exact new code
 - The new web component should preserve any dynamic ID expressions from the original iframe URL
-- If the iframe had explicit `width`/`height` attributes, wrap the web component in a `<div>` with equivalent CSS dimensions (web components expand to fill their container)
+- If the iframe had explicit `width`/`height` attributes or inline `style`, apply them directly to the web component element (e.g., `<metabase-dashboard dashboard-id="1" style="width:800px;height:600px">`) — do not wrap in a `<div>`
+- If the iframe was styled via CSS classes, apply those classes directly to the web component
 - If the iframe was inside a container element with styles, keep that container
 - Remove any server-side SSO URL construction that was used only for the iframe src (e.g., building `/sso/metabase?return_to=...`). But do not remove the SSO endpoint itself — it is still needed for modular embedding auth.
 - If the iframe src was built via a server-side route handler that sends inline HTML (e.g., Express `res.send('<iframe ...')`), replace the iframe HTML within that handler's response string
@@ -313,7 +313,7 @@ After replacing iframes and converting the SSO endpoint, identify and remove:
 - Helper functions that constructed Metabase iframe URLs if they are no longer called
 - Do not remove: the SSO endpoint itself, JWT signing function, environment variable reads, or any code that is used by other parts of the application
 
-#### 3g: Metabase admin configuration notes (manual steps for the user)
+#### 3f: Metabase admin configuration notes (manual steps for the user)
 
 List these as part of the plan — they will be included in the final summary:
 
@@ -326,7 +326,7 @@ List these as part of the plan — they will be included in the final summary:
 
 ---
 
-### Step 4: Apply code changes (ONLY after Step 3 ✅)
+### Step 4: Apply code changes (only after Step 3 ✅)
 
 Apply all changes from Step 3 in this order (backend changes first to minimize the window where things are broken):
 
@@ -344,27 +344,27 @@ Apply all changes from Step 3 in this order (backend changes first to minimize t
 
 ---
 
-### Step 5: Validate changes (ONLY after Step 4 ✅)
+### Step 5: Validate changes (only after Step 4 ✅)
 
-Perform all of these checks. Each check should have an explicit pass/fail result.
+Perform all of these checks. Checks 5a–5c can run in parallel (all are independent grep searches). Check 5d and 5e require reading specific files. Each check should have an explicit pass/fail result.
 
 #### 5a: No remaining Metabase iframes
 
 Use Grep to search for `<iframe` and `iframe` across all project files (excluding `node_modules`, `.git`, lockfiles).
-Verify that NO iframes pointing to Metabase URLs remain.
-Non-Metabase iframes (if any) should be untouched.
+Verify that no Full App / Interactive Embedding iframes pointing to Metabase remain.
+Non-Metabase iframes should be untouched. Also leave any guest embedding (formerly "static embedding") or public embedding iframes untouched — those use different URL patterns (e.g., `/embed/` or `/public/`) and are not part of this migration.
 
-**Pass criteria**: zero Metabase-related iframes found.
+**Pass criteria**: zero Full App / Interactive Embedding iframes found (guest/public embed iframes are excluded).
 
 #### 5b: embed.js appears exactly once
 
-Use Grep to search for `embed.js` across all project files (excluding `node_modules`, `.git`).
-**Pass criteria**: exactly ONE occurrence in the layout/head file.
+Use Grep to search for `/app/embed.js` across all project files (excluding `node_modules`, `.git`). This pattern is specific to Metabase's embed script URL and avoids false positives from other tools that may use a generic `embed.js` filename.
+**Pass criteria**: exactly one occurrence in the layout/head file.
 
 #### 5c: window.metabaseConfig is set exactly once
 
 Use Grep to search for `window.metabaseConfig` across all project files (excluding `node_modules`, `.git`).
-**Pass criteria**: exactly ONE occurrence (the assignment in the layout/head file).
+**Pass criteria**: exactly one occurrence (the assignment in the layout/head file).
 
 #### 5d: SSO endpoint returns JSON only
 
@@ -384,7 +384,7 @@ Read each modified file and verify:
 
 **Pass criteria**: all checks pass.
 
-If ANY check fails:
+If any check fails:
 - Fix the issue immediately
 - Re-run the specific check
 - If unable to fix after 3 attempts, mark Step 5 ❌ blocked and report which check failed and why
@@ -399,7 +399,7 @@ Organize the final output into these sections:
 2. **Web component mapping**: table showing each old iframe → new web component
 3. **Dropped parameters**: list of Full App iframe parameters that were dropped, with brief explanation of why they don't apply to modular embedding
 4. **Theme configuration**: any theme/appearance settings mapped into `window.metabaseConfig`
-5. **Manual steps required** (Metabase admin configuration from Step 3g):
+5. **Manual steps required** (Metabase admin configuration from Step 3f):
    - Enable modular embedding
    - Configure CORS origins
    - Configure JWT Identity Provider URI
