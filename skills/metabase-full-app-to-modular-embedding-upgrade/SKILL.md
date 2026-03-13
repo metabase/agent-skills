@@ -79,12 +79,20 @@ Other constraints:
 - No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
 - Do not follow changelog links to GitHub or guess URLs not handled by the script
 
+## Allowed documentation sources
+
+Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+
+Other constraints:
+- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
+- Do not follow changelog links to GitHub or guess URLs not handled by the script
+
 ## AskUserQuestion triggers
 
 Use AskUserQuestion and halt until answered if:
 
 - The Metabase instance URL cannot be determined from project code or environment variables
-- The Metabase instance version cannot be determined from the project code
+- Always ask for the Metabase instance version — do not rely solely on code detection
 - An iframe URL pattern does not match any known resource type (dashboard, question, collection, home)
 - No SSO/JWT endpoint can be identified in the project
 - No layout/head file can be identified (unclear where to inject embed.js)
@@ -108,7 +116,15 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 
 ## Workflow
 
-### Step 0: Detect Metabase version
+### Step 0: Detect Metabase instance version
+
+Always AskUserQuestion for the Metabase instance version — even if a version appears in Docker tags or env vars, confirm it with the user. Abort if v52 or older (modular embedding was introduced in v53).
+
+Then fetch the embedding docs for the confirmed version:
+
+```bash
+bash <skill-path>/scripts/fetch-docs.sh {INSTANCE_VERSION}
+```
 
 Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`, `metabase/metabase-enterprise:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
 
@@ -291,21 +307,18 @@ Modular embedding reads its configuration from `window.metabaseConfig`. There is
 
 - **Target**: same layout/head file as 3a
 - **Location**: before the embed.js script tag (the config must be set before embed.js loads, otherwise the SDK has no config to read)
-- **Code to add** (minimum required config):
+- **Code to add** (minimum — add auth fields only if the fetched docs list them for this version):
   ```html
   <script>
     window.metabaseConfig = {
       instanceUrl: "{METABASE_SITE_URL}",
-      jwtProviderUri: "{SSO_ENDPOINT_URL}",
+      // Add auth fields here only if supported by the confirmed version's docs
     };
   </script>
   ```
 - **Locale**: If a `locale` parameter was found on any iframe in Step 2c, add `locale: "{code}"` to the config object. If multiple iframes had different locale values, the user will have already been asked which one to use (per AskUserQuestion trigger).
-- Both `instanceUrl` and `jwtProviderUri` should be rendered dynamically using the project's template expression syntax.
-- **`jwtProviderUri`** must be a **full absolute URL** including protocol and host (e.g., `http://localhost:9090/sso/metabase`). Relative paths do not work because the browser needs the full origin to send the auth request. Pass the app's origin as a template variable (e.g., via middleware) and render: `jwtProviderUri: "{APP_URL}/sso/metabase"`.
-  - **Version-dependent behavior** (use the version detected in Step 0):
-    - **v59+**: Include `jwtProviderUri` in `window.metabaseConfig` (preferred approach).
-    - **v53–v58**: Do not include `jwtProviderUri` in `window.metabaseConfig` — it is not supported on these versions. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3f).
+- `instanceUrl` (and `jwtProviderUri` if supported) should be rendered dynamically using the project's template expression syntax.
+- **Auth config fields**: Consult the docs fetched in Step 0 to determine which fields `window.metabaseConfig` supports for the confirmed version. For example, `jwtProviderUri` may or may not be available. If the docs list it, include it as a **full absolute URL** (e.g., `http://localhost:9090/sso/metabase`) — relative paths don't work. If the docs don't list it, the JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3f).
 - `window.metabaseConfig` should be set exactly once — if it appears in per-iframe code instead of the layout, each component will re-initialize the SDK.
 
 #### 3c: SSO endpoint modification
@@ -316,7 +329,7 @@ For modular embedding, the embed.js SDK sends a fetch request to the JWT Identit
 
 This is a full migration, not a gradual one. The old iframe-based embedding is being completely replaced, so the redirect behavior is no longer needed.
 
-Refer to the Metabase authentication documentation for the expected endpoint behavior: https://www.metabase.com/docs/latest/embedding/authentication
+Consult the auth docs fetched in Step 0 for the expected SSO endpoint response format for the confirmed version.
 
 **Constraints:**
 - Do not modify the JWT signing logic — only change how the response is delivered
@@ -352,9 +365,7 @@ List these as part of the plan — they will be included in the final summary:
 
 1. **Enable modular embedding**: Admin > Embedding > toggle "Enable modular embedding"
 2. **Configure CORS origins**: Admin > Embedding > Modular embedding > add the host app's domain (e.g., `http://localhost:9090`)
-3. **Configure JWT Identity Provider URI** (use the version detected in Step 0):
-   - **v53–v58 (required)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint (e.g., `http://localhost:9090/sso/metabase`). This is the only way to configure JWT auth on these versions since `jwtProviderUri` in config is not supported.
-   - **v59+ (optional if `jwtProviderUri` is set in `window.metabaseConfig`)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint. If `jwtProviderUri` was added to `window.metabaseConfig` in Step 3b, this admin setting is not strictly required but can serve as a backup.
+3. **Configure JWT Identity Provider URI**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint (e.g., `http://localhost:9090/sso/metabase`). Check the fetched docs to determine whether this is required or optional for the confirmed version (it depends on whether `window.metabaseConfig` supports a JWT provider field).
 4. **JWT shared secret**: No change needed — reuse the existing shared secret from Full App embedding setup
 
 ### Step 4: Apply code changes (only after Step 3 ✅)
