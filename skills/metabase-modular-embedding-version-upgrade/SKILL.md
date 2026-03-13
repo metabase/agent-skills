@@ -97,7 +97,7 @@ This skill handles upgrades for:
   - v56–v57: docs are at `embedded-analytics-js.md`
   - v58+: docs split into `components.md`, `appearance.md`, `authentication.md`
 
-### What this skill does NOT handle
+### What this skill does not handle
 
 - Migrating between different embedding technologies
 

@@ -74,9 +74,8 @@ This skill converts Static (signed/guest) iframe embedding to Modular guest embe
 - Mapping locked `params` in the JWT to `initial-parameters` attribute where applicable
 - Removing `iframeResizer.js` references if present
 
-### What this skill does NOT handle
+### What this skill does not handle
 
-- Migrating from Full App (Interactive) embedding — use the `metabase-full-app-to-modular-embedding-upgrade` skill instead
 - Migrating to SSO-based modular embedding (with user accounts) — this skill targets guest embedding only
 
 ### How guest modular embedding differs from static iframe embedding
@@ -131,7 +130,7 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 
 ### Step 0: Detect Metabase version
 
-Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v53 or older`, `v54–v58`, `v59+`). Abort if < v53 (modular embedding not available). Record the version.
+Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`, `metabase/metabase-enterprise:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v53 or older`, `v54–v58`, `v59+`). Abort if < v53 (modular embedding not available). Record the version.
 
 ### Step 1: Scan the project + fetch docs
 

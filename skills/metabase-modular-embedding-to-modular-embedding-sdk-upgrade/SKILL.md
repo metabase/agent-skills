@@ -1,6 +1,6 @@
 ---
 name: metabase-modular-embedding-to-modular-embedding-sdk-upgrade
-description: Migrates a React project from Metabase Modular embedding (embed.js web components) to the Modular embedding SDK (@metabase/embedding-sdk-react). Replaces metabase-dashboard, metabase-question, metabase-browser custom elements with React SDK components, removes embed.js script tag, and converts window.metabaseConfig to MetabaseProvider. Use this skill whenever the user wants to migrate/convert/switch from modular embedding to modular embedding SDK, from embed.js to React SDK, from EmbedJS to SDK, from web components to React components, or stop using embed.js and use MetabaseProvider instead. This is NOT a version upgrade — it changes the embedding technology.
+description: Migrates a React project from Metabase Modular embedding (embed.js web components) to the Modular embedding SDK (@metabase/embedding-sdk-react). Use when the user wants to switch from embed.js web components to React SDK components (MetabaseProvider). This is not a version upgrade — it changes the embedding technology.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
@@ -20,7 +20,7 @@ If you cannot complete a step due to missing info or tool failure, you must:
 Your response should contain these sections in this order:
 
 1. **Step 0: Prerequisites Check**
-2. **Migration Plan Checklist** (Step 0.1)
+2. **Step 0.1: Migration Plan Checklist**
 3. **Step 1: Project Scan**
 4. **Step 2: Target SDK API**
 5. **Step 3: Migration Mapping**
@@ -92,7 +92,7 @@ After Round 3, output Step 1 Results + Step 2 Results + Step 3 Migration Mapping
 
 ## Scope
 
-This skill converts Modular embedding web components used inside a React app to the Modular embedding SDK (`@metabase/embedding-sdk-react`). The project must already be a React application with Modular embedding web components in JSX/TSX files.
+This skill converts Modular embedding (web-components-based) used inside a React app to the Modular embedding SDK (`@metabase/embedding-sdk-react`). The project must already be a React application with Modular embedding web components in JSX/TSX files.
 
 If the project is not React-based, this skill does not apply. If the project uses iframes instead of web components, use the `metabase-full-app-to-modular-embedding-upgrade` skill instead.
 
@@ -106,7 +106,7 @@ If the project is not React-based, this skill does not apply. If the project use
 - Removing the `window.metabaseConfig` assignment
 - Converting HTML attribute naming (kebab-case) to React prop naming (camelCase)
 
-### What this skill does NOT handle
+### What this skill does not handle
 
 - Non-React projects using Modular embedding web components in plain HTML/templates
 
@@ -114,11 +114,11 @@ If the project is not React-based, this skill does not apply. If the project use
 
 Do all version detection in Round 1.
 
-- **Metabase instance version**: grep for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references in env files. If undetected, AskUserQuestion.
+- **Metabase instance version**: grep for Docker image tags (`metabase/metabase:v`, `metabase/metabase-enterprise:v`), `METABASE_VERSION`, or version references in env files. If undetected, AskUserQuestion.
 - **Target SDK version**:
   - If user specifies, use it.
   - Otherwise, use the Metabase instance version to determine the matching SDK version (they use the same version scheme: Metabase v0.58 → SDK 0.58.x). Run `npm view @metabase/embedding-sdk-react version` to find the latest matching version.
-- **Package manager**: detect from lock files — `yarn.lock` → yarn, `pnpm-lock.yaml` → pnpm, `package-lock.json` → npm.
+- **Package manager**: detect from lock files e.g. `yarn.lock` → yarn, `pnpm-lock.yaml` → pnpm, `package-lock.json` → npm.
 
 ## Pre-workflow steps
 
@@ -142,7 +142,7 @@ Verify before starting:
 
 1. **React dependency**: check `package.json` for `react` in `dependencies` or `devDependencies`. If not present, mark ❌ blocked — this skill only applies to React projects.
 2. **Web components in JSX/TSX**: confirm the grep results from Round 1 show `<metabase-*` usage in `.jsx`, `.tsx`, `.js`, or `.ts` files (not only in plain HTML). If web components are only in plain HTML files, mark ❌ blocked — this skill requires web components to already be used inside React.
-3. **Metabase instance version**: detect or ask user.
+3. **Metabase instance version**: detect or ask user (see "Detecting versions" section above).
 4. **Target SDK version**: determine as described in "Detecting versions".
 5. **Package manager**: detect from lock files.
 
@@ -181,7 +181,7 @@ If d.ts is available, extract from it:
 - The `MetabaseProvider` config type (what fields it accepts)
 - The auth config type
 
-If d.ts is not available (very old SDK versions), mark Step 2 ❌ blocked — the user should target a newer SDK version.
+If d.ts is not available (SDK versions before 0.52.0 do not ship a single `index.d.ts`), mark Step 2 ❌ blocked — the user should target a newer SDK version.
 
 ### Step 3: Build migration mapping (after Steps 1–2 are ✅ complete)
 
@@ -220,7 +220,7 @@ Map `window.metabaseConfig` fields to `MetabaseProvider` config:
 ```
 ### Auth & Config
 - window.metabaseConfig.instanceUrl → config.metabaseInstanceUrl (check d.ts for exact field name)
-- window.metabaseConfig.jwtProviderUri → authConfig.jwtProviderUri or config.jwtProviderUri (check d.ts)
+- window.metabaseConfig.jwtProviderUri → authConfig.jwtProviderUri or authConfig.authProviderUri or config.authProviderUri (check d.ts — the field was renamed from `jwtProviderUri` to `authProviderUri` in some versions)
 - window.metabaseConfig.locale → locale prop or config field (check d.ts)
 ```
 
@@ -270,7 +270,7 @@ Determine where to add `<MetabaseProvider>`:
 
 When converting HTML attribute values to React props:
 - String `"true"` / `"false"` → boolean `{true}` / `{false}`
-- Numeric strings `"123"` → number `{123}` (only if the d.ts prop type is `number`)
+- Numeric strings `"123"` → check the d.ts prop type: if it's a union (e.g., `number | string`), keep as string; if it's strictly `number`, convert to `{123}`
 - Template expressions already in JSX (e.g., `{dashboardId}`) → keep as-is
 - Static string IDs → keep as strings if the d.ts prop type accepts strings, otherwise convert
 

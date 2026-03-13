@@ -67,9 +67,9 @@ This skill converts Full App / Interactive embedding (iframe-based) to Modular e
 - Modifying SSO/JWT endpoints to support modular embedding's JSON response format
 - Mapping iframe URL customization parameters to theme config and component attributes
 
-### What this skill does NOT handle
+### What this skill does not handle
 
-- Migrating from Static (signed/guest) embedding — use the `metabase-static-embedding-to-modular-guest-embedding-upgrade` skill instead
+- Migrating from Static (signed/guest) embedding
 
 ## Allowed documentation sources
 
@@ -110,7 +110,7 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 
 ### Step 0: Detect Metabase version
 
-Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
+Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`, `metabase/metabase-enterprise:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
 
 ### Step 1: Scan the project + fetch docs no sub-agent)
 
