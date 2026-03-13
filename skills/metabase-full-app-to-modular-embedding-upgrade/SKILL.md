@@ -73,19 +73,13 @@ This skill converts Full App / Interactive embedding (iframe-based) to Modular e
 
 ## Allowed documentation sources
 
-Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+Fetch the version-specific `llms-embedding-full.txt` from `https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt`. This single file contains all embedding documentation for that version, optimized for LLM consumption. Use WebFetch to retrieve it directly — no scripts needed.
+
+The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`).
 
 Other constraints:
-- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
-- Do not follow changelog links to GitHub or guess URLs not handled by the script
-
-## Allowed documentation sources
-
-Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
-
-Other constraints:
-- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
-- Do not follow changelog links to GitHub or guess URLs not handled by the script
+- No GitHub PRs/issues or npm pages
+- Do not follow changelog links to GitHub or guess URLs
 
 ## AskUserQuestion triggers
 
@@ -120,10 +114,10 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 
 Always AskUserQuestion for the Metabase instance version — even if a version appears in Docker tags or env vars, confirm it with the user. Abort if v52 or older (modular embedding was introduced in v53).
 
-Then fetch the embedding docs for the confirmed version:
+Then fetch the embedding docs for the confirmed version using WebFetch:
 
-```bash
-bash <skill-path>/scripts/fetch-docs.sh {INSTANCE_VERSION}
+```
+https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
 ```
 
 Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`, `metabase/metabase-enterprise:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
@@ -134,15 +128,13 @@ Perform the project scan and doc fetch concurrently — they are independent. Us
 
 #### 1a: Fetch target version docs
 
-Use `scripts/fetch-docs.sh` to fetch the embedding documentation for the target Metabase version:
+Use WebFetch to retrieve the embedding docs for the target Metabase version:
 
-```bash
-bash <skill-path>/scripts/fetch-docs.sh {TARGET_VERSION}
+```
+https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
 ```
 
-The script discovers all available doc pages for that version via the GitHub Contents API — no hardcoded page lists. After it completes, read all fetched files from `/tmp/embedjs-docs/`.
-
-These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+This single file contains all embedding documentation for that version. These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
 
 Launch this concurrently with the project scan steps below.
 

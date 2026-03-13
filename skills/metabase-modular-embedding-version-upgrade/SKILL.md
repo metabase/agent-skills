@@ -70,21 +70,23 @@ Steps 1+2 must complete in **3 tool-call rounds**.
 
 All four tool calls in ONE message.
 
-**Round 2** — `prepare.sh` ALONE (single Bash call, nothing else):
+**Round 2** — `prepare.sh` + WebFetch docs (concurrent):
 ```bash
 bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --sdk
 # or for Modular embedding (embed.js):
 bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
 ```
-Always pass `--sdk` or `--embedjs` to indicate the embedding type. This single script does everything: npm pack both versions (SDK only), check d.ts, fetch+truncate changelog, and fetch docs for versions without d.ts. It outputs `SDK_TMPDIR` and d.ts/doc availability.
+Always pass `--sdk` or `--embedjs` to indicate the embedding type. The script does: npm pack both versions (SDK only), check d.ts, and fetch+truncate changelog. It outputs `SDK_TMPDIR` and d.ts availability.
 
-**No other tool calls in this message.** Bash calls get cancelled if a parallel Read errors.
+In the same message, use WebFetch to fetch the embedding docs for the current and/or target version:
+- For `--embedjs`: fetch both `https://www.metabase.com/docs/v0.{CURRENT}/llms-embedding-full.txt` and `https://www.metabase.com/docs/v0.{TARGET}/llms-embedding-full.txt`
+- For `--sdk`: fetch docs for versions without d.ts (as reported by prepare.sh in a subsequent round if needed)
 
 **Round 3** — `read-sources.sh` (single Bash call — reference data only, no project files):
 ```bash
 bash <skill-path>/scripts/read-sources.sh {SDK_TMPDIR}
 ```
-Dumps SDK reference data (d.ts diff or raw d.ts, doc files, changelog) to stdout. **Does not read project files** — those are read one by one in Step 4.
+Dumps SDK reference data (d.ts diff or raw d.ts, changelog) to stdout. **Does not read project files** — those are read one by one in Step 4.
 
 After Round 3, output Step 1 Results (file list from grep) + Step 2 Results + Step 3 Change Catalog with zero additional tool calls. Do not treat Step 3 as a separate thinking phase — produce it inline right after the data is loaded.
 
@@ -103,11 +105,13 @@ This skill handles upgrades for:
 
 ## Allowed documentation sources
 
-Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+Fetch the version-specific `llms-embedding-full.txt` from `https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt`. This single file contains all embedding documentation for that version, optimized for LLM consumption. Use WebFetch to retrieve it directly — no scripts needed.
+
+The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`).
 
 Other constraints:
-- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com` (preserves `include_file` directives needed for snippet expansion)
-- Do not follow changelog links to GitHub or guess URLs not handled by the script
+- No GitHub PRs/issues or npm pages
+- Do not follow changelog links to GitHub or guess URLs
 
 ## Detecting versions
 

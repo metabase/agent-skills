@@ -74,13 +74,16 @@ Steps 1+2 must complete in **3 tool-call rounds**.
 
 All tool calls in one message.
 
-**Round 2** — `prepare.sh` alone (single Bash call, nothing else):
+**Round 2** — `prepare.sh` + WebFetch docs (concurrent):
 ```bash
 bash <skill-path>/scripts/prepare.sh {TARGET_VERSION}
 ```
 Downloads the target SDK npm package and extracts it. Outputs `SDK_TMPDIR` and d.ts availability.
 
-**No other tool calls in this message.** Bash calls get cancelled if a parallel Read errors.
+In the same message, use WebFetch to fetch the embedding docs:
+```
+https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
+```
 
 **Round 3** — `read-sources.sh` (single Bash call):
 ```bash
@@ -181,7 +184,9 @@ If d.ts is available, extract from it:
 - The `MetabaseProvider` config type (what fields it accepts)
 - The auth config type
 
-If d.ts is not available (SDK versions before 0.52.0 do not ship a single `index.d.ts`), mark Step 2 ❌ blocked — the user should target a newer SDK version.
+The embedding docs (`llms-embedding-full.txt`) fetched by `prepare.sh` provide supplementary reference for component usage, configuration options, and migration guidance. Use them alongside the d.ts for a complete picture.
+
+If d.ts is not available (SDK versions before 0.52.0 do not ship a single `index.d.ts`), use the embedding docs as the primary API reference instead. If neither d.ts nor docs are available, mark Step 2 ❌ blocked.
 
 ### Step 3: Build migration mapping (after Steps 1–2 are ✅ complete)
 

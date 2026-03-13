@@ -1,10 +1,10 @@
 #!/bin/bash
-# Dumps SDK reference data (d.ts diff, docs, changelog) to stdout.
+# Dumps SDK reference data (d.ts diff, changelog) to stdout.
 # Replaces multiple parallel Read calls to avoid cancellations.
 #
 # Usage: ./read-sources.sh <SDK_TMPDIR>
 #
-# SDK_TMPDIR: the temp directory from prepare.sh (contains d.ts diff, docs, changelog)
+# SDK_TMPDIR: the temp directory from prepare.sh (contains d.ts diff, changelog)
 #
 # Output format:
 #   ════ FILE: <path> ════
@@ -35,18 +35,6 @@ elif [[ -f "$SDK_TMPDIR/current/package/dist/index.d.ts" ]]; then
   print_file "$SDK_TMPDIR/current/package/dist/index.d.ts"
 elif [[ -f "$SDK_TMPDIR/target/package/dist/index.d.ts" ]]; then
   print_file "$SDK_TMPDIR/target/package/dist/index.d.ts"
-fi
-
-# --- Doc files ---
-DOCS_DIR="$SDK_TMPDIR/docs"
-if [[ -d "$DOCS_DIR" ]] && ls "$DOCS_DIR"/*.md &>/dev/null; then
-  echo "═══════════════════════════════"
-  echo "  DOC FILES"
-  echo "═══════════════════════════════"
-  echo ""
-  for doc in "$DOCS_DIR"/*.md; do
-    print_file "$doc"
-  done
 fi
 
 # --- Changelog ---
