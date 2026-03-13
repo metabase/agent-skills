@@ -49,7 +49,7 @@ Follow the app's existing architecture, template engine, layout/partial system, 
 
 The web component must be rendered using the **same delivery mechanism** as the static iframe it replaces. If the iframe was rendered by a server-side template (EJS, Jinja, ERB, Blade, etc.), the web component should be rendered by the same template. If the iframe was returned as inline HTML from a route handler (e.g., `res.send('<iframe ...')`), the web component should be returned the same way. If the iframe was in a static HTML file, the web component goes in that same file. Do not move rendering from one layer to another — the migration should be a drop-in replacement at the same point in the rendering pipeline.
 
-**Token delivery must also stay server-side.** If the original static embedding generated the JWT on the server and rendered it directly into the HTML (e.g., `res.send(\`<iframe src=".../${token}">\`)`), then the migrated web component must receive its token the same way — rendered server-side into the `token` attribute (e.g., `<metabase-dashboard token="${token}">`). Do NOT introduce a client-side `fetch()` call to a new `/api/token` endpoint to deliver the token — `embed.js` may intercept such requests and return HTML instead of JSON, causing `SyntaxError: Unexpected token '<'` errors. Keep the token generation and delivery in the same server-side route handler where the page is rendered.
+**Token delivery must use the same mechanism as the original static embedding.** If the JWT was rendered server-side into the HTML (e.g., `res.send(\`<iframe src=".../${token}">\`)`), the migrated web component should receive its token the same way — rendered server-side into the `token` attribute (e.g., `<metabase-dashboard token="${token}">`). If the JWT was fetched client-side via `fetch()`, keep using `fetch()` for the token. Do not change the delivery mechanism — just change what is delivered (raw token instead of full iframe URL).
 
 ## Performance
 
@@ -90,9 +90,9 @@ The auth model is the **same** — both use `METABASE_SECRET_KEY` to sign JWTs w
 | **Script** | Optional `iframeResizer.js` | Required `embed.js` |
 | **Appearance** | Hash params (`#titled=true`) | Component attributes (`with-title="true"`) |
 | **Locked params** | In JWT `params` field | Same JWT `params` field (unchanged) |
-| **Editable params** | Not supported | `initial-parameters` attribute on component |
-| **Downloads** | Not available | `with-downloads="true"` attribute (Pro/Enterprise) |
 | **Secret key** | `METABASE_SECRET_KEY` | Same `METABASE_SECRET_KEY` |
+
+Guest embeds support additional attributes (e.g., downloads, drill-through, hidden parameters) not available in static embedding. Consult the fetched docs for the full list of available attributes for the target version.
 
 ## Allowed documentation sources
 
