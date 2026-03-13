@@ -96,11 +96,13 @@ Guest embeds support additional attributes (e.g., downloads, drill-through, hidd
 
 ## Allowed documentation sources
 
-Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+Fetch the version-specific `llms-embedding-full.txt` from `https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt`. This single file contains all embedding documentation for that version, optimized for LLM consumption. Use WebFetch to retrieve it directly — no scripts needed.
+
+The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`).
 
 Other constraints:
-- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
-- Do not follow changelog links to GitHub or guess URLs not handled by the script
+- No GitHub PRs/issues or npm pages
+- Do not follow changelog links to GitHub or guess URLs
 
 ## AskUserQuestion triggers
 
@@ -138,15 +140,13 @@ Perform the project scan and doc fetch concurrently — they are independent. Us
 
 #### 1a: Fetch target version docs
 
-Use `scripts/fetch-docs.sh` to fetch the embedding documentation for the target Metabase version:
+Use WebFetch to retrieve the embedding docs for the target Metabase version:
 
-```bash
-bash <skill-path>/scripts/fetch-docs.sh {TARGET_VERSION}
+```
+https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
 ```
 
-The script discovers all available doc pages for that version via the GitHub Contents API — no hardcoded page lists. After it completes, read all fetched files from `/tmp/embedjs-docs/`.
-
-These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+This single file contains all embedding documentation for that version. These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
 
 Launch this concurrently with the project scan steps below.
 
@@ -477,7 +477,7 @@ Organize the final output into these sections:
 ## Retry policy
 
 **Doc fetching:**
-- The `scripts/fetch-docs.sh` script exits with an error if the version's docs directory does not exist. If this happens, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
+- If WebFetch returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
 
 **Validation:**
 - If any validation check in Step 5 fails after 3 fix attempts, mark Step 5 ❌ blocked and report which check failed and why.

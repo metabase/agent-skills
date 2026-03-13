@@ -1,20 +1,17 @@
 #!/bin/bash
-# Combined probe + fetch: downloads SDK packages, checks d.ts, fetches changelog,
-# and fetches docs for versions without d.ts — all in one call.
+# Combined probe + fetch: downloads SDK packages, checks d.ts, and fetches changelog.
 #
 # Usage: ./prepare.sh <CURRENT_VERSION> <TARGET_VERSION> --sdk
 #        ./prepare.sh <CURRENT_VERSION> <TARGET_VERSION> --embedjs
 #
 # Requires --sdk or --embedjs flag to specify embedding type.
-# For SDK upgrades (--sdk): probes both versions via npm pack, then fetches docs
-# for whichever version lacks a d.ts file.
-# For Modular Embedding upgrades (--embedjs): skips npm pack, fetches docs for both versions.
+# For SDK upgrades (--sdk): probes both versions via npm pack.
+# For Modular Embedding upgrades (--embedjs): skips npm pack, fetches changelog only.
 #
-# Output: prints SDK_TMPDIR, d.ts availability, and fetched doc/d.ts paths.
+# Output: prints SDK_TMPDIR, d.ts availability, and fetched d.ts paths.
 
 set -euo pipefail
 
-SKILL_DIR="$(cd "$(dirname "$0")" && pwd)"
 CURRENT="${1:?Usage: prepare.sh <CURRENT> <TARGET> --sdk|--embedjs}"
 TARGET="${2:?Usage: prepare.sh <CURRENT> <TARGET> --sdk|--embedjs}"
 MODE="${3:?Usage: prepare.sh <CURRENT> <TARGET> --sdk|--embedjs. Must specify --sdk or --embedjs.}"
@@ -32,25 +29,18 @@ SDK_TMPDIR=$(node -e "
   console.log(dir);
 ")
 
-DOCS_DIR="$SDK_TMPDIR/docs"
-mkdir -p "$SDK_TMPDIR/current" "$SDK_TMPDIR/target" "$DOCS_DIR"
+mkdir -p "$SDK_TMPDIR/current" "$SDK_TMPDIR/target"
 
 if [[ "$MODE" == "--embedjs" ]]; then
-  # Modular Embedding (embed.js): no npm pack, fetch docs for both versions
-  echo "Modular Embedding mode — fetching docs for both versions..."
+  # Modular Embedding (embed.js): no npm pack, just changelog
+  echo "Modular Embedding mode — fetching changelog..."
 
-  echo "Fetching changelog..."
   curl -sL "https://raw.githubusercontent.com/metabase/metabase/master/enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md" \
-    | head -1000 > "$SDK_TMPDIR/changelog.md" &
-
-  bash "$SKILL_DIR/fetch-docs.sh" --version "$CURRENT" --type embedjs --prefix current --outdir "$DOCS_DIR" &
-  bash "$SKILL_DIR/fetch-docs.sh" --version "$TARGET" --type embedjs --prefix target --outdir "$DOCS_DIR" &
-  wait
+    | head -1000 > "$SDK_TMPDIR/changelog.md"
 
   echo ""
   echo "SDK_TMPDIR=$SDK_TMPDIR"
   echo "CHANGELOG=$SDK_TMPDIR/changelog.md"
-  echo "DOCS_DIR=$DOCS_DIR"
   echo "current_dts=no"
   echo "target_dts=no"
   exit 0
@@ -77,23 +67,9 @@ echo ""
 echo "current_dts=$CURRENT_DTS"
 echo "target_dts=$TARGET_DTS"
 
-# Fetch docs for versions without d.ts
-if [[ "$CURRENT_DTS" == "no" ]]; then
-  echo ""
-  echo "--- Fetching current version docs (no d.ts) ---"
-  bash "$SKILL_DIR/fetch-docs.sh" --version "$CURRENT" --type sdk --prefix current --outdir "$DOCS_DIR"
-fi
-
-if [[ "$TARGET_DTS" == "no" ]]; then
-  echo ""
-  echo "--- Fetching target version docs (no d.ts) ---"
-  bash "$SKILL_DIR/fetch-docs.sh" --version "$TARGET" --type sdk --prefix target --outdir "$DOCS_DIR"
-fi
-
 echo ""
 echo "SDK_TMPDIR=$SDK_TMPDIR"
 echo "CHANGELOG=$SDK_TMPDIR/changelog.md"
-echo "DOCS_DIR=$DOCS_DIR"
 
 # If both d.ts exist, auto-diff them (saves reading 4k lines of raw d.ts)
 if [[ "$CURRENT_DTS" == "yes" && "$TARGET_DTS" == "yes" ]]; then
