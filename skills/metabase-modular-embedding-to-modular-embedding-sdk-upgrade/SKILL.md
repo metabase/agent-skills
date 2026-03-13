@@ -270,7 +270,7 @@ Determine where to add `<MetabaseProvider>`:
 
 When converting HTML attribute values to React props:
 - String `"true"` / `"false"` → boolean `{true}` / `{false}`
-- Numeric strings `"123"` → check the d.ts prop type: if it's a union (e.g., `number | string`), keep as string; if it's strictly `number`, convert to `{123}`
+- Numeric strings `"123"` → number `{123}`
 - Template expressions already in JSX (e.g., `{dashboardId}`) → keep as-is
 - Static string IDs → keep as strings if the d.ts prop type accepts strings, otherwise convert
 
