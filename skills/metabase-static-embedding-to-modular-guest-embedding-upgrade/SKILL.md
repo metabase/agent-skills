@@ -1,6 +1,6 @@
 ---
 name: metabase-static-embedding-to-modular-guest-embedding-upgrade
-description: Migrates a project from Metabase Static embedding to Modular guest embedding (web components via embed.js). Use when the user wants to migrate/convert/switch/upgrade from static embedding to modular embedding, from signed embed iframes to web components, or replace /embed/ iframes with metabase-dashboard/metabase-question components.
+description: Migrates a project from Metabase static embedding to guest embeds (web components via embed.js). Use when the user wants to migrate/convert/switch/upgrade from static embedding to guest embeds, from signed embed iframes to web components, or replace /embed/ iframes with metabase-dashboard/metabase-question components.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
@@ -20,7 +20,7 @@ If you cannot complete a step due to missing info or tool failure, you must:
 Your response should contain these sections in this order:
 
 1. **Step 0 Results: Metabase Version Detection**
-2. **Migration Plan Checklist**
+2. **Step 0.1: Migration Plan Checklist**
 3. **Step 1 Results: Project Scan + Docs Fetch**
 4. **Step 2 Results: Static Embed Analysis & Web Component Mapping**
 5. **Step 3: Migration Plan**
@@ -59,7 +59,7 @@ The web component must be rendered using the **same delivery mechanism** as the 
 
 ## Scope
 
-This skill converts Static (signed/guest) iframe embedding to Modular guest embedding (web-component-based via `embed.js`). Both approaches use the same authentication model — signed JWTs with `METABASE_SECRET_KEY` — so the backend signing logic is preserved. The migration changes how the signed content is delivered: from iframes with JWT-in-URL to web components with a `token` attribute.
+This skill converts static (signed) iframe embedding to guest embeds (web-component-based via `embed.js`). Both approaches use the same authentication model — signed JWTs with `METABASE_SECRET_KEY` — so the backend signing logic is preserved. The migration changes how the signed content is delivered: from iframes with JWT-in-URL to web components with a `token` attribute.
 
 **The consumer's app may be written in any backend language** (Node.js, Python, Ruby, PHP, Java, Go, .NET, etc.) with any template engine. Keep instructions language-agnostic unless a specific language is detected in Step 1.
 
@@ -78,11 +78,11 @@ This skill converts Static (signed/guest) iframe embedding to Modular guest embe
 
 - Migrating to SSO-based modular embedding (with user accounts) — this skill targets guest embedding only
 
-### How guest modular embedding differs from static iframe embedding
+### How guest embeds differs from static iframe embedding
 
 The auth model is the **same** — both use `METABASE_SECRET_KEY` to sign JWTs with `{resource, params, exp}`. What changes is how the embed is rendered:
 
-| Aspect | Static (iframe) | Modular guest (web component) |
+| Aspect | Static embedding (iframe) | Guest embeds (web component) |
 |---|---|---|
 | **Element** | `<iframe src="/embed/dashboard/{JWT}#params">` | `<metabase-dashboard token="{JWT}">` |
 | **Token delivery** | Baked into iframe URL path | Passed as `token` attribute |
@@ -215,14 +215,14 @@ iframeResizer: {present|not present}
 
 Use the documentation fetched in Step 1a as the authoritative reference for web component attributes, `window.metabaseConfig` options, and guest embedding behavior. The hardcoded tables below are fallbacks — if the docs describe additional attributes or different behavior for the target version, prefer the docs.
 
-For EACH static embed found in Step 1:
+For each static embed found in Step 1:
 
 #### 2a: Parse the signed iframe URL
 
 Extract from the iframe `src` attribute:
 
 - **Metabase base URL**: may come from env var, constant, or be hardcoded
-- **Content type**: `dashboard` or `question` (from the `/embed/{type}/` path)
+- **Resource type**: `dashboard` or `question` (from the `/embed/{type}/` path)
 - **Resource ID**: the numeric ID from the JWT `resource` field (e.g., `resource: { dashboard: 10 }`)
 - **Locked parameters**: any `params` in the JWT payload (e.g., `params: { category: ["Gadget"] }`)
 - **Hash parameters**: appearance customization after `#` (e.g., `#titled=true&bordered=false`)
@@ -241,9 +241,9 @@ If the token was built dynamically in a template (e.g., `src="<%= metabaseUrl %>
 
 #### 2c: Map hash parameters
 
-**Parameters that map to web component ATTRIBUTES:**
+**Parameters that map to web component attributes:**
 
-| Static Embed Hash Param | Modular Equivalent |
+| Static embedding hash params | Guest embeds equivalent |
 |---|---|
 | `titled=true/false` | `with-title="true/false"` on the component |
 | `bordered=true/false` | No direct equivalent — drop (web components have no border chrome) |
@@ -285,21 +285,10 @@ embed #{n}: {file}:{line}
 
 Create a complete file-by-file change plan covering all areas below. Every change should be specified with the target file, the old code, and the new code.
 
-#### 3a: embed.js script injection — exactly once per app
+#### 3a: metabaseConfig — exactly once per app
 
 - **Target**: the layout/head file identified in Step 1e
-- **Location**: inside `<head>` (or as close as possible to other `<script>` tags)
-- **Code to add**:
-  ```html
-  <script defer src="{METABASE_SITE_URL}/app/embed.js"></script>
-  ```
-- `{METABASE_SITE_URL}` should be rendered dynamically using the project's existing template expression syntax.
-- Verify this will appear exactly once in the rendered HTML regardless of which page the user visits.
-
-#### 3b: metabaseConfig — exactly once per app
-
-- **Target**: same layout/head file as 3a
-- **Location**: before the embed.js script tag (the config must be set before embed.js loads)
+- **Location**: inside `<head>`, before the embed.js script tag (the config must be set before embed.js loads)
 - **Code to add**:
   ```html
   <script>
@@ -314,6 +303,17 @@ Create a complete file-by-file change plan covering all areas below. Every chang
 - **Locale**: If a `locale` parameter was found in any static embed hash, add `locale: "{code}"` to the config object.
 - Consult the fetched docs (Step 1a) for any additional `window.metabaseConfig` options supported by the target version (e.g., `theme`, `font`).
 - `window.metabaseConfig` should be set exactly once.
+
+#### 3b: embed.js script injection — exactly once per app
+
+- **Target**: same layout/head file as 3a
+- **Location**: inside `<head>`, after the `window.metabaseConfig` script (embed.js reads the config on load)
+- **Code to add**:
+  ```html
+  <script defer src="{METABASE_SITE_URL}/app/embed.js"></script>
+  ```
+- `{METABASE_SITE_URL}` should be rendered dynamically using the project's existing template expression syntax.
+- Verify this will appear exactly once in the rendered HTML regardless of which page the user visits.
 
 #### 3c: Refactor backend token delivery
 
@@ -365,13 +365,13 @@ List these as part of the plan — they will be included in the final summary:
 
 1. **Enable modular embedding**: Admin > Embedding > toggle "Enable modular embedding"
 2. **Enable guest embedding**: Admin > Embedding > ensure "Guest embedding" (or "Static embedding" in older UI) is enabled. The existing static embedding secret key is reused.
-3. **Configure CORS origins**: Admin > Embedding > Modular embedding > add the host app's domain (e.g., `http://localhost:9090`). This is new — static iframe embedding did not require CORS configuration.
+3. **Configure CORS origins**: Admin > Embedding > Security > add the host app's domain (e.g., `http://localhost:9090`). This is new — static iframe embedding did not require CORS configuration.
 
 ### Step 4: Apply code changes (ONLY after Step 3 ✅)
 
 Apply all changes from Step 3 in this order:
 
-1. **First**: Add `window.metabaseConfig` assignment and embed.js script tag to the layout/head file (Step 3b + 3a, config before embed.js)
+1. **First**: Add `window.metabaseConfig` assignment and embed.js script tag to the layout/head file (Step 3a + 3b, config before embed.js)
 2. **Second**: Refactor backend token delivery — keep signing, remove URL construction (Step 3c)
 3. **Third**: Replace each iframe with its web component (Step 3d), one file at a time
 4. **Fourth**: Remove dead code — iframeResizer, URL builders (Step 3e)
