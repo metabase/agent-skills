@@ -155,7 +155,16 @@ Launch this concurrently with the project scan steps below.
 - Check for dependency/build files (`package.json`, `requirements.txt`, `Gemfile`, `pom.xml`, `go.mod`, `composer.json`, etc.).
 - Identify the template engine and record the language and framework.
 
-#### 1c: Find ALL static embedding code
+#### 1c: Check for existing modular embedding setup
+
+Grep for these patterns (in parallel) to detect if the app already has modular embedding configured:
+
+- `/app/embed.js` — existing embed.js script tag
+- `window.metabaseConfig` — existing config assignment
+
+Record whether each is already present and where. If both already exist (e.g., the app uses modular embedding alongside static embedding), Steps 3a and 3b will skip adding them.
+
+#### 1d: Find ALL static embedding code
 
 Use Grep to search for all of these patterns (in parallel):
 
@@ -168,7 +177,7 @@ Use Grep to search for all of these patterns (in parallel):
 
 For each file with a match, read the entire file.
 
-#### 1d: Find JWT signing code
+#### 1e: Find JWT signing code
 
 Use Grep to search for all of these patterns (in parallel):
 
@@ -178,9 +187,9 @@ Use Grep to search for all of these patterns (in parallel):
 
 For each matching file, read the entire file.
 
-#### 1e: Find the layout/head file(s)
+#### 1f: Find the layout/head file(s)
 
-Find the single file (or common code path) where the HTML `<head>` section is defined — this is where `embed.js` and `window.metabaseConfig` will be injected.
+Find the single file (or common code path) where the HTML `<head>` section is defined — this is where `embed.js` and `window.metabaseConfig` will be injected (unless already present per Step 1c).
 
 Search for:
 
@@ -188,7 +197,7 @@ Search for:
 - Layout/wrapper patterns: `include('head')`, `<%- include`, `{% extends`, `{% block`, `layout`, `base.html`, `_layout`, `application.html`
 - If the app builds HTML via inline strings in server code (e.g., `res.send(...)`), identify where the `<head>` content is generated
 
-#### 1f: Find Metabase configuration
+#### 1g: Find Metabase configuration
 
 Grep for `METABASE_` and `MB_` prefixed variables. Record every Metabase-related variable name and where it is read.
 
@@ -209,6 +218,7 @@ Static embeds found: {count}
 JWT signing: {file}:{line} — {library used}
 JWT payload: resource type={dashboard|question}, params={list or "none"}
 iframeResizer: {present|not present}
+Existing modular embedding: {embed.js: yes/no, metabaseConfig: yes/no}
 ```
 
 ### Step 2: Analyze static embeds and map to web components (ONLY after Step 1 ✅)
@@ -287,7 +297,9 @@ Create a complete file-by-file change plan covering all areas below. Every chang
 
 #### 3a: metabaseConfig — exactly once per app
 
-- **Target**: the layout/head file identified in Step 1e
+**Skip this step if Step 1c found an existing `window.metabaseConfig` assignment.** If it exists but is missing `isGuest: true`, add that field to the existing config instead of creating a new one.
+
+- **Target**: the layout/head file identified in Step 1f
 - **Location**: inside `<head>`, before the embed.js script tag (the config must be set before embed.js loads)
 - **Code to add**:
   ```html
@@ -305,6 +317,8 @@ Create a complete file-by-file change plan covering all areas below. Every chang
 - `window.metabaseConfig` should be set exactly once.
 
 #### 3b: embed.js script injection — exactly once per app
+
+**Skip this step if Step 1c found an existing embed.js script tag.**
 
 - **Target**: same layout/head file as 3a
 - **Location**: inside `<head>`, after the `window.metabaseConfig` script (embed.js reads the config on load)
