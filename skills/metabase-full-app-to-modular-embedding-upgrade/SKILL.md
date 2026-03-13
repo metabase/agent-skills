@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, 
 
 Follow the workflow steps in order — do not skip any step. Create the checklist first, then execute each step and explicitly mark it done with evidence. Each step's output feeds into the next, so skipping steps produces wrong migrations.
 
-If you cannot complete a step due to missing info or tool failure:
+If you cannot complete a step due to missing info or tool failure, you must:
 
 1. record the step as ❌ blocked,
 2. explain exactly what is missing / what failed,
@@ -34,11 +34,20 @@ Each step section should end with a status line:
 
 Steps are sequential — do not start a step until the previous one is ✅ complete.
 
+### Evidence requirements
+
+- Step 0: Metabase version detected (source: Docker tag, env var, or user answer).
+- Step 1: every matched file path, every iframe location, SSO endpoint, layout/head file, Metabase config variables.
+- Step 2: per iframe — parsed URL, content type, ID, hash params, mapped web component with attributes.
+- Step 3: the complete file-by-file change plan with exact old/new code.
+- Step 4: per file — what was changed and exact diffs applied.
+- Step 5: each validation check's pass/fail result with evidence.
+
 ## Architectural conformance
 
 Follow the app's existing architecture, template engine, layout/partial system, code style, and route patterns. Do not switch paradigms (e.g., templates to inline HTML or vice versa). If the app has middleware for shared template variables, prefer that over duplicating across route handlers.
 
-## Important performance notes
+## Performance
 
 - Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in a single message wherever possible.
 - Do not use sub-agents for project scanning — results need to stay in the main context for cross-referencing in later steps.
@@ -46,7 +55,7 @@ Follow the app's existing architecture, template engine, layout/partial system, 
 
 ## Scope
 
-This skill converts Full App / Interactive Embedding (iframe-based) to Modular embedding (web-component-based via `embed.js`).
+This skill converts Full App / Interactive embedding (iframe-based) to Modular embedding (web-component-based via `embed.js`).
 
 **The consumer's app may be written in any backend language** (Node.js, Python, Ruby, PHP, Java, Go, .NET, etc.) with any template engine. Keep instructions language-agnostic unless a specific language is detected in Step 1.
 
@@ -58,24 +67,32 @@ This skill converts Full App / Interactive Embedding (iframe-based) to Modular e
 - Modifying SSO/JWT endpoints to support modular embedding's JSON response format
 - Mapping iframe URL customization parameters to theme config and component attributes
 
-### Migration Plan Checklist
+### What this skill does not handle
 
-Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate tools:
+- Migrating from Static (signed/guest) embedding
 
-- Step 0: Detect Metabase version
-- Step 1: Scan project
-- Step 2: Analyze iframes and map to web components
-- Step 3: Plan migration changes
-- Step 4: Apply code changes
-- Step 5: Validate changes
-- Step 6: Final summary
+## Allowed documentation sources
+
+Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+
+Other constraints:
+- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
+- Do not follow changelog links to GitHub or guess URLs not handled by the script
+
+## Allowed documentation sources
+
+Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+
+Other constraints:
+- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
+- Do not follow changelog links to GitHub or guess URLs not handled by the script
 
 ## AskUserQuestion triggers
 
 Use AskUserQuestion and halt until answered if:
 
 - The Metabase instance URL cannot be determined from project code or environment variables
-- The Metabase instance version cannot be determined from the project code
+- Always ask for the Metabase instance version — do not rely solely on code detection
 - An iframe URL pattern does not match any known resource type (dashboard, question, collection, home)
 - No SSO/JWT endpoint can be identified in the project
 - No layout/head file can be identified (unclear where to inject embed.js)
@@ -83,24 +100,58 @@ Use AskUserQuestion and halt until answered if:
 - The backend language cannot be determined
 - Multiple iframes specify different `locale` values (ask user which locale to set in `window.metabaseConfig`)
 
+## Pre-workflow steps
+
+### Migration Plan Checklist
+
+Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate tools:
+
+- Step 0: Detect Metabase version
+- Step 1: Scan project + fetch target version docs
+- Step 2: Analyze iframes and map to web components (using docs)
+- Step 3: Plan migration changes
+- Step 4: Apply code changes
+- Step 5: Validate changes
+- Step 6: Final summary
+
 ## Workflow
 
-### Step 0: Detect Metabase version
+### Step 0: Detect Metabase instance version
 
-Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
+Always AskUserQuestion for the Metabase instance version — even if a version appears in Docker tags or env vars, confirm it with the user. Abort if v52 or older (modular embedding was introduced in v53).
 
----
+Then fetch the embedding docs for the confirmed version:
 
-### Step 1: Scan the project (no sub-agent)
+```bash
+bash <skill-path>/scripts/fetch-docs.sh {INSTANCE_VERSION}
+```
 
-Perform all of the following scans. Use parallel tool calls within a single message wherever there are no dependencies.
+Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`, `metabase/metabase-enterprise:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
 
-#### 1a: Identify backend language and framework
+### Step 1: Scan the project + fetch docs no sub-agent)
+
+Perform the project scan and doc fetch concurrently — they are independent. Use parallel tool calls within a single message wherever there are no dependencies.
+
+#### 1a: Fetch target version docs
+
+Use `scripts/fetch-docs.sh` to fetch the embedding documentation for the target Metabase version:
+
+```bash
+bash <skill-path>/scripts/fetch-docs.sh {TARGET_VERSION}
+```
+
+The script discovers all available doc pages for that version via the GitHub Contents API — no hardcoded page lists. After it completes, read all fetched files from `/tmp/embedjs-docs/`.
+
+These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+
+Launch this concurrently with the project scan steps below.
+
+#### 1b: Identify backend language and framework
 
 - Check for dependency/build files (`package.json`, `requirements.txt`, `Gemfile`, `pom.xml`, `go.mod`, `composer.json`, etc.).
 - Identify the template engine and record the language and framework.
 
-#### 1b: Find ALL Metabase iframes
+#### 1c: Find ALL Metabase iframes
 
 Use Grep to search for all of these patterns (in parallel):
 
@@ -110,7 +161,7 @@ Use Grep to search for all of these patterns (in parallel):
 
 For each file with a match, read the entire file.
 
-#### 1c: Find SSO/JWT authentication code
+#### 1d: Find SSO/JWT authentication code
 
 Use Grep to search for all of these patterns (in parallel):
 
@@ -123,7 +174,7 @@ Use Grep to search for all of these patterns (in parallel):
 
 For each matching file, read the entire file.
 
-#### 1d: Find the layout/head file(s)
+#### 1e: Find the layout/head file(s)
 
 Find the single file (or common code path) where the HTML `<head>` section is defined — this is where `embed.js` and `window.metabaseConfig` will be injected.
 
@@ -133,7 +184,7 @@ Search for:
 - Layout/wrapper patterns: `include('head')`, `<%- include`, `{% extends`, `{% block`, `layout`, `base.html`, `_layout`, `application.html`
 - If the app builds HTML via inline strings in server code (e.g., `res.send(...)`), identify where the `<head>` content is generated
 
-#### 1e: Find Metabase configuration
+#### 1f: Find Metabase configuration
 
 Grep for `METABASE_` and `MB_` prefixed variables. Record every Metabase-related variable name and where it is read.
 
@@ -155,9 +206,9 @@ Iframes found: {count}
 SSO endpoint: {file}:{line} — {route} ({method})
 ```
 
----
-
 ### Step 2: Analyze iframes and map to web components (only after Step 1 ✅)
+
+Use the documentation fetched in Step 1a as the authoritative reference for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior. The hardcoded tables below are fallbacks — if the docs describe additional attributes or different behavior for the target version, prefer the docs.
 
 For each iframe found in Step 1:
 
@@ -234,15 +285,13 @@ iframe #{n}: {file}:{line}
   New: {exact replacement web component HTML}
 ```
 
----
-
 ### Step 3: Plan migration changes (only after Step 2 ✅)
 
 Create a complete file-by-file change plan covering all areas below. Every change should be specified with the target file, the old code, and the new code.
 
 #### 3a: embed.js script injection — exactly once per app
 
-- **Target**: the layout/head file identified in Step 1d
+- **Target**: the layout/head file identified in Step 1e
 - **Location**: inside `<head>` (or as close as possible to other `<script>` tags)
 - **Code to add**:
   ```html
@@ -258,21 +307,18 @@ Modular embedding reads its configuration from `window.metabaseConfig`. There is
 
 - **Target**: same layout/head file as 3a
 - **Location**: before the embed.js script tag (the config must be set before embed.js loads, otherwise the SDK has no config to read)
-- **Code to add** (minimum required config):
+- **Code to add** (minimum — add auth fields only if the fetched docs list them for this version):
   ```html
   <script>
     window.metabaseConfig = {
       instanceUrl: "{METABASE_SITE_URL}",
-      jwtProviderUri: "{SSO_ENDPOINT_URL}",
+      // Add auth fields here only if supported by the confirmed version's docs
     };
   </script>
   ```
 - **Locale**: If a `locale` parameter was found on any iframe in Step 2c, add `locale: "{code}"` to the config object. If multiple iframes had different locale values, the user will have already been asked which one to use (per AskUserQuestion trigger).
-- Both `instanceUrl` and `jwtProviderUri` should be rendered dynamically using the project's template expression syntax.
-- **`jwtProviderUri`** must be a **full absolute URL** including protocol and host (e.g., `http://localhost:9090/sso/metabase`). Relative paths do not work because the browser needs the full origin to send the auth request. Pass the app's origin as a template variable (e.g., via middleware) and render: `jwtProviderUri: "{APP_URL}/sso/metabase"`.
-  - **Version-dependent behavior** (use the version detected in Step 0):
-    - **v59+**: Include `jwtProviderUri` in `window.metabaseConfig` (preferred approach).
-    - **v53–v58**: Do not include `jwtProviderUri` in `window.metabaseConfig` — it is not supported on these versions. The JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3f).
+- `instanceUrl` (and `jwtProviderUri` if supported) should be rendered dynamically using the project's template expression syntax.
+- **Auth config fields**: Consult the docs fetched in Step 0 to determine which fields `window.metabaseConfig` supports for the confirmed version. For example, `jwtProviderUri` may or may not be available. If the docs list it, include it as a **full absolute URL** (e.g., `http://localhost:9090/sso/metabase`) — relative paths don't work. If the docs don't list it, the JWT Identity Provider URI must be configured in Metabase admin settings instead (see Step 3f).
 - `window.metabaseConfig` should be set exactly once — if it appears in per-iframe code instead of the layout, each component will re-initialize the SDK.
 
 #### 3c: SSO endpoint modification
@@ -283,7 +329,7 @@ For modular embedding, the embed.js SDK sends a fetch request to the JWT Identit
 
 This is a full migration, not a gradual one. The old iframe-based embedding is being completely replaced, so the redirect behavior is no longer needed.
 
-Refer to the Metabase authentication documentation for the expected endpoint behavior: https://www.metabase.com/docs/latest/embedding/authentication
+Consult the auth docs fetched in Step 0 for the expected SSO endpoint response format for the confirmed version.
 
 **Constraints:**
 - Do not modify the JWT signing logic — only change how the response is delivered
@@ -319,12 +365,8 @@ List these as part of the plan — they will be included in the final summary:
 
 1. **Enable modular embedding**: Admin > Embedding > toggle "Enable modular embedding"
 2. **Configure CORS origins**: Admin > Embedding > Modular embedding > add the host app's domain (e.g., `http://localhost:9090`)
-3. **Configure JWT Identity Provider URI** (use the version detected in Step 0):
-   - **v53–v58 (required)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint (e.g., `http://localhost:9090/sso/metabase`). This is the only way to configure JWT auth on these versions since `jwtProviderUri` in config is not supported.
-   - **v59+ (optional if `jwtProviderUri` is set in `window.metabaseConfig`)**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint. If `jwtProviderUri` was added to `window.metabaseConfig` in Step 3b, this admin setting is not strictly required but can serve as a backup.
+3. **Configure JWT Identity Provider URI**: Admin > Authentication > JWT > set to the full URL of the SSO endpoint (e.g., `http://localhost:9090/sso/metabase`). Check the fetched docs to determine whether this is required or optional for the confirmed version (it depends on whether `window.metabaseConfig` supports a JWT provider field).
 4. **JWT shared secret**: No change needed — reuse the existing shared secret from Full App embedding setup
-
----
 
 ### Step 4: Apply code changes (only after Step 3 ✅)
 
@@ -341,8 +383,6 @@ Apply all changes from Step 3 in this order (backend changes first to minimize t
 - Do not add new package dependencies — modular embedding requires only the embed.js script served by the Metabase instance
 - Do not change environment variable names
 - If a file requires multiple edits, apply them top-to-bottom to avoid offset issues
-
----
 
 ### Step 5: Validate changes (only after Step 4 ✅)
 
@@ -389,8 +429,6 @@ If any check fails:
 - Re-run the specific check
 - If unable to fix after 3 attempts, mark Step 5 ❌ blocked and report which check failed and why
 
----
-
 ### Step 6: Output summary
 
 Organize the final output into these sections:
@@ -408,3 +446,8 @@ Organize the final output into these sections:
    - Users can no longer navigate between dashboards/questions/collections within a single embed (each web component is standalone)
    - The Metabase application shell (nav, sidebar, search) is no longer present
    - Any iframe parameters that could not be mapped
+
+## Retry policy
+
+- If any validation check in Step 5 fails after 3 fix attempts, mark Step 5 ❌ blocked and report which check failed and why.
+- If AskUserQuestion is not answered, remain blocked on that step — do not guess or proceed with assumptions.

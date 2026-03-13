@@ -97,6 +97,10 @@ This skill handles upgrades for:
   - v56–v57: docs are at `embedded-analytics-js.md`
   - v58+: docs split into `components.md`, `appearance.md`, `authentication.md`
 
+### What this skill does not handle
+
+- Migrating between different embedding technologies
+
 ## Allowed documentation sources
 
 Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
@@ -316,7 +320,7 @@ Organize into these sections:
 ## Retry policy
 
 **URL fetches:**
-- The `fetch-docs.sh` script handles 404 skipping automatically. If you need to fetch manually: 404 on a version-specific page means it doesn't exist for that version — skip silently.
+- The `scripts/fetch-docs.sh` script handles 404 skipping automatically. If you need to fetch manually: 404 on a version-specific page means it doesn't exist for that version — skip silently.
 - For other errors (5xx, timeout, network): retry once immediately. If still failing, mark that step ❌ blocked and stop.
 
 **npm pack:**
