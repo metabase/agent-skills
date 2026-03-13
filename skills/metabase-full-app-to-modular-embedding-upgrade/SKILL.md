@@ -87,6 +87,14 @@ Other constraints:
 - No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
 - Do not follow changelog links to GitHub or guess URLs not handled by the script
 
+## Allowed documentation sources
+
+Use `scripts/fetch-docs.sh` to fetch docs — it discovers available pages dynamically via the GitHub Contents API, so it works with any version without hardcoded logic. Do not construct doc URLs manually.
+
+Other constraints:
+- No GitHub PRs/issues, npm pages, or metabase.com — only `raw.githubusercontent.com`
+- Do not follow changelog links to GitHub or guess URLs not handled by the script
+
 ## AskUserQuestion triggers
 
 Use AskUserQuestion and halt until answered if:
