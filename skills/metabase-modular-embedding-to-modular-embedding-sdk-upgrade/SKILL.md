@@ -80,10 +80,7 @@ bash <skill-path>/scripts/prepare.sh {TARGET_VERSION}
 ```
 Downloads the target SDK npm package and extracts it. Outputs `SDK_TMPDIR` and d.ts availability.
 
-In the same message, use WebFetch to fetch the embedding docs:
-```
-https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
-```
+In the same message, use WebFetch to fetch `llms-embedding-full.txt` for the target version (see "Allowed documentation sources" for URL format).
 
 **Round 3** — `read-sources.sh` (single Bash call):
 ```bash

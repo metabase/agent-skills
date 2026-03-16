@@ -140,13 +140,7 @@ Perform the project scan and doc fetch concurrently — they are independent. Us
 
 #### 1a: Fetch target version docs
 
-Use WebFetch to retrieve the embedding docs for the target Metabase version:
-
-```
-https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
-```
-
-This single file contains all embedding documentation for that version. These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+Use WebFetch to fetch `llms-embedding-full.txt` for the target version (see "Allowed documentation sources" for URL format). These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
 
 Launch this concurrently with the project scan steps below.
 

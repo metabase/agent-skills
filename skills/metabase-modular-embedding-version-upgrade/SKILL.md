@@ -78,9 +78,7 @@ bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
 ```
 Always pass `--sdk` or `--embedjs` to indicate the embedding type. The script does: npm pack both versions (SDK only), check d.ts, and fetch+truncate changelog. It outputs `SDK_TMPDIR` and d.ts availability.
 
-In the same message, use WebFetch to fetch the embedding docs for the current and/or target version:
-- For `--embedjs`: fetch both `https://www.metabase.com/docs/v0.{CURRENT}/llms-embedding-full.txt` and `https://www.metabase.com/docs/v0.{TARGET}/llms-embedding-full.txt`
-- For `--sdk`: fetch docs for versions without d.ts (as reported by prepare.sh in a subsequent round if needed)
+In the same message, use WebFetch to fetch `llms-embedding-full.txt` for both the current and target versions (see "Allowed documentation sources" for URL format).
 
 **Round 3** — `read-sources.sh` (single Bash call — reference data only, no project files):
 ```bash

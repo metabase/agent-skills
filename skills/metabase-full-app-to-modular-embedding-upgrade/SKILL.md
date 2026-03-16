@@ -114,11 +114,7 @@ Create a checklist to track progress. In Claude Code, use TaskCreate/TaskUpdate 
 
 Always AskUserQuestion for the Metabase instance version — even if a version appears in Docker tags or env vars, confirm it with the user. Abort if v52 or older (modular embedding was introduced in v53).
 
-Then fetch the embedding docs for the confirmed version using WebFetch:
-
-```
-https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
-```
+Then use WebFetch to fetch `llms-embedding-full.txt` for the confirmed version (see "Allowed documentation sources" for URL format).
 
 Before anything else, determine the Metabase version. Grep the project for Docker image tags (`metabase/metabase:v`, `metabase/metabase-enterprise:v`), `METABASE_VERSION`, or version references. If undetected, AskUserQuestion (options: `v52 or older`, `v53`, `v54–v58`, `v59+`). Abort if v52 or older (modular embedding not available — it was introduced in v53). Record the version — it controls `jwtProviderUri` placement in later steps.
 
@@ -128,13 +124,7 @@ Perform the project scan and doc fetch concurrently — they are independent. Us
 
 #### 1a: Fetch target version docs
 
-Use WebFetch to retrieve the embedding docs for the target Metabase version:
-
-```
-https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
-```
-
-This single file contains all embedding documentation for that version. These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+Use WebFetch to fetch `llms-embedding-full.txt` for the target version (see "Allowed documentation sources" for URL format). These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and SSO endpoint behavior for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
 
 Launch this concurrently with the project scan steps below.
 
