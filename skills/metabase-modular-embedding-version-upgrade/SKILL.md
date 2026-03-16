@@ -70,7 +70,7 @@ Steps 1+2 must complete in **3 tool-call rounds**.
 
 All four tool calls in ONE message.
 
-**Round 2** — `prepare.sh` + WebFetch docs (concurrent):
+**Round 2** — `prepare.sh` + fetch docs (concurrent):
 ```bash
 bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --sdk
 # or for Modular embedding (embed.js):
@@ -78,7 +78,7 @@ bash <skill-path>/scripts/prepare.sh {CURRENT} {TARGET} --embedjs
 ```
 Always pass `--sdk` or `--embedjs` to indicate the embedding type. The script does: npm pack both versions (SDK only), check d.ts, and fetch+truncate changelog. It outputs `SDK_TMPDIR` and d.ts availability.
 
-In the same message, use WebFetch to fetch `llms-embedding-full.txt` for both the current and target versions (see "Allowed documentation sources" for URL format).
+In the same message, fetch `llms-embedding-full.txt` for both the current and target versions via curl (see "Allowed documentation sources" for URL format). Then Read the downloaded files.
 
 **Round 3** — `read-sources.sh` (single Bash call — reference data only, no project files):
 ```bash
@@ -103,9 +103,13 @@ This skill handles upgrades for:
 
 ## Allowed documentation sources
 
-Fetch the version-specific `llms-embedding-full.txt` from `https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt`. This single file contains all embedding documentation for that version, optimized for LLM consumption. Use WebFetch to retrieve it directly — no scripts needed.
+Fetch the version-specific `llms-embedding-full.txt` via curl to a temp file, then Read it:
 
-The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`).
+```bash
+curl -sL https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt -o /tmp/llms-embedding-v{VERSION}.txt
+```
+
+The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`). This single file contains all embedding documentation for that version, optimized for LLM consumption.
 
 Other constraints:
 - No GitHub PRs/issues or npm pages
@@ -322,7 +326,7 @@ Organize into these sections:
 ## Retry policy
 
 **URL fetches:**
-- If WebFetch returns 404 for `llms-embedding-full.txt`, the version's docs may not exist — skip silently.
+- If curl returns 404 for `llms-embedding-full.txt`, the version's docs may not exist — skip silently.
 - For other errors (5xx, timeout, network): retry once immediately. If still failing, mark that step ❌ blocked and stop.
 
 **npm pack:**

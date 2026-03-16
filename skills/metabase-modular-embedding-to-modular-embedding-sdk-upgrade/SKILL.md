@@ -74,13 +74,13 @@ Steps 1+2 must complete in **3 tool-call rounds**.
 
 All tool calls in one message.
 
-**Round 2** — `prepare.sh` + WebFetch docs (concurrent):
+**Round 2** — `prepare.sh` + fetch docs (concurrent):
 ```bash
 bash <skill-path>/scripts/prepare.sh {TARGET_VERSION}
 ```
 Downloads the target SDK npm package and extracts it. Outputs `SDK_TMPDIR` and d.ts availability.
 
-In the same message, use WebFetch to fetch `llms-embedding-full.txt` for the target version (see "Allowed documentation sources" for URL format).
+In the same message, fetch `llms-embedding-full.txt` for the target version via curl (see "Allowed documentation sources" for URL format). Then Read the downloaded file.
 
 **Round 3** — `read-sources.sh` (single Bash call):
 ```bash
@@ -109,6 +109,20 @@ If the project is not React-based, this skill does not apply. If the project use
 ### What this skill does not handle
 
 - Non-React projects using Modular embedding web components in plain HTML/templates
+
+## Allowed documentation sources
+
+Fetch the version-specific `llms-embedding-full.txt` via curl to a temp file, then Read it:
+
+```bash
+curl -sL https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt -o /tmp/llms-embedding-v{VERSION}.txt
+```
+
+The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`). This single file contains all embedding documentation for that version, optimized for LLM consumption.
+
+Other constraints:
+- No GitHub PRs/issues or npm pages
+- Do not follow changelog links to GitHub or guess URLs
 
 ## Detecting versions
 
@@ -181,7 +195,7 @@ If d.ts is available, extract from it:
 - The `MetabaseProvider` config type (what fields it accepts)
 - The auth config type
 
-The embedding docs (`llms-embedding-full.txt`) fetched via WebFetch in Round 2 provide supplementary reference for component usage, configuration options, and migration guidance. Use them alongside the d.ts for a complete picture.
+The embedding docs (`llms-embedding-full.txt`) fetched via curl in Round 2 provide supplementary reference for component usage, configuration options, and migration guidance. Use them alongside the d.ts for a complete picture.
 
 If d.ts is not available (SDK versions before 0.52.0 do not ship a single `index.d.ts`), use the embedding docs as the primary API reference instead. If neither d.ts nor docs are available, mark Step 2 ❌ blocked.
 
@@ -310,7 +324,7 @@ Organize into these sections:
 ## Retry policy
 
 **Doc fetching:**
-- If WebFetch returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, proceed without docs (d.ts is the primary source).
+- If curl returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, proceed without docs (d.ts is the primary source).
 
 **npm pack:**
 - If `npm pack` fails for the target version, it likely doesn't exist on npm. Mark as ❌ blocked and inform the user.

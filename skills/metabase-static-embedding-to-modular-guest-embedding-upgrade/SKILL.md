@@ -96,9 +96,13 @@ Guest embeds support additional attributes (e.g., downloads, drill-through, hidd
 
 ## Allowed documentation sources
 
-Fetch the version-specific `llms-embedding-full.txt` from `https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt`. This single file contains all embedding documentation for that version, optimized for LLM consumption. Use WebFetch to retrieve it directly — no scripts needed.
+Fetch the version-specific `llms-embedding-full.txt` via curl to a temp file, then Read it:
 
-The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`).
+```bash
+curl -sL https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt -o /tmp/llms-embedding-v{VERSION}.txt
+```
+
+The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`). This single file contains all embedding documentation for that version, optimized for LLM consumption.
 
 Other constraints:
 - No GitHub PRs/issues or npm pages
@@ -140,7 +144,7 @@ Perform the project scan and doc fetch concurrently — they are independent. Us
 
 #### 1a: Fetch target version docs
 
-Use WebFetch to fetch `llms-embedding-full.txt` for the target version (see "Allowed documentation sources" for URL format). These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+Fetch `llms-embedding-full.txt` for the target version via curl (see "Allowed documentation sources" for URL format), then Read the downloaded file. These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
 
 Launch this concurrently with the project scan steps below.
 
@@ -471,7 +475,7 @@ Organize the final output into these sections:
 ## Retry policy
 
 **Doc fetching:**
-- If WebFetch returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
+- If curl returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
 
 **Validation:**
 - If any validation check in Step 5 fails after 3 fix attempts, mark Step 5 ❌ blocked and report which check failed and why.
