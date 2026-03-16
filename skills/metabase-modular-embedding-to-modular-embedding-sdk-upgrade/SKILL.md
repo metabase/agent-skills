@@ -184,7 +184,7 @@ If d.ts is available, extract from it:
 - The `MetabaseProvider` config type (what fields it accepts)
 - The auth config type
 
-The embedding docs (`llms-embedding-full.txt`) fetched by `prepare.sh` provide supplementary reference for component usage, configuration options, and migration guidance. Use them alongside the d.ts for a complete picture.
+The embedding docs (`llms-embedding-full.txt`) fetched via WebFetch in Round 2 provide supplementary reference for component usage, configuration options, and migration guidance. Use them alongside the d.ts for a complete picture.
 
 If d.ts is not available (SDK versions before 0.52.0 do not ship a single `index.d.ts`), use the embedding docs as the primary API reference instead. If neither d.ts nor docs are available, mark Step 2 ❌ blocked.
 
@@ -311,6 +311,9 @@ Organize into these sections:
 **6. Instance requirements** — minimum Metabase instance version needed. The Metabase instance version must match the SDK version (e.g., SDK 0.58.x requires Metabase v0.58+).
 
 ## Retry policy
+
+**Doc fetching:**
+- If WebFetch returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, proceed without docs (d.ts is the primary source).
 
 **npm pack:**
 - If `npm pack` fails for the target version, it likely doesn't exist on npm. Mark as ❌ blocked and inform the user.
