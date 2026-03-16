@@ -441,5 +441,9 @@ Organize the final output into these sections:
 
 ## Retry policy
 
+**Doc fetching:**
+- If WebFetch returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
+
+**Validation:**
 - If any validation check in Step 5 fails after 3 fix attempts, mark Step 5 ❌ blocked and report which check failed and why.
 - If AskUserQuestion is not answered, remain blocked on that step — do not guess or proceed with assumptions.
