@@ -1,6 +1,6 @@
 ---
 name: metabase-embedding-sso-implementation
-description: Implements JWT SSO authentication for Metabase embedding in a project. Supports all embedding types that use SSO — Modular embedding (embed.js web components), Modular embedding SDK (@metabase/embedding-sdk-react), and Full App embedding (iframe-based). Creates the JWT signing endpoint, configures the frontend auth layer, and sets up group mappings. Use when the user wants to add SSO/JWT auth to their Metabase embedding, implement user identity for embedded analytics, set up JWT authentication for Metabase, or connect their app's authentication to Metabase embedding.
+description: Implements JWT SSO authentication for Metabase embedding in a project. Supports all embedding types that use SSO — Modular embedding (embed.js web components), Modular embedding SDK (@metabase/embedding-sdk-react), and Full app embedding (iframe-based). Creates the JWT signing endpoint, configures the frontend auth layer, and sets up group mappings. Use when the user wants to add SSO/JWT auth to their Metabase embedding, implement user identity for embedded analytics, set up JWT authentication for Metabase, or connect their app's authentication to Metabase embedding.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
@@ -23,7 +23,7 @@ Follow the app's existing architecture, template engine, layout/partial system, 
 
 The JWT SSO endpoint must integrate with the app's **existing authentication system**. The endpoint must only issue Metabase JWTs for users who are already authenticated in the host app. Never create an endpoint that issues tokens without verifying the user's session first.
 
-**SSO requests to the Metabase instance should be proxied through the app's backend whenever possible** (FE → BE → Metabase `/auth/sso`). This keeps the Metabase instance URL and JWT tokens off the client, avoids CORS issues, and ensures auth is always validated server-side. Only fall back to direct FE→Metabase calls if the app has no backend (e.g., a static SPA with no server).
+**SSO requests to the Metabase instance must be proxied through the app's backend** (FE → BE → Metabase `/auth/sso`). This keeps the Metabase instance URL and JWT tokens off the client, avoids CORS issues, and ensures auth is always validated server-side. The JWT shared secret must never be exposed to the frontend.
 
 ## Important performance notes
 
@@ -57,7 +57,7 @@ The SSO endpoint response format (JSON, redirect, proxy to Metabase `/auth/sso`,
 
 - Setting up the embedding itself (web components, SDK, or iframes) — use the migration skills for that
 - Upgrading the embedding version — use the `metabase-modular-embedding-version-upgrade` skill
-- Guest embedding auth (uses `METABASE_SECRET_KEY` with `{resource, params}` payloads, not SSO)
+- Guest embeds auth (uses `METABASE_SECRET_KEY` with `{resource, params}` payloads, not SSO)
 - SAML or LDAP authentication — this skill covers JWT SSO only
 
 ### JWT payload structure (SSO)
@@ -70,7 +70,7 @@ The JWT signed with `METABASE_JWT_SHARED_SECRET` must contain these fields:
 | `first_name` | string | Yes | User's first name — synced on every login. |
 | `last_name` | string | Yes | User's last name — synced on every login. |
 | `groups` | string[] | Yes | Array of group names — Metabase syncs group memberships on every login when group sync is enabled. |
-| `exp` | number | Yes | Token expiration as Unix timestamp. Recommend 10 minutes: `Math.round(Date.now() / 1000) + 600`. |
+| `exp` | number | Yes | Token expiration as Unix timestamp. Recommend 10 minutes: e.g. `Math.round(Date.now() / 1000) + 600`. |
 
 Additional user attributes can be included as extra key/value pairs in the JWT — Metabase will store them as user attributes for use in sandboxing and data permissions.
 
@@ -123,12 +123,12 @@ Grep the project for these patterns (in parallel) to determine which embedding t
 **Modular embedding (embed.js):**
 - `embed.js` or `/app/embed.js` in HTML/template files
 - `window.metabaseConfig` or `defineMetabaseConfig`
-- `<metabase-dashboard`, `<metabase-question`, `<metabase-browser`
+- e.g. `<metabase-dashboard`, `<metabase-question`, `<metabase-browser`
 
 **Modular embedding SDK:**
 - `@metabase/embedding-sdk-react` in `package.json` or import statements
 - `MetabaseProvider` or `defineMetabaseAuthConfig`
-- `InteractiveDashboard`, `InteractiveQuestion`, `CollectionBrowser`
+- e.g. `InteractiveDashboard`, `InteractiveQuestion`, `CollectionBrowser`, etc.
 
 **Full App embedding:**
 - `<iframe` with Metabase URLs (look for the instance URL or `/dashboard/`, `/question/`, `/auth/sso`)
@@ -240,7 +240,7 @@ Design the SSO endpoint route:
 
   If the mapping is unclear → AskUserQuestion.
 
-- **Token expiration**: 10 minutes (`Math.round(Date.now() / 1000) + 600`) unless the app has a specific session timeout that should be matched.
+- **Token expiration**: 10 minutes (e.g. `Math.round(Date.now() / 1000) + 600`) unless the app has a specific session timeout that should be matched.
 
 #### 2b: Endpoint response behavior
 
@@ -335,7 +335,7 @@ List these as part of the plan — they will be included in the final summary:
 1. **Enable JWT authentication**: Admin > Settings > Authentication > JWT > enable
 2. **Set JWT signing key**: Paste the same value as `METABASE_JWT_SHARED_SECRET`
 3. **Set JWT Identity Provider URI**: The full URL of the SSO endpoint (e.g., `http://localhost:9090/sso/metabase`) — check the fetched docs to determine whether this is required or optional for the detected version (it depends on whether the frontend config supports a JWT provider field).
-4. **Configure group sync** (if groups are used):
+4. **Configure group sync**:
    - Enable "Synchronize Group Memberships"
    - Create matching groups in Metabase, or set up group mappings if names differ
 5. **Configure CORS** (for modular embedding only): Admin > Embedding > Modular embedding > add the host app's domain
@@ -345,11 +345,11 @@ List these as part of the plan — they will be included in the final summary:
 
 Apply all changes from Step 3 in this order:
 
-1. **First**: Add environment variable (Step 3a)
-2. **Second**: Install JWT library if needed (Step 3b)
-3. **Third**: Create the SSO endpoint (Step 3c) — this is the core change
-4. **Fourth**: Configure frontend auth (Step 3d)
-5. **Fifth**: Remove dev-only auth if present (Step 3e)
+1. Add environment variable (Step 3a)
+2. Install JWT library if needed (Step 3b)
+3. Create the SSO endpoint (Step 3c) — this is the core change
+4. Configure frontend auth (Step 3d)
+5. Remove dev-only auth if present (Step 3e)
 
 **Constraints:**
 
@@ -426,7 +426,7 @@ Organize the final output into these sections:
    | groups | [req.user.role] | ["Analyst"] |
    | exp | Date.now()/1000 + 600 | 1700000600 |
    ```
-4. **Group mapping**: how app roles/groups map to Metabase groups (if a mapping was defined)
+4. **Group mapping**: how app roles/groups map to Metabase groups
 5. **Manual steps required** (Metabase admin configuration from Step 3f):
    - Enable JWT authentication and set signing key
    - Set JWT Identity Provider URI
