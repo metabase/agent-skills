@@ -12,6 +12,7 @@ A collection of Agent skills for Metabase embedding products. These skills are b
 | [metabase-full-app-to-modular-embedding-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-full-app-to-modular-embedding-upgrade-skill-md)                          | Helps migrate from Metabase Full App / Interactive (iframe-based) embedding to Modular embedding (web components via `embed.js`).               |
 | [metabase-static-embedding-to-guest-embedding-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-static-embedding-to-guest-embedding-upgrade-skill-md)       | Helps migrate from Metabase Static embedding (signed embed iframes) to Guest embeds (web components via `embed.js`).                           |
 | [metabase-modular-embedding-to-modular-embedding-sdk-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-modular-embedding-to-modular-embedding-sdk-upgrade-skill-md) | Helps migrate from Metabase Modular embedding (web components via `embed.js`) to the Modular embedding SDK (`@metabase/embedding-sdk-react`).  |
+| [metabase-embedding-sso-implementation](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-embedding-sso-implementation-skill-md)                                            | Helps implement JWT SSO authentication for Metabase embedding, including the signing endpoint, frontend auth layer, and group mappings.         |
 
 ## Installation
 
