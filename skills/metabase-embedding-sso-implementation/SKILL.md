@@ -170,10 +170,10 @@ Launch this concurrently with the project scan steps below.
 This is critical — the SSO endpoint must integrate with the app's existing auth. Search for:
 
 - Session middleware (`express-session`, `cookie-session`, `flask-login`, `devise`, `Passport`, `next-auth`, etc.)
-- Auth middleware patterns (`req.user`, `req.session`, `current_user`, `@login_required`, `[Authorize]`)
-- User model/schema definitions (look for fields: `email`, `name`, `first_name`, `last_name`, `role`, `group`)
-- Login routes (`/login`, `/auth`, `/signin`, `/api/auth`)
-- Token/cookie based auth (JWT verification middleware, cookie parsers)
+- Auth middleware patterns (`req.user`, `req.session`, `current_user`, `@login_required`, `[Authorize]`, etc)
+- User model/schema definitions (look for fields: `email`, `name`, `first_name`, `last_name`, `role`, `group`, etc)
+- Login routes (`/login`, `/auth`, `/signin`, `/api/auth`, etc)
+- Token/cookie based auth (JWT verification middleware, cookie parsers, etc)
 
 For each matching file, read the entire file.
 
