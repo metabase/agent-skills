@@ -8,17 +8,17 @@ A collection of Agent skills for Metabase embedding products. These skills are b
 
 | Skill                                                                                                                                                                                        | Description                                                                                                                                    |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| [metabase-modular-embedding-version-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-modular-embedding-version-upgrade-skill-md)                                   | Helps upgrade a project's Metabase Modular embedding SDK (`@metabase/embedding-sdk-react`) or Modular embedding (`embed.js`) to a newer version. |
-| [metabase-full-app-to-modular-embedding-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-full-app-to-modular-embedding-upgrade-skill-md)                           | Helps migrate from Metabase Full App / Interactive (iframe-based) embedding to Modular (web-component-based) embedding.                        |
-| [metabase-static-embedding-to-modular-guest-embedding-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-static-embedding-to-modular-guest-embedding-upgrade-skill-md) | Helps migrate from Metabase static embedding (signed embed iframes) to guest embeds (web components via `embed.js`).                           |
-| [metabase-modular-embedding-to-modular-embedding-sdk-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-modular-embedding-to-modular-embedding-sdk-upgrade-skill-md) | Helps migrate from Metabase Modular embedding (`embed.js` web components) to the Modular embedding SDK (`@metabase/embedding-sdk-react`).      |
+| [metabase-modular-embedding-version-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-modular-embedding-version-upgrade-skill-md)                                   | Helps upgrade a project's Modular embedding SDK (`@metabase/embedding-sdk-react`) or Modular embedding (web components via `embed.js`) to a newer version. |
+| [metabase-full-app-to-modular-embedding-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-full-app-to-modular-embedding-upgrade-skill-md)                           | Helps migrate from Metabase Full App / Interactive (iframe-based) embedding to Modular embedding (web components via `embed.js`).               |
+| [metabase-static-embedding-to-guest-embedding-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-static-embedding-to-modular-guest-embedding-upgrade-skill-md)       | Helps migrate from Metabase Static embedding (signed embed iframes) to Guest embeds (web components via `embed.js`).                           |
+| [metabase-modular-embedding-to-modular-embedding-sdk-upgrade](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-modular-embedding-to-modular-embedding-sdk-upgrade-skill-md) | Helps migrate from Metabase Modular embedding (web components via `embed.js`) to the Modular embedding SDK (`@metabase/embedding-sdk-react`).  |
 
 ## Installation
 
 Install all skills at once:
 
 ```sh
-npx skills add metabase/agent-skills
+npx skills add metabase/agent-skills -a claude-code
 ```
 
 Or install a specific skill:

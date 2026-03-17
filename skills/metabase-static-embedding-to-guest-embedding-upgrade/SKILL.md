@@ -1,5 +1,5 @@
 ---
-name: metabase-static-embedding-to-modular-guest-embedding-upgrade
+name: metabase-static-embedding-to-guest-embedding-upgrade
 description: Migrates a project from Metabase static embedding to guest embeds (web components via embed.js). Use when the user wants to migrate/convert/switch/upgrade from static embedding to guest embeds, from signed embed iframes to web components, or replace /embed/ iframes with metabase-dashboard/metabase-question components.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, WebFetch, Task, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
