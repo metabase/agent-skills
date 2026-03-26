@@ -15,3 +15,4 @@ Metabase uses 2 ways of identifying entities: by `entity_id` (nanoid) and natura
 ## Entities
 
 - Card [card.md](./entities/card.md).
+- Segment [segment.md](./entities/segment.md).
