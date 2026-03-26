@@ -2,7 +2,7 @@
 
 A card represents a Question, Model, or a Metric in Metabase. 
 
-Each card hols a `dataset_query`. See [query.md](../common/query.md) for the query specification. 
+Each card holds a `dataset_query`. See [query.md](../common/query.md) for the query specification. 
 
 ## Minimal required properties
 
