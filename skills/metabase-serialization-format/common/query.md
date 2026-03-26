@@ -389,3 +389,208 @@ native:
   query: SELECT * FROM PRODUCTS  # valid SQL
   template-tags: {}
 ```
+
+### Template tags
+
+Template tags are placeholders in native SQL queries that become interactive filters or dynamic references. They are used in the SQL as `{{tag_name}}` and defined in `template-tags`.
+
+#### String variable
+
+```yaml
+native:
+  query: "SELECT * FROM PRODUCTS WHERE CATEGORY = {{category}}"
+  template-tags:
+    category:
+      type: text
+      name: category
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Category
+      default: Widget
+```
+
+Compiled SQL (with value `Widget`):
+```sql
+SELECT * FROM PRODUCTS WHERE CATEGORY = 'Widget'
+```
+
+#### Number variable
+
+```yaml
+native:
+  query: "SELECT * FROM PRODUCTS WHERE PRICE > {{min_price}}"
+  template-tags:
+    min_price:
+      type: number
+      name: min_price
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Minimum Price
+      default: null
+```
+
+Compiled SQL (with value `50`):
+```sql
+SELECT * FROM PRODUCTS WHERE PRICE > 50
+```
+
+#### Date variable
+
+```yaml
+native:
+  query: "SELECT * FROM ORDERS WHERE CREATED_AT > {{after_date}}"
+  template-tags:
+    after_date:
+      type: date
+      name: after_date
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: After Date
+      default: null
+```
+
+Compiled SQL (with value `2024-01-01`):
+```sql
+SELECT * FROM ORDERS WHERE CREATED_AT > '2024-01-01'
+```
+
+#### Boolean variable
+
+```yaml
+native:
+  query: "SELECT * FROM PRODUCTS WHERE {{is_active}}"
+  template-tags:
+    is_active:
+      type: boolean
+      name: is_active
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Is Active
+      default: true
+```
+
+Compiled SQL (with value `true`):
+```sql
+SELECT * FROM PRODUCTS WHERE 1 = 1
+```
+
+When `false`, the clause becomes `1 <> 1`. When no value is provided, the tag is omitted entirely (`WHERE 1 = 1`).
+
+#### Field filter (dimension)
+
+Field filters map a template tag to a specific database field, enabling Metabase to generate smart filter widgets (e.g., date pickers, category dropdowns). The SQL must use the tag in a `WHERE` clause context — Metabase replaces it with the appropriate SQL expression.
+
+```yaml
+native:
+  query: "SELECT * FROM PRODUCTS WHERE {{category_filter}}"
+  template-tags:
+    category_filter:
+      type: dimension
+      name: category_filter
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Category
+      dimension:                       # Field FK
+      - field
+      - - Sample Database
+        - PUBLIC
+        - PRODUCTS
+        - CATEGORY
+      - null
+      widget-type: string/=            # filter widget type
+      default: null
+```
+
+Common `widget-type` values: `string/=`, `string/!=`, `string/contains`, `number/=`, `number/>=`, `number/between`, `date/single`, `date/range`, `date/month-year`, `date/quarter-year`, `date/relative`, `date/all-options`.
+
+Compiled SQL (with `widget-type: string/=` and value `Widget`):
+```sql
+SELECT * FROM PRODUCTS WHERE CATEGORY = 'Widget'
+```
+
+Compiled SQL (with `widget-type: date/range` on a date field, value `2024-01-01~2024-12-31`):
+```sql
+SELECT * FROM ORDERS WHERE CREATED_AT >= '2024-01-01' AND CREATED_AT < '2025-01-01'
+```
+
+When no value is provided, the entire `WHERE {{tag}}` clause is omitted (the query runs unfiltered).
+
+#### Time grouping
+
+```yaml
+native:
+  query: "SELECT CREATED_AT AS {{created_at}}, COUNT(*) FROM ORDERS GROUP BY {{created_at}}"
+  template-tags:
+    created_at:
+      type: time-grouping
+      name: created_at
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Created At
+      default: month
+```
+
+Compiled SQL (with value `month`):
+```sql
+SELECT DATE_TRUNC('month', CREATED_AT) AS CREATED_AT, COUNT(*) FROM ORDERS GROUP BY DATE_TRUNC('month', CREATED_AT)
+```
+
+#### Table references
+
+```yaml
+native:
+  query: "SELECT * FROM {{source_table}}"
+  template-tags:
+    source_table:
+      type: table
+      name: source_table
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Source Table
+```
+
+Compiled SQL (with `PUBLIC.PRODUCTS` selected):
+```sql
+SELECT * FROM PUBLIC.PRODUCTS
+```
+
+### Card references
+
+Reference a saved card (question) as a subquery using `{{#entity_id-card_name}}`:
+
+```yaml
+native:
+  query: "SELECT * FROM {{#f1C68pznmrpN1F5xFDj6d-products_question}} WHERE PRICE > 50"
+  template-tags:
+    "#f1C68pznmrpN1F5xFDj6d-products_question":
+      type: card
+      name: "#f1C68pznmrpN1F5xFDj6d-products_question"
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Products Question
+      card-id: f1C68pznmrpN1F5xFDj6d  # entity_id of the referenced card
+```
+
+Metabase replaces the tag with the card's query as a CTE.
+
+Compiled SQL (assuming the referenced card's query is `SELECT * FROM PUBLIC.PRODUCTS`):
+```sql
+WITH f1C68pznmrpN1F5xFDj6d_products_question AS (SELECT * FROM PUBLIC.PRODUCTS)
+SELECT * FROM f1C68pznmrpN1F5xFDj6d_products_question WHERE PRICE > 50
+```
+
+### Snippet references
+
+Reference a reusable SQL snippet using `{{snippet: Snippet Name}}`:
+
+```yaml
+native:
+  query: "SELECT * FROM ORDERS WHERE {{snippet: Active Order Filter}}"
+  template-tags:
+    "snippet: Active Order Filter":
+      type: snippet
+      name: "snippet: Active Order Filter"
+      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      display-name: Snippet: Active Order Filter
+      snippet-name: Active Order Filter
+      snippet-id: xK7mPqR2sT4uVwXyZ9a1b  # entity_id of the snippet
+```
+
+Metabase replaces the tag with the snippet's SQL content inline.
+
+Compiled SQL (assuming the snippet contains `STATUS = 'active' AND TOTAL > 0`):
+```sql
+SELECT * FROM ORDERS WHERE STATUS = 'active' AND TOTAL > 0
+```
