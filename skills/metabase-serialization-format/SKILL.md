@@ -21,6 +21,7 @@ Metabase uses 2 ways of identifying entities: by `entity_id` (nanoid) and natura
 - Database [database.md](./entities/database.md).
 - Table [table.md](./entities/table.md).
 - Field [field.md](./entities/field.md) (includes FieldValues and FieldUserSettings).
+- Collection [collection.md](./entities/collection.md).
 - Card [card.md](./entities/card.md).
 - Segment [segment.md](./entities/segment.md).
 - Measure [measure.md](./entities/measure.md).
