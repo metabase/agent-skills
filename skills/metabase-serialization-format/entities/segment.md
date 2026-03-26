@@ -8,7 +8,7 @@ Each segment holds a `definition` that specifies the source table and filter cri
 
 ```yaml
 name: Widget products
-entity_id: aB3kLmN9pQrStUvWxYz1a  # nanoid
+entity_id: aB3kLmN9pQrStUvWxYz1a   # nanoid
 creator_id: internal@metabase.com
 definition:
   source-table:                    # Table FK
@@ -25,7 +25,7 @@ definition:
     - null
   - Widget
 serdes/meta:
-- id: aB3kLmN9pQrStUvWxYz1a       # nanoid, matches entity_id
+- id: aB3kLmN9pQrStUvWxYz1a        # nanoid, matches entity_id
   label: widget_products           # lowercased name, spaces converted to underscores
   model: Segment
 ```

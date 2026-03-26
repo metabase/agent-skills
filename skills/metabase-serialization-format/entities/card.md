@@ -1,8 +1,8 @@
 # Card
 
-A card represents a Question, Model, or a Metric in Metabase. 
+A card represents a Question, Model, or Metric in Metabase. Cards are the primary way to save and share queries.
 
-Each card holds a `dataset_query`. See [query.md](../common/query.md) for the query specification. 
+Each card holds a `dataset_query`. See [query.md](../common/query.md) for the query specification.
 
 ## Minimal required properties
 
@@ -24,8 +24,8 @@ dataset_query:
 visualization_settings: {}
 serdes/meta:
 - id: f1C68pznmrpN1F5xFDj6d       # nanoid, matches entity_id
-  label: products_question
-  model: Card
+  label: products_question        # lowercased name, spaces converted to underscores
+  model: Card                     # always Card
 ```
 
 Card with a native query:
@@ -51,7 +51,7 @@ serdes/meta:
 ## Optional properties
 
 ```yaml
-description: All products                  # string or nulltype
+description: All products                  # string or null
 archived: false                            # boolean
 archived_directly: false                   # boolean
 collection_preview: true                   # boolean
