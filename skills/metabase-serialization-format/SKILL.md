@@ -12,9 +12,9 @@ Metabase serialization (SerDes) exports instance configuration as a tree of YAML
 
 See [folder_structure.md](./common/folder_structure.md) for the export directory layout and path construction rules.
 
-## Entity identifiers
+## Entity keys
 
-Metabase uses 2 ways of identifying entities: by `entity_id` (nanoid) and natural entity keys. See [id.md](./common//id.md) for the format specification.
+Metabase uses 2 ways of identifying entities: by `entity_id` (nanoid) and natural entity keys. See [id.md](./common//entity_key.md) for the format specification.
 
 ## Entities
 
