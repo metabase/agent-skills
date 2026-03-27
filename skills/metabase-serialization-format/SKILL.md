@@ -16,10 +16,9 @@ Metabase uses 2 ways of identifying entities: by `entity_id` (nanoid) and natura
 
 `entity_id` is a 21-character [NanoID](https://github.com/ai/nanoid) string like `NDzkGoTCdRcaRyt7GOepg`. This is the primary portable identifier used in cross-references.
 
-Generate a NanoID in Python:
-```python
-from nanoid import generate
-generate()  # => 'NDzkGoTCdRcaRyt7GOepg'
+Generate a NanoID in Bash:
+```bash
+head -c 21 /dev/urandom | base64 | tr -dc 'A-Za-z0-9_-' | head -c 21
 ```
 
 NanoID alphabet: `A-Za-z0-9_-` (64 chars, 21 chars long).
