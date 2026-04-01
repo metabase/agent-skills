@@ -21,8 +21,8 @@ The format defines 11 entity types. Each entity has a YAML JSON Schema in the `s
 | **Card** | `Card` | `schemas/card.yaml` | Question, model, or metric. Holds an MBQL or native `dataset_query`. Display types: table, bar, line, pie, scalar, etc. Card types: `"question"`, `"model"`, `"metric"`. |
 | **Dashboard** | `Dashboard` | `schemas/dashboard.yaml` | Grid layout (24 columns) of cards with filter parameters and optional tabs. Contains `dashcards` array for card placement and `parameters` array for filter controls. |
 | **Document** | `Document` | `schemas/document.yaml` | Rich text page using ProseMirror AST. Can embed cards via `cardEmbed` nodes and link to entities via `smartLink` nodes. |
-| **Segment** | `Segment` | `schemas/segment.yaml` | Saved filter definition scoped to a table. Definition must use `type: query` with only `source-table` and `filter` clauses. |
-| **Measure** | `Measure` | `schemas/measure.yaml` | Saved aggregation definition scoped to a table. Definition must use `type: query` with only `source-table` and exactly one `aggregation` clause. |
+| **Segment** | `Segment` | `schemas/segment.yaml` | Saved filter definition scoped to a table. Definition is a pMBQL query with a single stage containing only `source-table` and `filters`. |
+| **Measure** | `Measure` | `schemas/measure.yaml` | Saved aggregation definition scoped to a table. Definition is a pMBQL query with a single stage containing only `source-table` and exactly one `aggregation`. |
 | **Snippet** | `NativeQuerySnippet` | `schemas/snippet.yaml` | Reusable SQL fragment referenced in native queries via `{{snippet: Name}}`. |
 | **Transform** | `Transform` | `schemas/transform.yaml` | Materializes query or Python script results into a database table. Source is either MBQL/native query or Python script. |
 | **TransformTag** | `TransformTag` | `schemas/transform_tag.yaml` | Label for categorizing transforms. Built-in types: `"hourly"`, `"daily"`, `"weekly"`, `"monthly"`, or `null` for custom. |
@@ -67,16 +67,37 @@ Metabase imports entities from these directories only:
 
 ## Queries
 
-**MBQL queries** (portable, built with graphical query editor):
-- `source-table`: Table FK array or card entity_id string
-- `filter`, `aggregation`, `breakout`, `order-by`, `limit`, `expressions`, `joins`
-- Field references: `[field, Field-FK, options-or-null]`
-- Expression references: `[expression, "Name"]`
-- Aggregation references: `[aggregation, index]`
+Queries use **serialized pMBQL** format. The outer wrapper is always:
+```yaml
+"lib/type": mbql/query
+database: Sample Database
+stages:
+- "lib/type": mbql.stage/mbql   # or mbql.stage/native
+  ...
+```
 
-**Native queries** (raw SQL):
-- `native.query`: SQL string with `{{template_tag}}` placeholders
-- `native.template-tags`: map defining each tag's type, display name, and default
+**MBQL stages** (`mbql.stage/mbql`):
+- `source-table`: Table FK array (for physical tables)
+- `source-card`: Card entity_id string (for saved questions/models)
+- `fields`, `joins`, `expressions`, `filters`, `breakout`, `aggregation`, `order-by`, `limit`
+- Multi-stage queries use a flat `stages` array — no nested `source-query`
+
+**Expression clauses** always have options as the **second element** (`[operator, {options}, ...args]`):
+- Field references: `[field, {options}, Field-FK-or-name]` — options is always an object (empty `{}` when no options), never null
+- Expression references: `[expression, {}, "Name"]`
+- Aggregation references: `[aggregation, {}, "uuid"]` — UUID matches `lib/uuid` on the referenced aggregation clause
+- All operators: `[count, {}]`, `[sum, {}, field]`, `[=, {}, a, b]`, `[and, {}, clause1, clause2]`, etc.
+- `expressions` is an array; each top-level clause has `"lib/expression-name"` in its options
+- `filters` is an array of filter clauses (implicitly ANDed)
+- Aggregations referenced by `order-by` must have `"lib/uuid"` in their options
+
+**Joins** have their own `stages` array and `conditions` (plural) array.
+
+**Parameter mapping targets** use **legacy format**: `[field, Field-FK, null-or-options]`, `[expression, name]`.
+
+**Native stages** (`mbql.stage/native`):
+- `native`: SQL string with `{{template_tag}}` placeholders
+- `template-tags`: map defining each tag's type, display name, and default
 - Template tag types: `text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`
 
 See spec.md sections "MBQL Query" and "Native Query" for full syntax.
@@ -103,7 +124,7 @@ Omit `--folder` to validate the current directory. The tool:
 - `collection_id` determines collection membership (not the file path)
 - Cards with `dashboard_id` or `document_id` are nested under that container
 - A card should never have both `dashboard_id` and `document_id` set
-- Segment definitions: only `source-table` + `filter` (no aggregation, joins, expressions)
-- Measure definitions: only `source-table` + exactly one `aggregation` (no filter, joins, expressions)
+- Segment definitions: single stage with only `source-table` + `filters` (no aggregation, joins, expressions)
+- Measure definitions: single stage with only `source-table` + exactly one `aggregation` (no filters, joins, expressions)
 - Dashboard grid: 24 columns, `col + size_x <= 24`, cards cannot overlap
 - Snippet `serdes/meta` uses model `NativeQuerySnippet` (not `Snippet`)
