@@ -17,10 +17,11 @@ You need:
 
 ## How to retrieve metadata
 
-Ask the user whether they'd like to:
+Before fetching, ask the user:
 
-1. **Provide the URL and API key directly** so you can make the call, or
-2. **Get a cURL command** with placeholders to run themselves
+1. **Where to store the metadata?** Default is `.metadata_cache` in the working directory. The user can specify a different folder path.
+2. **Add the folder to `.gitignore`?** Default is **yes**. If the working directory is a git repo, add the folder to `.gitignore` unless the user declines.
+3. **Provide the URL and API key directly** so you can make the call, or **get a script command** to run themselves?
 
 ### Option 1: Direct call
 
@@ -42,33 +43,20 @@ The response is a `.tar.gz` archive.
 There is a ready-made script at `scripts/fetch-metadata.sh` in this skill folder. Tell the user to run it with their URL and API key as arguments:
 
 ```
-! bash <path-to-skill>/scripts/fetch-metadata.sh <METABASE_URL> <API_KEY>
+! bash <path-to-skill>/scripts/fetch-metadata.sh <METABASE_URL> <API_KEY> .metadata_cache
 ```
 
-The script downloads `metabase-export.tar.gz` into the current working directory. Using a script avoids line-wrapping issues that break long cURL commands when pasted inline.
+The script downloads the export, extracts it into the specified folder, keeps only the `databases/` directory (discarding `collections/`, `transforms/`, `settings.yaml`, etc.), and cleans up the archive. Using a script avoids line-wrapping issues that break long cURL commands when pasted inline.
 
 ## Storing the metadata
 
 Database metadata represents a point-in-time snapshot of the data model. It can change as databases evolve. Treat it as a **cache**, not a source of truth.
 
-1. Create a `.metadata_cache` folder in the working directory
-2. Extract the archive contents into `.metadata_cache`
-3. If the working directory is a git repo, add `.metadata_cache` to `.gitignore`
-
-```bash
-mkdir -p .metadata_cache
-tar -xzf metabase-export.tar.gz --strip-components=1 -C .metadata_cache
-# Only keep the databases folder — discard everything else
-find .metadata_cache -mindepth 1 -maxdepth 1 ! -name databases -exec rm -rf {} +
-rm -rf .metadata_cache/databases/internal_metabase_database
-rm metabase-export.tar.gz
-```
-
-Only the `databases/` folder is relevant — the archive also includes `collections/`, `transforms/`, `settings.yaml`, etc., which should be discarded. The `internal_metabase_database` is Metabase's internal storage and should also be removed.
+If the user agreed to add the folder to `.gitignore` (the default), append the folder path to `.gitignore` in the working directory.
 
 ## Using the metadata
 
-Once cached, the metadata is available at `.metadata_cache/databases/`. Each database folder contains YAML files describing tables, fields, field values, and relationships. Read these files to understand:
+Once cached, the metadata is available at `<folder>/databases/` (e.g. `.metadata_cache/databases/`). Each database folder contains YAML files describing tables, fields, field values, and relationships. Read these files to understand:
 
 - Which databases are connected
 - What tables exist in each database and schema
