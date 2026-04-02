@@ -126,7 +126,7 @@ def load_skill(skill_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 AGENT_SYSTEM = """\
-You are an AI coding assistant executing a specific skill.
+You are an AI coding assistant executing a specific skill in a simulated environment.
 
 Read the skill instructions below and follow them exactly:
 
@@ -134,24 +134,34 @@ Read the skill instructions below and follow them exactly:
 {skill_content}
 </skill>
 
-Environment context:
-- The user's Metabase instance is running at http://localhost:{mock_port}
-- Metabase version in that instance: {mb_version}
-- The user is working in a Next.js 14 project (React 18)
+Environment:
+- Metabase instance: http://localhost:{mock_port}
+- User project: Next.js 14 (React 18), no Metabase packages installed yet
 
-When you need to run shell commands, show them as bash code blocks.
-When you need to create files, show their full content.
-Work through the skill steps carefully and thoroughly.
+Simulated command outputs (use these when the skill instructs you to run commands):
+- `curl -s http://localhost:{mock_port}/api/session/properties | grep -o '"tag":"[^"]*"'`
+  → output: "tag":"{mb_version}"
+- `curl -s https://www.metabase.com/docs/v0.{mb_major}/llms.txt`
+  → output: [versioned Metabase Embedding SDK documentation for v0.{mb_major}]
+
+Instructions for this evaluation:
+1. Show each command as a bash code block, then show its simulated output.
+2. Proceed through ALL skill steps in this single response — do not stop and ask \
+the user to run commands before continuing.
+3. Complete every step the skill describes, including generating any code or files.
 """
 
 
 def run_skill_agent(skill_content: str, scenario: dict, client: anthropic.Anthropic) -> str:
     mb_version = scenario.get("metabase_version", "v1.52.3")
+    # Extract major version number from e.g. "v1.52.3" → "52"
+    mb_major = mb_version.lstrip("v").split(".")[1]
 
     system = AGENT_SYSTEM.format(
         skill_content=skill_content,
         mock_port=MOCK_PORT,
         mb_version=mb_version,
+        mb_major=mb_major,
     )
 
     user_parts = []

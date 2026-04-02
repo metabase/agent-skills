@@ -1,12 +1,17 @@
 ---
-skill: metabase-embed-dashboard
+skill: metabase-react-sdk-docs
 name: Embed multiple dashboards with a shared provider
 metabase_version: v1.60.2
 ---
 
 ## User prompt
 
-I need to embed three dashboards in my React app: a sales overview, a user growth chart, and a top products report. The sales one should be interactive so users can filter it. My Metabase is at http://localhost:13000.
+I need to embed three dashboards in my React app: a sales overview, a user growth chart, and a top products report. The sales one should be interactive so users can filter it. My Metabase is at http://localhost:13000. I'm using API key auth — my key is in `METABASE_API_KEY`.
+
+Assume the following dashboards already exist in Metabase:
+- Sales Overview → dashboard ID 12
+- User Growth → dashboard ID 15
+- Top Products → dashboard ID 23
 
 ## Grading criteria
 

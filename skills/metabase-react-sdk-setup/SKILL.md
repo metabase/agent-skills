@@ -3,7 +3,7 @@ name: metabase-react-sdk-setup
 description: One-time setup for Metabase Embedding SDK. Confirms the Metabase instance URL and version, sets up authentication (API key for dev, JWT for production), and installs the SDK.
 ---
 
-Run these steps to prepare a project for Metabase embedded analytics. This covers instance verification, auth mode selection, and SDK installation. Once complete, use the `metabase-embed-dashboard` skill to generate dashboard components.
+Run these steps to prepare a project for Metabase embedded analytics. This covers instance verification, auth mode selection, and SDK installation. Once complete, use the `metabase-react-sdk-docs` skill for any embedding tasks.
 
 ---
 
@@ -89,4 +89,4 @@ Tell the user setup is complete. Summarize:
 - Auth mode chosen (API key / JWT) and where credentials are stored
 - SDK version installed
 
-Suggest using the `metabase-embed-dashboard` skill to start generating dashboard components.
+Stop here. Do not generate any React component code, Quick Reference snippets, MetabaseProvider examples, or any other code beyond what was already shown for auth and SDK installation. Simply tell the user setup is complete and suggest they use the `metabase-react-sdk-docs` skill for their next task.
