@@ -1,5 +1,5 @@
 ---
-name: metabase-embedding-setup
+name: metabase-react-sdk-setup
 description: One-time setup for Metabase Embedding SDK. Confirms the Metabase instance URL and version, sets up authentication (API key for dev, JWT for production), and installs the SDK.
 ---
 
@@ -44,6 +44,7 @@ Fall back to `https://www.metabase.com/docs/latest/llms.txt` if the versioned UR
 Ask the user:
 
 > "How will this embedding be used?
+>
 > - **API key** — easiest to set up, good for development and internal tools
 > - **JWT** — recommended for production apps where end users access the embed"
 
@@ -83,6 +84,7 @@ Check whether `@metabase/embedding-sdk-react` is already in the user's `package.
 ## Step 5 — Done
 
 Tell the user setup is complete. Summarize:
+
 - Instance URL and version confirmed
 - Auth mode chosen (API key / JWT) and where credentials are stored
 - SDK version installed

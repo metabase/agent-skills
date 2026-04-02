@@ -70,7 +70,7 @@ Read the auth mode from the user's project context:
 - If a JWT auth endpoint exists → JWT auth.
 - If unclear, ask the user: "Are you using API key auth or JWT auth for embedding?"
 
-If auth is not yet set up at all, suggest running the `metabase-embedding-setup` skill first.
+If auth is not yet set up at all, suggest running the `metabase-react-sdk-setup` skill first.
 
 ---
 
