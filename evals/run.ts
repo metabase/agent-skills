@@ -18,18 +18,26 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { parseArgs } from "util";
-import { readdirSync, readFileSync, existsSync } from "fs";
+import {
+  readdirSync,
+  readFileSync,
+  existsSync,
+  mkdirSync,
+  writeFileSync,
+} from "fs";
 import { join, basename } from "path";
+
+const RUNS_DIR = join(import.meta.dir, "runs");
 
 const ROOT = join(import.meta.dir, "..");
 const SCENARIOS_DIR = join(import.meta.dir, "scenarios");
 const MOCK_PORT = 13000;
 
-const G = "\x1b[32m";   // green
-const R = "\x1b[31m";   // red
-const Y = "\x1b[33m";   // yellow
-const B = "\x1b[1m";    // bold
-const X = "\x1b[0m";    // reset
+const G = "\x1b[32m"; // green
+const R = "\x1b[31m"; // red
+const Y = "\x1b[33m"; // yellow
+const B = "\x1b[1m"; // bold
+const X = "\x1b[0m"; // reset
 
 // ---------------------------------------------------------------------------
 // Mock Metabase server
@@ -69,9 +77,13 @@ function parseScenario(path: string): Scenario {
 
   if (lines[0]?.trim() === "---") {
     for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim() === "---") { bodyStart = i + 1; break; }
+      if (lines[i].trim() === "---") {
+        bodyStart = i + 1;
+        break;
+      }
       const sep = lines[i].indexOf(": ");
-      if (sep !== -1) meta[lines[i].slice(0, sep).trim()] = lines[i].slice(sep + 2).trim();
+      if (sep !== -1)
+        meta[lines[i].slice(0, sep).trim()] = lines[i].slice(sep + 2).trim();
     }
   }
 
@@ -131,31 +143,42 @@ Instructions for this evaluation:
 2. Proceed through ALL skill steps in this single response — do not stop and ask the user to run commands before continuing.
 3. Complete every step the skill describes, including generating any code or files.`;
 
+interface AgentRun {
+  systemPrompt: string;
+  userMessage: string;
+  response: string;
+}
+
 async function runSkillAgent(
   skillContent: string,
   scenario: Scenario,
   client: Anthropic,
-): Promise<string> {
+): Promise<AgentRun> {
   const mbVersion = scenario.metabase_version ?? "v1.60.1";
   const mbMajor = mbVersion.replace(/^v\d+\./, "").split(".")[0];
 
-  const system = AGENT_SYSTEM
-    .replaceAll("{skill_content}", skillContent)
+  const systemPrompt = AGENT_SYSTEM.replaceAll("{skill_content}", skillContent)
     .replaceAll("{mock_port}", String(MOCK_PORT))
     .replaceAll("{mb_version}", mbVersion)
     .replaceAll("{mb_major}", mbMajor);
 
   const userParts: string[] = [];
-  if (scenario.project_context) userParts.push(`**Project context**\n\n${scenario.project_context}`);
+  if (scenario.project_context)
+    userParts.push(`**Project context**\n\n${scenario.project_context}`);
   userParts.push(scenario.user_prompt.trim());
+  const userMessage = userParts.join("\n\n---\n\n");
 
   const msg = await client.messages.create({
     model: "claude-opus-4-5",
     max_tokens: 4096,
-    system,
-    messages: [{ role: "user", content: userParts.join("\n\n---\n\n") }],
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
   });
-  return (msg.content[0] as { text: string }).text;
+  return {
+    systemPrompt,
+    userMessage,
+    response: (msg.content[0] as { text: string }).text,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -200,13 +223,14 @@ async function gradeResponse(
   const msg = await client.messages.create({
     model: "claude-opus-4-5",
     max_tokens: 2048,
-    messages: [{
-      role: "user",
-      content: JUDGE_PROMPT
-        .replace("{user_prompt}", scenario.user_prompt)
-        .replace("{agent_response}", agentResponse)
-        .replace("{criteria}", scenario.grading_criteria),
-    }],
+    messages: [
+      {
+        role: "user",
+        content: JUDGE_PROMPT.replace("{user_prompt}", scenario.user_prompt)
+          .replace("{agent_response}", agentResponse)
+          .replace("{criteria}", scenario.grading_criteria),
+      },
+    ],
   });
 
   let text = (msg.content[0] as { text: string }).text.trim();
@@ -225,31 +249,91 @@ interface ScenarioResult {
   total: number;
   allPass: boolean;
   grades: Grade[];
+  runFile?: string;
   error?: string;
+}
+
+function saveRunMarkdown(
+  scenario: Scenario,
+  run: AgentRun,
+  grades: Grade[],
+  passed: number,
+  runId: string,
+): string {
+  mkdirSync(RUNS_DIR, { recursive: true });
+
+  const statusEmoji = passed === grades.length ? "✅" : "❌";
+  const gradingRows = grades
+    .map(g => `| ${g.pass ? "✅" : "❌"} | ${g.criterion} | ${g.reason} |`)
+    .join("\n");
+
+  const md = [
+    `# ${scenario.name ?? scenario._stem}`,
+    "",
+    `**Skill:** \`${scenario.skill}\`  `,
+    `**Metabase version:** ${scenario.metabase_version}  `,
+    `**Result:** ${statusEmoji} ${passed}/${grades.length} criteria passed  `,
+    `**Run:** \`${runId}\`  `,
+    "",
+    "---",
+    "",
+    "## System prompt",
+    "",
+    "```",
+    run.systemPrompt,
+    "```",
+    "",
+    "---",
+    "",
+    "## User message",
+    "",
+    run.userMessage,
+    "",
+    "---",
+    "",
+    "## Agent response",
+    "",
+    run.response,
+    "",
+    "---",
+    "",
+    "## Grading",
+    "",
+    "| Pass | Criterion | Reason |",
+    "|------|-----------|--------|",
+    gradingRows,
+    "",
+  ].join("\n");
+
+  const filename = `${runId}-${scenario._stem}.md`;
+  writeFileSync(join(RUNS_DIR, filename), md);
+  return filename;
 }
 
 async function runScenario(
   path: string,
   client: Anthropic,
   verbose: boolean,
+  runId: string,
 ): Promise<ScenarioResult> {
   const scenario = parseScenario(path);
-  if (!scenario.skill) throw new Error(`Missing 'skill:' in frontmatter of ${path}`);
+  if (!scenario.skill)
+    throw new Error(`Missing 'skill:' in frontmatter of ${path}`);
 
   const skillContent = loadSkill(scenario.skill);
   const name = scenario.name ?? scenario._stem;
 
   console.log(`\n${B}▸ ${name}${X}  [${scenario.skill}]`);
 
-  const agentResponse = await runSkillAgent(skillContent, scenario, client);
+  const run = await runSkillAgent(skillContent, scenario, client);
 
   if (verbose) {
     console.log(`\n${Y}--- agent response ---${X}`);
-    console.log(agentResponse);
+    console.log(run.response);
     console.log(`${Y}--- end response ---${X}\n`);
   }
 
-  const grades = await gradeResponse(agentResponse, scenario, client);
+  const grades = await gradeResponse(run.response, scenario, client);
   const passed = grades.filter(g => g.pass).length;
   const total = grades.length;
   const allPass = passed === total;
@@ -265,7 +349,10 @@ async function runScenario(
     if (!g.pass) console.log(`    ${Y}→ ${g.reason}${X}`);
   }
 
-  return { scenario: name, skill: scenario.skill, passed, total, allPass, grades };
+  const runFile = saveRunMarkdown(scenario, run, grades, passed, runId);
+  console.log(`  ${Y}↳ runs/${runFile}${X}`);
+
+  return { scenario: name, skill: scenario.skill, passed, total, allPass, grades, runFile };
 }
 
 // ---------------------------------------------------------------------------
@@ -276,27 +363,36 @@ const { values: args } = parseArgs({
   args: Bun.argv.slice(2),
   options: {
     scenario: { type: "string" },
-    skill:    { type: "string" },
-    verbose:  { type: "boolean", short: "v", default: false },
-    json:     { type: "boolean", default: false },
+    skill: { type: "string" },
+    verbose: { type: "boolean", short: "v", default: false },
+    json: { type: "boolean", default: false },
   },
 });
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
-if (!apiKey) { console.error("Error: ANTHROPIC_API_KEY is not set"); process.exit(1); }
+if (!apiKey) {
+  console.error("Error: ANTHROPIC_API_KEY is not set");
+  process.exit(1);
+}
 
 const client = new Anthropic({ apiKey });
 
-// Start mock server using the first scenario's version (or default)
+// Shared run ID for all scenarios in this invocation (timestamp-based)
+const runId = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+
+// Start mock server
 startMockServer("v1.60.1");
 
 // Discover scenario files
 let scenarioPaths = readdirSync(SCENARIOS_DIR)
-  .filter(f => f.endsWith(".md"))
+  .filter((f) => f.endsWith(".md"))
   .sort()
-  .map(f => join(SCENARIOS_DIR, f));
+  .map((f) => join(SCENARIOS_DIR, f));
 
-if (args.scenario) scenarioPaths = scenarioPaths.filter(p => basename(p).includes(args.scenario!));
+if (args.scenario)
+  scenarioPaths = scenarioPaths.filter((p) =>
+    basename(p).includes(args.scenario!),
+  );
 
 if (scenarioPaths.length === 0) {
   console.error(`No scenarios found in ${SCENARIOS_DIR}`);
@@ -307,21 +403,31 @@ const results: ScenarioResult[] = [];
 
 for (const path of scenarioPaths) {
   try {
-    const result = await runScenario(path, client, args.verbose ?? false);
+    const result = await runScenario(path, client, args.verbose ?? false, runId);
     if (args.skill && result.skill !== args.skill) continue;
     results.push(result);
   } catch (err) {
     console.error(`  ${R}ERROR: ${err}${X}`);
-    results.push({ scenario: basename(path, ".md"), skill: "", passed: 0, total: 0, allPass: false, grades: [], error: String(err) });
+    results.push({
+      scenario: basename(path, ".md"),
+      skill: "",
+      passed: 0,
+      total: 0,
+      allPass: false,
+      grades: [],
+      error: String(err),
+    });
   }
 }
 
-const valid = results.filter(r => !r.error);
-const fullyPassing = valid.filter(r => r.allPass).length;
+const valid = results.filter((r) => !r.error);
+const fullyPassing = valid.filter((r) => r.allPass).length;
 
 console.log(`\n${"─".repeat(50)}`);
 const summaryColor = fullyPassing === valid.length ? G : R;
-console.log(`${summaryColor}${B}${fullyPassing}/${valid.length} scenarios fully passing${X}`);
+console.log(
+  `${summaryColor}${B}${fullyPassing}/${valid.length} scenarios fully passing${X}`,
+);
 
 if (args.json) console.log(JSON.stringify(results, null, 2));
 
