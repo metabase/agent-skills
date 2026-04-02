@@ -1,0 +1,14 @@
+{
+  "name": "agent-skills-evals",
+  "private": true,
+  "scripts": {
+    "eval": "bun run.ts",
+    "eval:verbose": "bun run.ts --verbose"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
+  }
+}
