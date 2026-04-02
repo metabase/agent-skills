@@ -36,17 +36,17 @@ Headers:
 
 The `dirname=metadata` parameter controls the name of the root folder inside the archive (defaults to `<instance-name>-<YYYY-MM-dd_HH-mm>` otherwise). Using a fixed name makes extraction predictable.
 
-The response is a `.tar.gz` archive.
+The response is a `.tar.gz` archive. **The download may take several minutes** depending on the size of the instance.
 
 ### Option 2: Script for the user
 
-There is a ready-made script at `scripts/fetch-metadata.sh` in this skill folder. Tell the user to run it with their URL and API key as arguments:
+There is a ready-made script at `scripts/fetch-metadata.py` in this skill folder. Tell the user to run it with their URL and API key as arguments:
 
 ```
-! bash <path-to-skill>/scripts/fetch-metadata.sh <METABASE_URL> <API_KEY> .metadata_cache
+! python3 <path-to-skill>/scripts/fetch-metadata.py <METABASE_URL> <API_KEY> .metadata_cache
 ```
 
-The script downloads the export, extracts it into the specified folder, keeps only the `databases/` directory (discarding `collections/`, `transforms/`, `settings.yaml`, etc.), and cleans up the archive. Using a script avoids line-wrapping issues that break long cURL commands when pasted inline.
+The script downloads the export, extracts it into the specified folder, keeps only the `databases/` directory (discarding `collections/`, `transforms/`, `settings.yaml`, etc.), and cleans up the archive. Using a script avoids line-wrapping issues that break long cURL commands when pasted inline. It uses only Python standard library modules so it works on macOS, Linux, and Windows without extra dependencies.
 
 ## Storing the metadata
 
