@@ -11,7 +11,7 @@ A lightweight mock Metabase HTTP server handles `/api/session/properties` on
 
 ```sh
 cd evals
-pip install -r requirements.txt
+bun install
 export ANTHROPIC_API_KEY=sk-...
 ```
 
@@ -19,19 +19,19 @@ export ANTHROPIC_API_KEY=sk-...
 
 ```sh
 # Run all scenarios
-python run.py
+bun run.ts
 
 # Run a specific scenario
-python run.py --scenario react-sdk-setup-api-key
+bun run.ts --scenario react-sdk-setup-api-key
 
 # Run all scenarios for one skill
-python run.py --skill metabase-react-sdk-setup
+bun run.ts --skill metabase-react-sdk-setup
 
 # Print the agent's full response for each scenario (useful for debugging)
-python run.py --verbose
+bun run.ts --verbose
 
 # Output results as JSON (useful for CI)
-python run.py --json
+bun run.ts --json
 ```
 
 ## How it works
