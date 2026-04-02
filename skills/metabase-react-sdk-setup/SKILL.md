@@ -1,9 +1,9 @@
 ---
 name: metabase-react-sdk-setup
-description: One-time setup for Metabase Embedding SDK. Confirms the Metabase instance URL and version, sets up authentication (API key for dev, JWT for production), and installs the SDK.
+description: One-time setup for the Metabase Embedding SDK. Confirms the instance URL and version, configures JWT SSO authentication, and installs the SDK.
 ---
 
-Run these steps to prepare a project for Metabase embedded analytics. This covers instance verification, auth mode selection, and SDK installation. Once complete, use the `metabase-react-sdk-docs` skill for any embedding tasks.
+Run these steps to prepare a project for Metabase embedded analytics. This covers instance verification, JWT SSO authentication setup, and SDK installation. Once complete, use the `metabase-react-sdk-docs` skill for any embedding tasks.
 
 ---
 
@@ -39,36 +39,13 @@ Fall back to `https://www.metabase.com/docs/latest/llms.txt` if the versioned UR
 
 ---
 
-## Step 3 — Choose authentication mode
-
-Ask the user:
-
-> "How will this embedding be used?
->
-> - **API key** — easiest to set up, good for development and internal tools
-> - **JWT** — recommended for production apps where end users access the embed"
-
-### If they choose API key
-
-1. Use the Metabase MCP to check whether an embedding-specific API key already exists.
-2. If one does not exist, guide the user to create one:
-   - Via the Metabase admin UI: **Settings → Admin → API Keys → Create API key**
-   - Or via the API (requires an existing admin API key):
-     ```bash
-     curl -s -X POST <INSTANCE_URL>/api/api-key \
-       -H "Content-Type: application/json" \
-       -H "x-api-key: <ADMIN_API_KEY>" \
-       -d '{"name": "Embedding", "group_id": 1}'
-     ```
-3. Tell the user to save the returned key as `METABASE_API_KEY` in their project's `.env` or `.env.local` file, and confirm it is in `.gitignore`.
-
-### If they choose JWT
+## Step 3 — Set up JWT SSO authentication
 
 Follow the auth setup instructions in the `llms.txt` fetched in Step 2 — the JWT implementation details (endpoint shape, token fields, signing approach) vary by version. In particular:
 
 - Retrieve the JWT signing secret from Metabase: **Settings → Admin → Embedding → Embedding secret key**
 - Tell the user to save it as `METABASE_JWT_SECRET` in their server-side environment only (never a browser-accessible env var)
-- Ask which backend framework they are using (Next.js API route, Express, Fastify, etc.) and scaffold a minimal auth endpoint following the pattern in the `llms.txt`
+- Ask which backend framework they are using (Next.js API route, Express, Fastify, etc.) and scaffold a minimal JWT signing endpoint following the pattern in the `llms.txt`
 
 ---
 
@@ -86,7 +63,7 @@ Check whether `@metabase/embedding-sdk-react` is already in the user's `package.
 Tell the user setup is complete. Summarize:
 
 - Instance URL and version confirmed
-- Auth mode chosen (API key / JWT) and where credentials are stored
+- JWT signing secret stored server-side and auth endpoint scaffolded
 - SDK version installed
 
 Stop here. Do not generate any React component code, Quick Reference snippets, MetabaseProvider examples, or any other code beyond what was already shown for auth and SDK installation. Simply tell the user setup is complete and suggest they use the `metabase-react-sdk-docs` skill for their next task.
