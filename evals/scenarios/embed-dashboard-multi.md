@@ -1,7 +1,7 @@
 ---
 skill: metabase-react-sdk-docs
 name: Embed multiple dashboards with a shared provider
-metabase_version: v1.60.2
+metabase_version: v1.60.1
 ---
 
 ## User prompt

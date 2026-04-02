@@ -1,7 +1,7 @@
 ---
 skill: metabase-react-sdk-setup
 name: JWT setup with a Next.js API route
-metabase_version: v1.60.2
+metabase_version: v1.60.1
 ---
 
 ## User prompt

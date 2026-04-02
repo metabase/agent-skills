@@ -1,7 +1,7 @@
 ---
 skill: metabase-react-sdk-docs
 name: Embed a single sales dashboard
-metabase_version: v1.52.3
+metabase_version: v1.60.1
 ---
 
 ## User prompt
@@ -11,7 +11,7 @@ Embed a sales overview dashboard in my React app. My Metabase is at http://local
 ## Grading criteria
 
 - The agent shows a curl command targeting `/api/session/properties` to detect the Metabase version
-- The agent fetches a versioned llms.txt URL containing the detected major version (e.g., `v0.52`)
+- The agent fetches a versioned llms.txt URL containing the detected major version (e.g., `v0.60`)
 - The agent acknowledges the provided dashboard ID (7) and does not attempt to create a new dashboard from scratch
 - The agent generates a React component named something like `SalesOverviewDashboard`
 - The generated component imports from `@metabase/embedding-sdk-react`, not from an internal Metabase path
