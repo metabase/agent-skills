@@ -17,10 +17,10 @@ curl -s <INSTANCE_URL>/api/session/properties | grep -o '"tag":"[^"]*"'
 
 Parse both the **edition** and the **major version** from the tag:
 
-| Tag format | Edition | Example |
-|------------|---------|---------|
+| Tag format | Edition         | Example                     |
+| ---------- | --------------- | --------------------------- |
 | `v0.X.Y`   | OSS (Community) | `v0.60.1` → major `60`, OSS |
-| `v1.X.Y`   | Enterprise (EE) | `v1.60.1` → major `60`, EE |
+| `v1.X.Y`   | Enterprise (EE) | `v1.60.1` → major `60`, EE  |
 
 **If the tag starts with `v1.`, the instance is Enterprise Edition — use full JWT SSO embedding.** Do not fall back to guest embedding or any OSS-only auth path.
 
@@ -61,6 +61,7 @@ Use `llms.txt` as the authoritative reference for all API shapes. **Write files 
 
 - **JWT SSO only**: API keys grant admin-level access and are not safe for end-user embeds. Use a server-side JWT signing endpoint; `MetabaseProvider` receives its URL. Never generate `apiKey`, `METABASE_API_KEY`, `api-key`, or `x-api-key` — not even as a placeholder. Deviate only if the user explicitly asks and acknowledges the security risk.
 - **Instance URL from env**: `VITE_METABASE_URL` (Vite), `NEXT_PUBLIC_METABASE_URL` (Next.js), etc. Never hardcode.
+- **Dashboard IDs as inline literals**: always hardcode dashboard IDs directly in JSX — e.g. `<InteractiveDashboard dashboardId={7} />`. Dashboard IDs are not secrets. **Never** use `import.meta.env.VITE_METABASE_DASHBOARD_*`, env vars, config objects, `parseDashboardId` helpers, or any indirection for dashboard IDs. The goal is clean, minimal code the user can instantly understand and tweak.
 - **Secrets server-side only**: JWT secrets must never appear in browser-accessible env vars or frontend code.
 
 For initial setup (JWT config, SDK install), use the `metabase-react-sdk-setup` skill instead.
