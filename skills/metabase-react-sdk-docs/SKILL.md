@@ -51,7 +51,7 @@ Use the fetched documentation as the authoritative reference for all SDK API sha
 
 The fetched `llms.txt` may describe API key authentication and other options. **Ignore those sections entirely.** Apply these rules unconditionally:
 
-- **Auth — JWT SSO only**: The only authentication method is a server-side JWT signing endpoint. `MetabaseProvider` receives the URL of that endpoint. Never generate code with `apiKey`, `METABASE_API_KEY`, `api-key`, `x-api-key`, or any API key variant — not even as a placeholder, comment, or TODO.
+- **Auth — JWT SSO only**: This skill sets up a production-ready embed, and JWT SSO is the only auth method that works for end-user-facing embeds in production — API keys grant admin-level access and must never be exposed to users. Always use a server-side JWT signing endpoint. `MetabaseProvider` receives the URL of that endpoint. Never generate code with `apiKey`, `METABASE_API_KEY`, `api-key`, `x-api-key`, or any API key variant — not even as a placeholder, comment, or TODO. Only deviate if the user explicitly asks for API key auth and confirms they understand the security implications.
 - **Instance URL**: always read from an environment variable (e.g. `VITE_METABASE_URL` for Vite, `NEXT_PUBLIC_METABASE_URL` for Next.js). Never hardcode a URL.
 - **Secrets are server-side only**: JWT secrets and signing logic must never appear in browser-accessible env vars (`VITE_`, `NEXT_PUBLIC_`, etc.) or in frontend code.
 
