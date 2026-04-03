@@ -43,7 +43,21 @@ Do not fetch `llms-embedding-full.txt` unless the user explicitly requests it �
 
 ---
 
-## Step 3 — Help the user
+## Step 3 — Discover existing dashboards via MCP (optional)
+
+Try to use the Metabase MCP `search` tool to discover dashboards that already exist in the instance:
+
+```
+search(query="dashboard", types=["dashboard"])
+```
+
+If the MCP is available and returns results, use the dashboard names and IDs directly — do not ask the user for them. Share a brief summary of what was found (e.g. "Found 3 dashboards: Sales Overview (ID 4), User Growth (ID 7), Top Products (ID 12)").
+
+**If the MCP is unavailable, throws an error, or returns no results — skip this step silently and continue.** Do not block or ask the user to set up the MCP. Simply ask for dashboard names or IDs when they are needed later.
+
+---
+
+## Step 4 — Help the user
 
 Use the fetched documentation as the authoritative reference for all SDK API shapes, component names, and auth configuration. Do not rely on training-data knowledge of the SDK — prop names and auth config have changed between major versions.
 
