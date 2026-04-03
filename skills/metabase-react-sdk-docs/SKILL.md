@@ -43,17 +43,19 @@ Do not fetch `llms-embedding-full.txt` unless the user explicitly requests it �
 
 ---
 
-## Step 3 — Discover existing dashboards via MCP (optional)
+## Step 3 — Connect to Metabase via MCP (optional)
 
-Try to use the Metabase MCP `search` tool to discover dashboards that already exist in the instance:
+Invoke the `setup-metabase-mcp` skill, passing the instance URL from Step 1. That skill handles everything: checking whether `mcp.json` is already configured, replacing the placeholder if needed, and authenticating.
+
+Once the MCP is connected, use the `search` tool to discover existing dashboards:
 
 ```
 search(query="dashboard", types=["dashboard"])
 ```
 
-If the MCP is available and returns results, use the dashboard names and IDs directly — do not ask the user for them. Share a brief summary of what was found (e.g. "Found 3 dashboards: Sales Overview (ID 4), User Growth (ID 7), Top Products (ID 12)").
+If dashboards are found, use their names and IDs directly in subsequent steps — do not ask the user for them. Share a brief summary (e.g. "Found 3 dashboards: Sales Overview (ID 4), User Growth (ID 7), Top Products (ID 12)").
 
-**If the MCP is unavailable, throws an error, or returns no results — skip this step silently and continue.** Do not block or ask the user to set up the MCP. Simply ask for dashboard names or IDs when they are needed later.
+**If MCP setup fails, the user declines, or any error occurs — skip this step entirely and continue.** Do not block. Simply ask for dashboard names or IDs when they are needed later.
 
 ---
 
