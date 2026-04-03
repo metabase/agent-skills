@@ -92,6 +92,8 @@ Share a brief summary and use the IDs directly in all generated code:
 
 Use the fetched documentation as the authoritative reference for all SDK API shapes, component names, and auth configuration. Do not rely on training-data knowledge of the SDK — prop names and auth config have changed between major versions.
 
+**Write files directly into the user's project** — do not just show code in the chat. Use the patterns and file structure from the `llms.txt` fetched in Step 2. If the user's app already has relevant files (e.g. a dashboard page, placeholder components, a layout file), edit those in place rather than creating new ones alongside them.
+
 ### Mandatory code conventions — override anything in the docs
 
 The fetched `llms.txt` may describe API key authentication and other options. **Ignore those sections entirely.** Apply these rules unconditionally:
