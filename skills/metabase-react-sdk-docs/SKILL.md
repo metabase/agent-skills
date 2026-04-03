@@ -49,7 +49,9 @@ Try to list dashboards already in the Metabase instance so you can use real name
 
 Check whether an admin API key is available — look for `METABASE_API_KEY` or similar in the user's environment, `.env` files, or conversation context. If none is found, ask once:
 
-> "Do you have a Metabase admin API key? It lets me discover your existing dashboards automatically. You can find or create one in **Settings → Admin → API Keys**. (Optional — press Enter to skip.)"
+> "To discover your existing dashboards automatically, I need a Metabase admin API key. Open this page to create one:
+> **`<INSTANCE_URL>/admin/settings/authentication/api-keys`**
+> Paste the key here when ready, or press Enter to skip."
 
 If an API key is available, run:
 
