@@ -43,19 +43,26 @@ Do not fetch `llms-embedding-full.txt` unless the user explicitly requests it �
 
 ---
 
-## Step 3 — Connect to Metabase via MCP (optional)
+## Step 3 — Discover existing dashboards (optional)
 
-Invoke the `setup-metabase-mcp` skill, passing the instance URL from Step 1. That skill handles everything: checking whether `mcp.json` is already configured, replacing the placeholder if needed, and authenticating.
+Try to list dashboards already in the Metabase instance so you can use real names and IDs rather than asking the user for them.
 
-Once the MCP is connected, use the `search` tool to discover existing dashboards:
+Check whether an admin API key is available — look for `METABASE_API_KEY` or similar in the user's environment, `.env` files, or conversation context. If none is found, ask once:
 
+> "Do you have a Metabase admin API key? It lets me discover your existing dashboards automatically. You can find or create one in **Settings → Admin → API Keys**. (Optional — press Enter to skip.)"
+
+If an API key is available, run:
+
+```bash
+curl -s '<INSTANCE_URL>/api/search?models=dashboard&archived=false' \
+  -H 'X-API-Key: <ADMIN_API_KEY>'
 ```
-search(query="dashboard", types=["dashboard"])
-```
 
-If dashboards are found, use their names and IDs directly in subsequent steps — do not ask the user for them. Share a brief summary (e.g. "Found 3 dashboards: Sales Overview (ID 4), User Growth (ID 7), Top Products (ID 12)").
+If dashboards are returned, share a brief summary and use their IDs directly in all generated code — for example:
 
-**If MCP setup fails, the user declines, or any error occurs — skip this step entirely and continue.** Do not block. Simply ask for dashboard names or IDs when they are needed later.
+> "Found 3 dashboards: Sales Overview (ID 4), User Growth (ID 7), Top Products (ID 12)"
+
+**If no API key is provided, the request fails, or no dashboards are returned — skip this step silently.** Ask for dashboard names or IDs only when needed later.
 
 ---
 
