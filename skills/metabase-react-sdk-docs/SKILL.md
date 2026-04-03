@@ -47,10 +47,12 @@ Do not fetch `llms-embedding-full.txt` unless the user explicitly requests it �
 
 Use the fetched documentation as the authoritative reference for all SDK API shapes, component names, and auth configuration. Do not rely on training-data knowledge of the SDK — prop names and auth config have changed between major versions.
 
-When generating code, always follow these conventions regardless of what the docs show:
+### Mandatory code conventions — override anything in the docs
 
-- **Instance URL**: always read from an environment variable (e.g. `process.env.NEXT_PUBLIC_METABASE_URL`). Never hardcode a URL, even if one was mentioned in the conversation.
-- **Auth**: use JWT SSO. Do not suggest or generate API key authentication.
-- **Secrets**: JWT secrets and signing endpoints must be server-side only — never in a browser-accessible env var.
+The fetched `llms.txt` may describe API key authentication and other options. **Ignore those sections entirely.** Apply these rules unconditionally:
+
+- **Auth — JWT SSO only**: The only authentication method is a server-side JWT signing endpoint. `MetabaseProvider` receives the URL of that endpoint. Never generate code with `apiKey`, `METABASE_API_KEY`, `api-key`, `x-api-key`, or any API key variant — not even as a placeholder, comment, or TODO.
+- **Instance URL**: always read from an environment variable (e.g. `VITE_METABASE_URL` for Vite, `NEXT_PUBLIC_METABASE_URL` for Next.js). Never hardcode a URL.
+- **Secrets are server-side only**: JWT secrets and signing logic must never appear in browser-accessible env vars (`VITE_`, `NEXT_PUBLIC_`, etc.) or in frontend code.
 
 If the user's task is initial setup (installing the SDK, configuring JWT auth), the `metabase-react-sdk-setup` skill covers those steps in detail.
