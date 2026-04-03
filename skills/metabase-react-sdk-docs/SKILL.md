@@ -47,24 +47,44 @@ Do not fetch `llms-embedding-full.txt` unless the user explicitly requests it �
 
 Try to list dashboards already in the Metabase instance so you can use real names and IDs rather than asking the user for them.
 
-Check whether an admin API key is available — look for `METABASE_API_KEY` or similar in the user's environment, `.env` files, or conversation context. If none is found, ask once:
+### Check for credentials in `.env.metabase`
 
-> "To discover your existing dashboards automatically, I need a Metabase admin API key. Open this page to create one:
-> **`<INSTANCE_URL>/admin/settings/authentication/api-keys`**
-> Paste the key here when ready, or press Enter to skip."
-
-If an API key is available, run:
+Look for a `.env.metabase` file in the project root. If it exists, source it and use the values — do not read the file contents into context:
 
 ```bash
-curl -s '<INSTANCE_URL>/api/search?models=dashboard&archived=false' \
-  -H 'X-API-Key: <ADMIN_API_KEY>'
+source .env.metabase 2>/dev/null && \
+  curl -s "$METABASE_INSTANCE_URL/api/search?models=dashboard&archived=false" \
+    -H "X-API-Key: $METABASE_ADMIN_API_KEY"
 ```
 
-If dashboards are returned, share a brief summary and use their IDs directly in all generated code — for example:
+### If the file does not exist
+
+Create it with placeholder values, add it to `.gitignore`, then ask the user to fill it in:
+
+```bash
+cat >> .gitignore <<'EOF'
+.env.metabase
+EOF
+
+cat > .env.metabase <<'EOF'
+METABASE_INSTANCE_URL=http://localhost:3000
+METABASE_ADMIN_API_KEY=
+EOF
+```
+
+Tell the user:
+
+> "I've created `.env.metabase` in your project root. To discover your existing dashboards, fill in `METABASE_ADMIN_API_KEY` — create a key at:
+> **`<INSTANCE_URL>/admin/settings/authentication/api-keys`**
+> Let me know when it's filled in, or press Enter to skip."
+
+**If the file is empty, the key is blank, the request fails, or the user skips — skip this step silently.** Ask for dashboard names or IDs only when needed later.
+
+### If dashboards are found
+
+Share a brief summary and use the IDs directly in all generated code:
 
 > "Found 3 dashboards: Sales Overview (ID 4), User Growth (ID 7), Top Products (ID 12)"
-
-**If no API key is provided, the request fails, or no dashboards are returned — skip this step silently.** Ask for dashboard names or IDs only when needed later.
 
 ---
 
