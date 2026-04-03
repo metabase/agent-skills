@@ -15,7 +15,16 @@ Use it from context if known, otherwise ask.
 curl -s <INSTANCE_URL>/api/session/properties | grep -o '"tag":"[^"]*"'
 ```
 
-Extract the major version (e.g. `v1.60.3` → `60`), then fetch the versioned docs index:
+Parse both the **edition** and the **major version** from the tag:
+
+| Tag format | Edition | Example |
+|------------|---------|---------|
+| `v0.X.Y`   | OSS (Community) | `v0.60.1` → major `60`, OSS |
+| `v1.X.Y`   | Enterprise (EE) | `v1.60.1` → major `60`, EE |
+
+**If the tag starts with `v1.`, the instance is Enterprise Edition — use full JWT SSO embedding.** Do not fall back to guest embedding or any OSS-only auth path.
+
+Extract just the major version number (e.g. `v1.60.3` → `60`), then fetch the versioned docs index:
 
 ```bash
 curl -s https://www.metabase.com/docs/v0.<MAJOR>/llms.txt

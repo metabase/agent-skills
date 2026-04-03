@@ -24,10 +24,16 @@ Run **exactly this command** — do not try other endpoints:
 curl -s <INSTANCE_URL>/api/session/properties | grep -o '"tag":"[^"]*"'
 ```
 
-This returns something like `"tag":"v1.52.0"`. Extract the major version number (e.g. `52` from `v1.52.0`).
+This returns something like `"tag":"v1.52.0"`. Parse both the edition and major version:
 
-- If the major version is **below 49**: tell the user the Embedding SDK requires Metabase 49 or later and stop.
-- If it is **49 or above**: continue.
+| Tag format | Edition | Example |
+|------------|---------|---------|
+| `v0.X.Y`   | OSS (Community) | `v0.60.1` → major `60`, OSS |
+| `v1.X.Y`   | Enterprise (EE) | `v1.60.1` → major `60`, EE |
+
+Extract the major version number (the `X` part). If below 49, tell the user the Embedding SDK requires Metabase 49 or later and stop.
+
+**If the tag starts with `v1.`, the instance is Enterprise Edition — proceed with full JWT SSO setup.** Do not suggest guest embedding or any OSS-only auth path.
 
 Fetch the versioned documentation index for use in the remaining steps:
 
