@@ -51,6 +51,14 @@ The web component must be rendered using the **same delivery mechanism** as the 
 
 **Token delivery must use the same mechanism as the original static embedding.** If the JWT was rendered server-side into the HTML (e.g., `res.send(\`<iframe src=".../${token}">\`)`), the migrated web component should receive its token the same way — rendered server-side into the `token` attribute (e.g., `<metabase-dashboard token="${token}">`). If the JWT was fetched client-side via `fetch()`, keep using `fetch()` for the token. Do not change the delivery mechanism — just change what is delivered (raw token instead of full iframe URL).
 
+## Credential safety
+
+This migration touches code that handles `METABASE_SECRET_KEY` and signed JWTs. Rules:
+
+- **Never output literal secret values** — if you encounter a hardcoded secret key or token string in the code, reference it by variable name only (e.g., "the secret in `config.js:12`"), never echo the value itself
+- In code diffs and summaries, use variable references (`METABASE_SECRET_KEY`, `token`) — not the resolved values
+- If you find hardcoded secrets, flag them to the user and recommend moving them to environment variables as part of the migration
+
 ## Performance
 
 - Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in single messages wherever possible.
@@ -96,10 +104,10 @@ Guest embeds support additional attributes (e.g., downloads, drill-through, hidd
 
 ## Allowed documentation sources
 
-Fetch the version-specific `llms-embedding-full.txt` via curl to a temp file, then Read it:
+Fetch the version-specific `llms-embedding-full.txt` using this URL:
 
-```bash
-curl -sL https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt -o /tmp/llms-embedding-v{VERSION}.txt
+```
+https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
 ```
 
 The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`). This single file contains all embedding documentation for that version, optimized for LLM consumption.
@@ -144,7 +152,7 @@ Perform the project scan and doc fetch concurrently — they are independent. Us
 
 #### 1a: Fetch target version docs
 
-Fetch `llms-embedding-full.txt` for the target version via curl (see "Allowed documentation sources" for URL format), then Read the downloaded file. These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
+Fetch `llms-embedding-full.txt` for the target version (see "Allowed documentation sources" for URL format). These docs are the authoritative source for web component attributes, `window.metabaseConfig` options, and guest embedding configuration for the target version. Use them in Step 2 for mapping instead of relying on hardcoded tables alone.
 
 Launch this concurrently with the project scan steps below.
 
@@ -475,7 +483,7 @@ Organize the final output into these sections:
 ## Retry policy
 
 **Doc fetching:**
-- If curl returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
+- If fetching `llms-embedding-full.txt` returns 404, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
 
 **Validation:**
 - If any validation check in Step 5 fails after 3 fix attempts, mark Step 5 ❌ blocked and report which check failed and why.

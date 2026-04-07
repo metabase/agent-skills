@@ -76,10 +76,10 @@ Additional user attributes can be included as extra key/value pairs in the JWT �
 
 ## Allowed documentation sources
 
-Fetch the version-specific `llms-embedding-full.txt` via curl to a temp file, then Read it:
+Fetch the version-specific `llms-embedding-full.txt` using this URL:
 
-```bash
-curl -sL https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt -o /tmp/llms-embedding-v{VERSION}.txt
+```
+https://www.metabase.com/docs/v0.{VERSION}/llms-embedding-full.txt
 ```
 
 The version in the URL uses the format `v0.58` (normalize: strip leading `v` or `0.`, drop patch — e.g., `0.58.1` → `58` → URL uses `v0.58`). This single file contains all embedding documentation for that version, optimized for LLM consumption.
@@ -153,7 +153,7 @@ Perform the project scan and doc fetch concurrently — they are independent. Us
 
 #### 1a: Fetch docs for the Metabase instance version
 
-Fetch `llms-embedding-full.txt` for the instance version confirmed in Step 0b via curl (see "Allowed documentation sources" for URL format), then Read the downloaded file. Search within it for `fetchRequestToken`, `authProviderUri`, `jwtProviderUri`, `defineMetabaseAuthConfig`, `JWT`, and `SSO` to find the relevant auth documentation.
+Fetch `llms-embedding-full.txt` for the instance version confirmed in Step 0b (see "Allowed documentation sources" for URL format). Search within it for `fetchRequestToken`, `authProviderUri`, `jwtProviderUri`, `defineMetabaseAuthConfig`, `JWT`, and `SSO` to find the relevant auth documentation.
 
 These docs are the authoritative source for auth configuration options, function signatures, deprecated fields, and endpoint response formats for the detected version. Use them in Step 2 when designing the auth architecture.
 
@@ -442,7 +442,7 @@ Organize the final output into these sections:
 ## Retry policy
 
 **Doc fetching:**
-- If curl returns 404 for `llms-embedding-full.txt`, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
+- If fetching `llms-embedding-full.txt` returns 404, verify the Metabase version number and retry. If still failing, mark Step 1 ❌ blocked.
 
 **Validation:**
 - If AskUserQuestion is not answered, remain blocked on that step — do not guess or proceed with assumptions.
