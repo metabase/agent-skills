@@ -51,6 +51,14 @@ The web component must be rendered using the **same delivery mechanism** as the 
 
 **Token delivery must use the same mechanism as the original static embedding.** If the JWT was rendered server-side into the HTML (e.g., `res.send(\`<iframe src=".../${token}">\`)`), the migrated web component should receive its token the same way — rendered server-side into the `token` attribute (e.g., `<metabase-dashboard token="${token}">`). If the JWT was fetched client-side via `fetch()`, keep using `fetch()` for the token. Do not change the delivery mechanism — just change what is delivered (raw token instead of full iframe URL).
 
+## Credential safety
+
+This migration touches code that handles `METABASE_SECRET_KEY` and signed JWTs. Rules:
+
+- **Never output literal secret values** — if you encounter a hardcoded secret key or token string in the code, reference it by variable name only (e.g., "the secret in `config.js:12`"), never echo the value itself
+- In code diffs and summaries, use variable references (`METABASE_SECRET_KEY`, `token`) — not the resolved values
+- If you find hardcoded secrets, flag them to the user and recommend moving them to environment variables as part of the migration
+
 ## Performance
 
 - Maximize parallelism within each step. Use parallel Grep/Glob/Read calls in single messages wherever possible.

@@ -41,6 +41,14 @@ Each step section should end with a status line:
 - Step 4: per file — what was changed and exact diffs applied.
 - Step 5: the exact typecheck command run and error summary if any remain.
 
+## Credential safety
+
+This migration touches code that may contain API keys, JWTs, or auth configuration values (e.g., `window.metabaseConfig`). Rules:
+
+- **Never output literal secret values** — if you encounter a hardcoded API key, token, or secret in the code, reference it by variable name or file location (e.g., "the key in `config.js:12`"), never echo the value itself
+- In code diffs and summaries, use variable references — not the resolved values
+- If you find hardcoded secrets, flag them to the user and recommend moving them to environment variables as part of the migration
+
 ## Performance
 
 The workflow is designed as a pipeline:
