@@ -1,8 +1,6 @@
-# agent-skills
+# Agent skills for Metabase
 
-A collection of Agent skills for Metabase. These skills are built for Claude Code but may also work with other AI coding agents (Cursor, Windsurf, etc.). They help perform complex Metabase embedding migrations and upgrades, explore data models, and create Metabase content automatically.
-
-> **Important:** Always review and validate the changes made by a skill. Depending on your application's complexity, a skill may not work properly in all cases. Check that your application builds, tests pass, and the embedding works as expected before committing.
+A collection of agent skills for working with your Metabase. These skills are built for Claude Code but may also work with other AI coding agents (Cursor, Windsurf, etc.). They help perform complex Metabase embedding migrations and upgrades, explore data models, and create Metabase content automatically.
 
 ## Installation
 
@@ -19,6 +17,8 @@ npx skills add metabase/agent-skills --skill metabase-modular-embedding-version-
 ```
 
 ## Skills
+
+Always review and validate the changes made by a skill. Depending on your application's complexity, a skill may not work properly in all cases. Check that your application builds, tests pass, and the embedding works as expected before committing.
 
 ### Database metadata
 
