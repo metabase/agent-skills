@@ -19,8 +19,8 @@ METABASE_URL="$1"
 METABASE_API_KEY="$2"
 
 base_url="${METABASE_URL%/}"
-export_url="${base_url}/api/ee/serialization/export?all_collections=false&field_values=true&dirname=metadata"
-target_dir="metadata/databases"
+export_url="${base_url}/api/ee/serialization/export?all_collections=false&field_values=true&dirname=.metadata"
+target_dir=".metadata/databases"
 
 temp_dir=$(mktemp -d)
 archive_path="${temp_dir}/export.tar.gz"
@@ -54,16 +54,16 @@ After saving the file, make it executable:
 chmod +x fetch-metadata.sh
 ```
 
-If the working directory is a git repo, add `metadata/` to `.gitignore` so cached metadata isn't committed.
+If the working directory is a git repo, add `.metadata/` to `.gitignore` so cached metadata isn't committed.
 
 ## How it works
 
 The script calls the Metabase serialization export API:
 
 ```
-POST {METABASE_URL}/api/ee/serialization/export?all_collections=false&field_values=true&dirname=metadata
+POST {METABASE_URL}/api/ee/serialization/export?all_collections=false&field_values=true&dirname=.metadata
 ```
 
-with header `x-api-key: {API_KEY}`. The response is a `.tar.gz` archive; the script keeps only the `databases/` directory and writes it to `metadata/databases` in the working directory.
+with header `x-api-key: {API_KEY}`. The response is a `.tar.gz` archive; the script keeps only the `databases/` directory and writes it to `.metadata/databases` in the working directory.
 
 The download may take several minutes depending on the size of the instance.

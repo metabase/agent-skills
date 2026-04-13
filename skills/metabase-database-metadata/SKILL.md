@@ -25,7 +25,7 @@ fetch-metadata.sh <url> <api-key>
 
 Do **not** run the script yourself — the user provides their credentials directly to it.
 
-The metadata will be written to `metadata/databases` in the working directory. The download may take several minutes depending on the size of the instance.
+The metadata will be written to `.metadata/databases` in the working directory. The download may take several minutes depending on the size of the instance.
 
 ## Storing the metadata
 
@@ -33,7 +33,7 @@ Database metadata represents a point-in-time snapshot of the data model. It can 
 
 ## Using the metadata
 
-Once cached, the metadata is available at `metadata/databases/`. Each database folder contains YAML files describing tables, fields, field values, and relationships. Read these files to understand:
+Once cached, the metadata is available at `.metadata/databases/`. Each database folder contains YAML files describing tables, fields, field values, and relationships. Read these files to understand:
 
 - Which databases are connected
 - What tables exist in each database and schema
