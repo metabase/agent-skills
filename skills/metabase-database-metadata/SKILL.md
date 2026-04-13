@@ -31,8 +31,6 @@ The metadata will be written to `metadata/databases` in the working directory. T
 
 Database metadata represents a point-in-time snapshot of the data model. It can change as databases evolve. Treat it as a **cache**, not a source of truth.
 
-If the working directory is a git repo, add `metadata/` to `.gitignore`.
-
 ## Using the metadata
 
 Once cached, the metadata is available at `metadata/databases/`. Each database folder contains YAML files describing tables, fields, field values, and relationships. Read these files to understand:

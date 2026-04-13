@@ -54,6 +54,8 @@ After saving the file, make it executable:
 chmod +x fetch-metadata.sh
 ```
 
+If the working directory is a git repo, add `metadata/` to `.gitignore` so cached metadata isn't committed.
+
 ## How it works
 
 The script calls the Metabase serialization export API:
