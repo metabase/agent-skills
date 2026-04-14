@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TaskCreate, TaskUpdate, Task
 
 Metabase represents user-created content as a tree of YAML files. Each file is one entity (a collection, card, dashboard, etc.). The format is **portable** across Metabase instances: numeric database IDs are replaced with human-readable names and entity IDs.
 
-The format is defined by a spec and a set of JSON Schemas, both shipped with the `@metabase/representations` npm package. Extract them on demand (see below) rather than copying them into the repo.
+The format is defined by a spec and a set of YAML Schemas, both shipped with the `@metabase/representations` npm package. Extract them on demand (see below) rather than copying them into the repo.
 
 ## Entities
 
