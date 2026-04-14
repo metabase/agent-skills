@@ -44,3 +44,22 @@ npx @metabase/representations --extract-schema --folder <path>
 ```
 
 Extract both to a temp folder at the start of the session and reference them as needed — e.g. `mktemp -d` then point `--file` and `--folder` inside it.
+
+## Validating
+
+Validate YAML files against the schemas:
+
+```sh
+npx @metabase/representations validate-schema --folder <path>
+```
+
+Pass the top-level export folder, or the git repository root. The tool finds YAML files in recognized import directories, reads `serdes/meta` to pick the right schema, and exits non-zero on failure.
+
+## Generating entity IDs
+
+Every entity needs a 21-character NanoID for `entity_id`. Generate one with:
+
+```sh
+npx nanoid
+# → LZfXLFzPPR4NNrgjlWDxn
+```
