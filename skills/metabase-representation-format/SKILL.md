@@ -5,15 +5,15 @@ model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
 ---
 
-## What is the Metabase Representation Format
+## Metabase Representation Format
 
 Metabase represents user-created content as a tree of YAML files. Each file is one entity (a collection, card, dashboard, etc.). The format is **portable** across Metabase instances: numeric database IDs are replaced with human-readable names and entity IDs.
 
-The full specification is in `spec.md` in this skill folder. Always Read it before creating or editing representation YAML files. The spec covers entity keys, folder structure, MBQL queries, native queries, visualization settings, click behaviors, parameters, and all entity types with examples.
+The format is defined by a spec and a set of YAML Schemas, both shipped with the `@metabase/representations` npm package. Extract them on demand (see below) rather than copying them into the repo.
 
 ## Entities
 
-The format defines 11 entity types. Each entity has a YAML JSON Schema in the `schemas/` folder.
+The format defines 11 entity types. Each entity has a YAML JSON Schema.
 
 | Entity | SerDes Model | Schema File | Description |
 |--------|-------------|-------------|-------------|
@@ -29,102 +29,37 @@ The format defines 11 entity types. Each entity has a YAML JSON Schema in the `s
 | **TransformJob** | `TransformJob` | `schemas/transform_job.yaml` | Scheduled job (cron) that executes transforms matching specific tags. |
 | **PythonLibrary** | `PythonLibrary` | `schemas/python_library.yaml` | Shared Python source file available to Python-based transforms. |
 
-Common schemas referenced by entity schemas live in `schemas/common/`:
-- `id.yaml` — entity_id (NanoID), user_id (email), database_id (name), table_id, field_id
-- `query.yaml` — MBQL and native query structure with expression validation
-- `ref.yaml` — field, expression, aggregation, metric, measure, segment references
-- `parameter.yaml` — parameter definitions and targets
-- `temporal_bucketing.yaml` — datetime bucketing and extraction units
+## Extracting the spec and schemas
 
-## Entity Identification
-
-Every entity has:
-- **`entity_id`** — 21-character NanoID (alphabet: `A-Za-z0-9_-`). Stable across renames/moves. Unique per entity type.
-- **`serdes/meta`** — Array encoding the identity path. Each entry has `id`, `model`, and optionally `label` (slugified name). The last entry's `model` field determines the entity type.
-
-Generate a NanoID:
-```bash
-head -c 21 /dev/urandom | base64 | tr -dc 'A-Za-z0-9_-' | head -c 21
-```
-
-Foreign key references use human-readable names instead of numeric IDs:
-- **Database FK**: database name string (e.g., `"Sample Database"`)
-- **Table FK**: `[database, schema, table]` array (e.g., `["Sample Database", "PUBLIC", "ORDERS"]`)
-- **Field FK**: `[database, schema, table, field, ...]` array (4+ elements for JSON paths)
-- **Collection/Card/Dashboard FK**: entity_id (NanoID)
-- **User FK**: email address
-
-## Folder Structure
-
-Metabase imports entities from these directories only:
-- `collections/**/*.yaml` — cards, dashboards, documents, snippets, collections
-- `databases/**/segments/**/*.yaml` — segment definitions
-- `databases/**/measures/**/*.yaml` — measure definitions
-- `python_libraries/**/*.yaml` (also `python-libraries/`) — Python library files
-- `transforms/**/*.yaml` — transform jobs and tags
-
-**Important**: directory structure is for readability only. The authoritative source for collection membership is each entity's `collection_id` field. Collections are organized by namespace: `main/` (regular content), `snippets/` (SQL snippets), `transforms/` (transform entities).
-
-## Queries
-
-Queries use **serialized pMBQL** format. The outer wrapper is always:
-```yaml
-"lib/type": mbql/query
-database: Sample Database
-stages:
-- "lib/type": mbql.stage/mbql   # or mbql.stage/native
-  ...
-```
-
-**MBQL stages** (`mbql.stage/mbql`):
-- `source-table`: Table FK array (for physical tables)
-- `source-card`: Card entity_id string (for saved questions/models)
-- `fields`, `joins`, `expressions`, `filters`, `breakout`, `aggregation`, `order-by`, `limit`
-- Multi-stage queries use a flat `stages` array — no nested `source-query`
-
-**Expression clauses** always have options as the **second element** (`[operator, {options}, ...args]`):
-- Field references: `[field, {options}, Field-FK-or-name]` — options is always an object (empty `{}` when no options), never null
-- Expression references: `[expression, {}, "Name"]`
-- Aggregation references: `[aggregation, {}, "uuid"]` — UUID matches `lib/uuid` on the referenced aggregation clause
-- All operators: `[count, {}]`, `[sum, {}, field]`, `[=, {}, a, b]`, `[and, {}, clause1, clause2]`, etc.
-- `expressions` is an array; each top-level clause has `"lib/expression-name"` in its options
-- `filters` is an array of filter clauses (implicitly ANDed)
-- Aggregations referenced by `order-by` must have `"lib/uuid"` in their options
-
-**Joins** have their own `stages` array and `conditions` (plural) array.
-
-**Parameter mapping targets** use **legacy format**: `[field, Field-FK, null-or-options]`, `[expression, name]`.
-
-**Native stages** (`mbql.stage/native`):
-- `native`: SQL string with `{{template_tag}}` placeholders
-- `template-tags`: map defining each tag's type, display name, and default
-- Template tag types: `text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`
-
-See spec.md sections "MBQL Query" and "Native Query" for full syntax.
-
-## Schema Validation
-
-Use `@metabase/representations` as a CLI tool to validate YAML files against the schemas:
+Extract the full spec to a file:
 
 ```sh
-npx @metabase/representations validate-schema --folder ./my-export
+npx @metabase/representations --extract-spec --file <path>
 ```
 
-Omit `--folder` to validate the current directory. The tool:
-1. Finds YAML files in the recognized import directories
-2. Reads `serdes/meta` to determine the entity model
-3. Validates against the corresponding JSON Schema
-4. Reports OK/FAIL per file with error details
-5. Exits with code 1 if any failures
+Extract JSON schemas to a folder:
 
-## Key Rules
+```sh
+npx @metabase/representations --extract-schema --folder <path>
+```
 
-- Every entity YAML file must have a `serdes/meta` array with the correct `model` value
-- `entity_id` must be a valid 21-character NanoID
-- `collection_id` determines collection membership (not the file path)
-- Cards with `dashboard_id` or `document_id` are nested under that container
-- A card should never have both `dashboard_id` and `document_id` set
-- Segment definitions: single stage with only `source-table` + `filters` (no aggregation, joins, expressions)
-- Measure definitions: single stage with only `source-table` + exactly one `aggregation` (no filters, joins, expressions)
-- Dashboard grid: 24 columns, `col + size_x <= 24`, cards cannot overlap
-- Snippet `serdes/meta` uses model `NativeQuerySnippet` (not `Snippet`)
+Extract both to a temp folder at the start of the session and reference them as needed — e.g. `mktemp -d` then point `--file` and `--folder` inside it.
+
+## Validating
+
+Validate YAML files against the schemas:
+
+```sh
+npx @metabase/representations validate-schema --folder <path>
+```
+
+Pass the top-level export folder, or the git repository root. The tool finds YAML files in recognized import directories, reads `serdes/meta` to pick the right schema, and exits non-zero on failure.
+
+## Generating entity IDs
+
+Every entity needs a 21-character NanoID for `entity_id`. Generate one with:
+
+```sh
+npx nanoid
+# → LZfXLFzPPR4NNrgjlWDxn
+```
