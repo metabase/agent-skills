@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TaskCreate, TaskUpdate, Task
 
 Metabase represents database metadata — synced databases, their tables, and their fields — as a tree of YAML files. Files are **diff-friendly**: numeric IDs are omitted entirely, and foreign keys use natural-key tuples like `["Sample Database", "PUBLIC", "ORDERS"]` instead of database identifiers.
 
-The YAML tree is produced by the `@metabase/database-metadata` npm package. The format is defined by a spec shipped with that package — extract it on demand rather than copying it into the repo.
+The format is defined by a specification hosted at [metabase/database-metadata](https://github.com/metabase/database-metadata) (see [`core-spec/v1/spec.md`](https://github.com/metabase/database-metadata/blob/main/core-spec/v1/spec.md)). The spec is the canonical reference — extract it on demand and read it before making non-trivial edits. The same repository also ships a CLI (`@metabase/database-metadata` on npm) that converts the raw JSON from `GET /api/database/metadata` into the YAML tree described by the spec.
 
 ## Conventions
 
