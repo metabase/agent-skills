@@ -1,0 +1,134 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Ref
+description: >
+  Column and entity reference types used in MBQL expressions,
+  parameter mappings, and visualization settings. Options are always
+  the second element (an object, never null).
+
+$defs:
+  field_options:
+    description: Options for field refs.
+    allOf:
+      - $ref: "query.yaml#/$defs/options"
+      - type: object
+        properties:
+          temporal-unit:
+            $ref: "temporal_bucketing.yaml#/$defs/datetime_bucketing_unit"
+          join-alias:
+            type: string
+          binning:
+            type: object
+            required:
+              - strategy
+            properties:
+              strategy:
+                type: string
+                enum: [default, num-bins, bin-width]
+            allOf:
+              - if:
+                  properties:
+                    strategy: { const: bin-width }
+                then:
+                  required: [bin-width]
+                  properties:
+                    bin-width:
+                      type: number
+                      exclusiveMinimum: 0
+              - if:
+                  properties:
+                    strategy: { const: num-bins }
+                then:
+                  required: [num-bins]
+                  properties:
+                    num-bins:
+                      type: integer
+                      minimum: 1
+          source-field:
+            $ref: "id.yaml#/$defs/field_id"
+          source-field-name:
+            type: string
+          source-field-join-alias:
+            type: string
+
+  field_ref:
+    description: "[field, options, Field-FK-or-name]"
+    type: array
+    prefixItems:
+      - const: field
+      - $ref: "#/$defs/field_options"
+      - if: { type: array }
+        then: { $ref: "id.yaml#/$defs/field_id" }
+    minItems: 3
+    maxItems: 3
+
+  expression_ref:
+    description: "[expression, options, name]"
+    type: array
+    prefixItems:
+      - const: expression
+      - $ref: "query.yaml#/$defs/options"
+      - type: string
+    minItems: 3
+    maxItems: 3
+
+  aggregation_ref:
+    description: "[aggregation, options, uuid] — uuid matches the lib/uuid on the aggregation clause"
+    type: array
+    prefixItems:
+      - const: aggregation
+      - $ref: "query.yaml#/$defs/options"
+      - type: string
+        format: uuid
+    minItems: 3
+    maxItems: 3
+
+  metric_ref:
+    description: "[metric, options, entity_id]"
+    type: array
+    prefixItems:
+      - const: metric
+      - $ref: "query.yaml#/$defs/options"
+      - type: string
+    minItems: 3
+    maxItems: 3
+
+  measure_ref:
+    description: "[measure, options, entity_id]"
+    type: array
+    prefixItems:
+      - const: measure
+      - $ref: "query.yaml#/$defs/options"
+      - type: string
+    minItems: 3
+    maxItems: 3
+
+  segment_ref:
+    description: "[segment, options, entity_id]"
+    type: array
+    prefixItems:
+      - const: segment
+      - $ref: "query.yaml#/$defs/options"
+      - type: string
+    minItems: 3
+    maxItems: 3
+
+  legacy_field_ref:
+    description: "[field, Field-FK-or-name, null-or-options] — legacy format used in parameter targets"
+    type: array
+    prefixItems:
+      - const: field
+      - if: { type: array }
+        then: { $ref: "id.yaml#/$defs/field_id" }
+      - type: [object, "null"]
+    minItems: 3
+    maxItems: 3
+
+  legacy_expression_ref:
+    description: "[expression, name] or [expression, name, null-or-options] — legacy format used in parameter targets"
+    type: array
+    prefixItems:
+      - const: expression
+      - type: string
+      - type: [object, "null"]
+    minItems: 2
+    maxItems: 3

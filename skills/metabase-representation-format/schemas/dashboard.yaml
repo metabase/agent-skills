@@ -1,0 +1,287 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Dashboard
+description: >
+  A collection of cards arranged in a grid layout. Dashboards contain
+  dashboard cards (dashcards), parameters for filtering, and optional tabs.
+type: object
+required:
+  - name
+  - entity_id
+  - creator_id
+  - serdes/meta
+properties:
+  name:
+    type: string
+    description: Dashboard name
+  entity_id:
+    $ref: "common/id.yaml#/$defs/entity_id"
+  creator_id:
+    $ref: "common/id.yaml#/$defs/user_id"
+  description:
+    type:
+      - string
+      - "null"
+    description: Human-readable description
+  archived:
+    type: boolean
+    description: Whether archived
+    default: false
+  archived_directly:
+    type: boolean
+    description: Archived directly vs. inherited
+    default: false
+  collection_id:
+    description: Collection FK, null for root collection
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/entity_id" }
+  collection_position:
+    type:
+      - integer
+      - "null"
+    description: Position within collection
+  position:
+    type:
+      - integer
+      - "null"
+    description: Display position
+  auto_apply_filters:
+    type: boolean
+    description: Auto-apply filter changes
+    default: true
+  width:
+    type: string
+    description: Dashboard width
+    enum:
+      - fixed
+      - full
+    default: fixed
+  enable_embedding:
+    type: boolean
+    description: Embedding enabled
+    default: false
+  embedding_params:
+    type:
+      - object
+      - "null"
+    description: Embedding parameter configuration
+  embedding_type:
+    type:
+      - string
+      - "null"
+    description: Embedding type
+    enum:
+      - null
+      - sdk
+      - standalone
+  public_uuid:
+    type:
+      - string
+      - "null"
+    description: Public sharing UUID
+    format: uuid
+  made_public_by_id:
+    description: User who made this public
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/user_id" }
+  show_in_getting_started:
+    type: boolean
+    description: Show in getting started section
+    default: false
+  caveats:
+    type:
+      - string
+      - "null"
+    description: Known limitations
+  points_of_interest:
+    type:
+      - string
+      - "null"
+    description: Noteworthy features
+  initially_published_at:
+    type:
+      - string
+      - "null"
+    description: ISO 8601 timestamp of initial publication
+    format: date-time
+  parameters:
+    type: array
+    description: Dashboard filter parameters
+    items:
+      $ref: "common/parameter.yaml"
+  tabs:
+    type: array
+    description: >
+      Dashboard tabs for organizing content into separate pages.
+      Each dashcard can be assigned to a tab via dashboard_tab_id.
+      Deleting a tab deletes all dashcards assigned to it.
+    items:
+      type: object
+      required:
+        - entity_id
+        - name
+        - position
+      properties:
+        entity_id:
+          $ref: "common/id.yaml#/$defs/entity_id"
+        name:
+          type: string
+          description: Tab name
+        position:
+          type: integer
+          description: Display order (ascending)
+          minimum: 0
+  dashcards:
+    type: array
+    description: Dashboard cards placed on the grid
+    items:
+      $ref: "#/$defs/dashcard"
+  created_at:
+    type: string
+    description: ISO 8601 timestamp
+    format: date-time
+  serdes/meta:
+    type: array
+    description: Identity path for serialization
+    items:
+      type: object
+      required:
+        - id
+        - model
+      properties:
+        id:
+          type: string
+          description: Entity identifier (matches entity_id)
+        label:
+          type: string
+          description: Slugified name
+        model:
+          type: string
+          const: Dashboard
+
+$defs:
+  dashcard:
+    type: object
+    description: >
+      A dashboard card that places a card (question) on the 24-column
+      dashboard grid. Constraint: col + size_x <= 24. Cards cannot overlap.
+    required:
+      - entity_id
+      - row
+      - col
+      - size_x
+      - size_y
+      - serdes/meta
+    properties:
+      entity_id:
+        $ref: "common/id.yaml#/$defs/entity_id"
+      row:
+        type: integer
+        description: Grid row position (0+)
+        minimum: 0
+      col:
+        type: integer
+        description: Grid column position (0-23)
+        minimum: 0
+        maximum: 23
+      size_x:
+        type: integer
+        description: Width in grid units (1-24, col + size_x <= 24)
+        minimum: 1
+        maximum: 24
+      size_y:
+        type: integer
+        description: Height in grid units (1+)
+        minimum: 1
+      card_id:
+        description: Card FK, null for virtual cards (text, heading, link, iframe, placeholder)
+        type: [string, "null"]
+        if: { type: string }
+        then: { $ref: "common/id.yaml#/$defs/entity_id" }
+      dashboard_tab_id:
+        description: >
+          Tab FK as [dashboard_entity_id, tab_entity_id], null for untabbed cards.
+        type: [array, "null"]
+        if: { type: array }
+        then:
+          items:
+            $ref: "common/id.yaml#/$defs/entity_id"
+          minItems: 2
+          maxItems: 2
+      inline_parameters:
+        type: array
+        description: >
+          List of parameter IDs to display directly on this
+          dashcard instead of at the top of the dashboard.
+        items:
+          type: string
+      parameter_mappings:
+        type: array
+        description: Connects dashboard parameters to card columns/variables
+        items:
+          $ref: "#/$defs/parameter_mapping"
+      series:
+        type: array
+        description: Overlay series — additional cards on the same visualization
+        items:
+          $ref: "#/$defs/series"
+      visualization_settings:
+        type: object
+        description: Display settings
+        additionalProperties: true
+      created_at:
+        type: string
+        description: ISO 8601 timestamp
+        format: date-time
+      serdes/meta:
+        type: array
+        description: "Identity path: Dashboard → DashboardTab → DashboardCard"
+        items:
+          type: object
+          required:
+            - id
+            - model
+          properties:
+            id:
+              type: string
+            model:
+              type: string
+              enum:
+                - Dashboard
+                - DashboardTab
+                - DashboardCard
+
+  parameter_mapping:
+    type: object
+    description: >
+      Connects a dashboard parameter to a specific card column or variable.
+    required:
+      - parameter_id
+      - target
+    properties:
+      card_id:
+        description: Card FK
+        $ref: "common/id.yaml#/$defs/entity_id"
+      parameter_id:
+        type: string
+        description: ID matching a dashboard parameter's id
+      target:
+        $ref: "common/parameter.yaml#/$defs/parameter_target"
+
+  series:
+    type: object
+    description: >
+      Overlays an additional card on the same dashboard card visualization
+      (e.g., multiple lines on one chart).
+    required:
+      - card_id
+      - position
+    properties:
+      card_id:
+        description: Card FK
+        $ref: "common/id.yaml#/$defs/entity_id"
+      position:
+        type: integer
+        description: Display order (starting at 0)
+        minimum: 0

@@ -1,0 +1,26 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Action
+description: An action associated with a model card.
+type: object
+required:
+  - name
+  - entity_id
+  - type
+  - serdes/meta
+properties:
+  name:
+    type: string
+  entity_id:
+    $ref: "common/id.yaml#/$defs/entity_id"
+  type:
+    type: string
+  serdes/meta:
+    type: array
+    items:
+      type: object
+      required: [id, model]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        model: { type: string, const: Action }
+additionalProperties: true

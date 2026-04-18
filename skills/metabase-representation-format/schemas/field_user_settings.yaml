@@ -1,0 +1,16 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: FieldUserSettings
+description: User-customized settings for a field.
+type: object
+required:
+  - serdes/meta
+properties:
+  serdes/meta:
+    type: array
+    items:
+      type: object
+      required: [id, model]
+      properties:
+        id: { type: string }
+        model: { type: string, enum: [Database, Schema, Table, Field, FieldUserSettings] }
+additionalProperties: true

@@ -1,0 +1,96 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Field
+description: >
+  A table field (column) definition. Fields belong to tables and describe
+  individual columns. Serialized to databases/{db}/…/tables/{table}/fields/{field}.yaml.
+type: object
+required:
+  - name
+  - base_type
+  - database_type
+  - table_id
+  - serdes/meta
+properties:
+  name:
+    type: string
+    description: Column name in the database
+  display_name:
+    type:
+      - string
+      - "null"
+    description: Human-readable display name
+  description:
+    type:
+      - string
+      - "null"
+    description: Human-readable description
+  base_type:
+    type: string
+    description: "Metabase base type (e.g., type/Integer, type/Text)"
+  effective_type:
+    type:
+      - string
+      - "null"
+    description: Effective type after coercion
+  database_type:
+    type: string
+    description: Native database type (e.g., INTEGER, VARCHAR)
+  semantic_type:
+    type:
+      - string
+      - "null"
+    description: "Semantic type (e.g., type/PK, type/FK, type/Category)"
+  coercion_strategy:
+    type:
+      - string
+      - "null"
+    description: Type coercion strategy
+  table_id:
+    description: Table FK [database, schema, table]
+    $ref: "common/id.yaml#/$defs/table_id"
+  fk_target_field_id:
+    description: FK target field [database, schema, table, field]
+    type:
+      - array
+      - "null"
+    if: { type: array }
+    then: { $ref: "common/id.yaml#/$defs/field_id" }
+  parent_id:
+    description: Parent field FK for nested/JSON-unfolded fields
+    type:
+      - array
+      - "null"
+    if: { type: array }
+    then: { $ref: "common/id.yaml#/$defs/field_id" }
+  active:
+    type: boolean
+    description: Whether the field is active
+    default: true
+  settings:
+    type:
+      - object
+      - "null"
+    description: Field-level settings
+    additionalProperties: true
+  dimensions:
+    type: array
+    description: Inlined Dimension entities for remapping
+    items:
+      type: object
+      additionalProperties: true
+    default: []
+  serdes/meta:
+    type: array
+    description: >
+      Identity path for serialization. Contains Database, optional Schema,
+      Table, and one or more Field entries (for nested fields).
+    items:
+      type: object
+      required: [id, model]
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+          enum: [Database, Schema, Table, Field]
+additionalProperties: true

@@ -1,0 +1,146 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Parameter
+description: >
+  A filter control parameter for cards and dashboards. Parameters allow
+  users to interactively filter data via UI controls.
+
+type: object
+required:
+  - id
+  - name
+  - slug
+  - type
+properties:
+  id:
+    type: string
+    minLength: 1
+    description: >
+      Unique identifier within the dashboard or card. UUIDs are recommended,
+      but Metabase accepts any unique non-empty string.
+  name:
+    type: string
+    description: Display name
+  slug:
+    type: string
+    description: URL-friendly identifier
+  type:
+    type: string
+    description: >
+      Filter widget type: string/=, string/!=, string/contains,
+      string/starts-with, string/ends-with, number/=, number/!=,
+      number/>=, number/<=, number/between, date/single, date/range,
+      date/month-year, date/quarter-year, date/relative, date/all-options,
+      boolean/=, temporal-unit
+  default:
+    description: Default value (type depends on filter type)
+  required:
+    type: boolean
+    description: Whether a value is required
+  sectionId:
+    type: string
+    description: >
+      UI section grouping. Restricts which columns are available for
+      mapping. For id — only PK and FK columns. For location — only
+      location columns (country, city, etc.). Normally matches the
+      first part of the parameter type.
+    enum:
+      - string
+      - number
+      - date
+      - boolean
+      - temporal-unit
+      - id
+      - location
+  temporal_units:
+    type: array
+    description: Allowed temporal units (for temporal-unit type)
+    items:
+      type: string
+      enum:
+        - minute
+        - hour
+        - day
+        - week
+        - month
+        - quarter
+        - year
+  values_query_type:
+    type: string
+    enum:
+      - list
+      - search
+      - none
+  values_source_type:
+    type:
+      - string
+      - "null"
+    enum:
+      - null
+      - card
+      - static-list
+  values_source_config:
+    type: object
+    description: >
+      Source configuration. For static-list: {values: [[val, label], ...]}.
+      For card: {card_id, value_field, label_field}.
+    properties:
+      values:
+        type: array
+        description: Static list of [value, label] pairs
+      card_id:
+        type: string
+        description: Card entity_id to source values from
+      value_field:
+        description: Field clause for extracting values from card results
+      label_field:
+        description: Field clause for extracting labels from card results
+    additionalProperties: true
+
+$defs:
+  parameter_target:
+    description: >
+      Parameter target for dashboard parameter mappings. Uses legacy
+      MBQL format: [field, Field-FK, null-or-options].
+    type: array
+    minItems: 2
+    allOf:
+      - if: { prefixItems: [{ const: dimension }] }
+        then:
+          prefixItems:
+            - const: dimension
+            - type: array
+              minItems: 2
+              allOf:
+                - if: { prefixItems: [{ const: field }] }
+                  then: { $ref: "ref.yaml#/$defs/legacy_field_ref" }
+                - if: { prefixItems: [{ const: expression }] }
+                  then: { $ref: "ref.yaml#/$defs/legacy_expression_ref" }
+                - if: { prefixItems: [{ const: template-tag }] }
+                  then:
+                    prefixItems: [{ const: template-tag }, { type: string }]
+                    minItems: 2
+                    maxItems: 2
+          items:
+            anyOf:
+              - type: object
+                properties:
+                  stage-number: { type: integer }
+              - type: "null"
+          maxItems: 3
+      - if: { prefixItems: [{ const: variable }] }
+        then:
+          prefixItems:
+            - const: variable
+            - type: array
+              prefixItems: [{ const: template-tag }, { type: string }]
+              minItems: 2
+              maxItems: 2
+          minItems: 2
+          maxItems: 2
+      - if: { prefixItems: [{ const: text-tag }] }
+        then:
+          prefixItems:
+            - const: text-tag
+            - type: string
+          minItems: 2
+          maxItems: 2

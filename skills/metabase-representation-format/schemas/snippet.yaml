@@ -1,0 +1,64 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: NativeQuerySnippet
+description: >
+  A reusable SQL fragment that can be referenced in native queries using
+  {{snippet: Snippet Name}}. Stored under collections/snippets/.
+type: object
+required:
+  - name
+  - entity_id
+  - creator_id
+  - content
+  - serdes/meta
+properties:
+  name:
+    type: string
+    description: "Snippet name (used in {{snippet: Name}} references)"
+  entity_id:
+    $ref: "common/id.yaml#/$defs/entity_id"
+  creator_id:
+    $ref: "common/id.yaml#/$defs/user_id"
+  content:
+    type: string
+    description: SQL content of the snippet (inlined when referenced)
+  description:
+    type:
+      - string
+      - "null"
+    description: Human-readable description
+  archived:
+    type: boolean
+    description: Whether archived
+    default: false
+  collection_id:
+    description: Collection FK (snippets collection)
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/entity_id" }
+  template_tags:
+    type: object
+    description: Template tag definitions (usually empty)
+    additionalProperties: true
+    default: {}
+  created_at:
+    type: string
+    description: ISO 8601 timestamp
+    format: date-time
+  serdes/meta:
+    type: array
+    description: Identity path for serialization
+    items:
+      type: object
+      required:
+        - id
+        - model
+      properties:
+        id:
+          type: string
+          description: Entity identifier (matches entity_id)
+        label:
+          type: string
+          description: Slugified name
+        model:
+          type: string
+          const: NativeQuerySnippet

@@ -1,0 +1,58 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: FieldValues
+description: >
+  Cached distinct values for a field, used for filter dropdowns and auto-complete.
+  Serialized alongside the parent field as {field}___fieldvalues.yaml.
+type: object
+required:
+  - values
+  - serdes/meta
+properties:
+  values:
+    type: array
+    description: List of distinct field values
+    items: {}
+  human_readable_values:
+    type: array
+    description: Human-readable labels for remapped values (parallel to values array)
+    items: {}
+    default: []
+  has_more_values:
+    type: boolean
+    description: Whether there are more values than cached
+    default: false
+  type:
+    type: string
+    description: Type of field values cache
+    enum:
+      - full
+      - sandbox
+  hash_key:
+    type:
+      - string
+      - "null"
+    description: Hash key for sandbox-scoped field values
+  created_at:
+    type: string
+    description: ISO 8601 timestamp
+    format: date-time
+  last_used_at:
+    type:
+      - string
+      - "null"
+    description: ISO 8601 timestamp of last use
+    format: date-time
+  serdes/meta:
+    type: array
+    description: >
+      Identity path for serialization. Contains Database, optional Schema,
+      Table, Field, and FieldValues entries.
+    items:
+      type: object
+      required: [id, model]
+      properties:
+        id:
+          type: string
+        model:
+          type: string
+          enum: [Database, Schema, Table, Field, FieldValues]

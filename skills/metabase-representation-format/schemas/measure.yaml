@@ -1,0 +1,94 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Measure
+description: >
+  A saved aggregation definition. Measures allow reusable aggregations that
+  can be applied across multiple questions and dashboards. Stored under their
+  table's directory: databases/{db}/schemas/{schema}/tables/{table}/measures/.
+type: object
+required:
+  - name
+  - entity_id
+  - creator_id
+  - table_id
+  - definition
+  - serdes/meta
+properties:
+  name:
+    type: string
+    description: Measure name
+  entity_id:
+    $ref: "common/id.yaml#/$defs/entity_id"
+  creator_id:
+    $ref: "common/id.yaml#/$defs/user_id"
+  table_id:
+    description: Table FK, must match source-table in definition
+    $ref: "common/id.yaml#/$defs/table_id"
+  definition:
+    description: >
+      Aggregation definition in pMBQL format. Must have a single MBQL stage
+      with a physical table source and exactly one aggregation clause.
+      Measures cannot use filter, breakout, joins, expressions, or other
+      query clauses.
+    allOf:
+      - $ref: "common/query.yaml"
+      - type: object
+        required:
+          - "lib/type"
+          - database
+          - stages
+        properties:
+          stages:
+            type: array
+            minItems: 1
+            maxItems: 1
+            items:
+              type: object
+              required:
+                - "lib/type"
+                - source-table
+                - aggregation
+              additionalProperties: false
+              properties:
+                "lib/type":
+                  const: mbql.stage/mbql
+                source-table:
+                  description: >
+                    Table FK [database, schema, table]. Measures must reference
+                    a physical table, not a saved card/model.
+                  $ref: "common/id.yaml#/$defs/table_id"
+                aggregation:
+                  type: array
+                  description: Exactly one aggregation clause
+                  minItems: 1
+                  maxItems: 1
+  description:
+    type:
+      - string
+      - "null"
+    description: Human-readable description
+  archived:
+    type: boolean
+    description: Whether archived
+    default: false
+  created_at:
+    type: string
+    description: ISO 8601 timestamp
+    format: date-time
+  serdes/meta:
+    type: array
+    description: Identity path for serialization
+    items:
+      type: object
+      required:
+        - id
+        - model
+      properties:
+        id:
+          type: string
+          description: Entity identifier (matches entity_id)
+        label:
+          type: string
+          description: Slugified name
+        model:
+          type: string
+          const: Measure

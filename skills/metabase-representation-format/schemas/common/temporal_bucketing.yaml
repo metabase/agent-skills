@@ -1,0 +1,49 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Temporal Bucketing
+description: Datetime truncation, extraction, and bucketing unit definitions.
+
+$defs:
+  datetime_truncation_unit:
+    description: >
+      Truncation units — truncate a datetime to a boundary.
+      Also used for intervals and datetime arithmetic.
+    type: string
+    enum:
+      - millisecond
+      - second
+      - minute
+      - hour
+      - day
+      - week
+      - month
+      - quarter
+      - year
+
+  datetime_extraction_unit:
+    description: >
+      Extraction units — extract a numeric component from a datetime.
+    type: string
+    enum:
+      - second-of-minute
+      - minute-of-hour
+      - hour-of-day
+      - day-of-week
+      - day-of-week-iso
+      - day-of-month
+      - day-of-year
+      - week-of-year
+      - week-of-year-iso
+      - week-of-year-us
+      - week-of-year-instance
+      - month-of-year
+      - quarter-of-year
+      - year-of-era
+
+  datetime_bucketing_unit:
+    description: >
+      All datetime units — truncation + extraction + default.
+      Used for field temporal-unit option.
+    anyOf:
+      - const: default
+      - $ref: "#/$defs/datetime_truncation_unit"
+      - $ref: "#/$defs/datetime_extraction_unit"

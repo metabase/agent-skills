@@ -1,0 +1,212 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Card
+description: >
+  A Question, Model, or Metric in Metabase. Cards are the primary way to save
+  and share queries. Each card holds a dataset_query (MBQL or native).
+type: object
+required:
+  - name
+  - entity_id
+  - display
+  - creator_id
+  - database_id
+  - dataset_query
+  - visualization_settings
+  - serdes/meta
+properties:
+  name:
+    type: string
+    description: Card name
+  entity_id:
+    $ref: "common/id.yaml#/$defs/entity_id"
+  display:
+    type: string
+    description: Visualization type
+    enum:
+      - table
+      - bar
+      - line
+      - area
+      - row
+      - pie
+      - scalar
+      - smartscalar
+      - number
+      - combo
+      - pivot
+      - funnel
+      - map
+      - scatter
+      - waterfall
+      - progress
+      - gauge
+      - object
+      - list
+      - heading
+      - text
+      - link
+      - iframe
+      - action
+      - sankey
+      - boxplot
+  creator_id:
+    $ref: "common/id.yaml#/$defs/user_id"
+  database_id:
+    type:
+      - string
+      - "null"
+    description: Database FK (database name), should match database in dataset_query
+  dataset_query:
+    description: Query definition in pMBQL format
+    $ref: "common/query.yaml"
+  visualization_settings:
+    type: object
+    description: Display settings (can be empty {})
+    additionalProperties: true
+  description:
+    type:
+      - string
+      - "null"
+    description: Human-readable description
+  archived:
+    type: boolean
+    description: Whether archived
+    default: false
+  archived_directly:
+    type: boolean
+    description: Archived directly vs. inherited
+    default: false
+  type:
+    type: string
+    description: Card type
+    enum:
+      - question
+      - model
+      - metric
+    default: question
+  collection_id:
+    description: Collection FK, null for root collection
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/entity_id" }
+  collection_position:
+    type:
+      - integer
+      - "null"
+    description: Position within collection
+  collection_preview:
+    type: boolean
+    description: Show preview in collection view
+    default: true
+  dashboard_id:
+    description: >
+      Dashboard FK. Nests this card under a dashboard as if the dashboard
+      were a container. Cards with dashboard_id set should only be used
+      within that dashboard. To reuse a card elsewhere, unset dashboard_id
+      and place the card directly in a collection.
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/entity_id" }
+  document_id:
+    description: >
+      Document FK. Nests this card under a document as if the document
+      were a container. Cards with document_id set should only be used
+      within that document. To reuse a card elsewhere, unset document_id
+      and place the card directly in a collection.
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/entity_id" }
+  table_id:
+    description: Table FK, should match source-table in the first stage
+    type: [array, "null"]
+    if: { type: array }
+    then: { $ref: "common/id.yaml#/$defs/table_id" }
+  source_card_id:
+    description: Source card FK, should match source-card in the first stage
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/entity_id" }
+  parameters:
+    type: array
+    description: Native query parameters
+    items:
+      $ref: "common/parameter.yaml"
+  parameter_mappings:
+    type: array
+    description: Parameter mappings (unused, always empty)
+    items: {}
+  result_metadata:
+    description: Query result column metadata
+    type:
+      - array
+      - "null"
+  enable_embedding:
+    type: boolean
+    description: Embedding enabled
+    default: false
+  embedding_params:
+    type:
+      - object
+      - "null"
+    description: Embedding parameter configuration
+  embedding_type:
+    type:
+      - string
+      - "null"
+    description: Embedding type
+    enum:
+      - null
+      - sdk
+      - standalone
+  public_uuid:
+    type:
+      - string
+      - "null"
+    description: Public sharing UUID
+    format: uuid
+  made_public_by_id:
+    description: User who made this public
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/user_id" }
+  metabase_version:
+    type:
+      - string
+      - "null"
+    description: Metabase version that created the card
+  card_schema:
+    type:
+      - integer
+      - "null"
+    description: Internal card schema version (should not be changed manually)
+  query_type:
+    type:
+      - string
+      - "null"
+    description: Query type
+    enum:
+      - null
+      - query
+      - native
+  created_at:
+    type: string
+    description: ISO 8601 timestamp
+    format: date-time
+  serdes/meta:
+    type: array
+    description: Identity path for serialization
+    items:
+      type: object
+      required:
+        - id
+        - model
+      properties:
+        id:
+          type: string
+          description: Entity identifier (matches entity_id)
+        label:
+          type: string
+          description: Slugified name
+        model:
+          type: string
+          const: Card

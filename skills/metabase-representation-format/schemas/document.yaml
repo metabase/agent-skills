@@ -1,0 +1,202 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+title: Document
+description: >
+  A rich document that can contain text, headings, lists, embedded
+  cards/queries, and references to other entities. Documents use a
+  ProseMirror-compatible tree structure. Cards can be nested under a
+  document via card.document_id, similar to how cards nest under dashboards.
+type: object
+required:
+  - name
+  - entity_id
+  - creator_id
+  - document
+  - serdes/meta
+properties:
+  name:
+    type: string
+    description: Document name (1-254 characters)
+  entity_id:
+    $ref: "common/id.yaml#/$defs/entity_id"
+  creator_id:
+    $ref: "common/id.yaml#/$defs/user_id"
+  document:
+    description: >
+      Document content as a ProseMirror AST. The root node has type "doc"
+      with an array of content nodes.
+    $ref: "#/$defs/node"
+  description:
+    type:
+      - string
+      - "null"
+    description: Human-readable description
+  content_type:
+    type: string
+    description: Document content MIME type
+    const: "application/json+vnd.prose-mirror"
+  collection_id:
+    description: Collection FK, null for root collection
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/entity_id" }
+  collection_position:
+    type:
+      - integer
+      - "null"
+    description: Position within collection (for pinning)
+  archived:
+    type: boolean
+    description: Whether archived
+    default: false
+  archived_directly:
+    type: boolean
+    description: Archived directly vs. inherited
+    default: false
+  public_uuid:
+    type:
+      - string
+      - "null"
+    description: Public sharing UUID
+    format: uuid
+  made_public_by_id:
+    description: User who made this public
+    type: [string, "null"]
+    if: { type: string }
+    then: { $ref: "common/id.yaml#/$defs/user_id" }
+  view_count:
+    type: integer
+    description: Number of times viewed
+    default: 0
+  created_at:
+    type: string
+    description: ISO 8601 timestamp
+    format: date-time
+  serdes/meta:
+    type: array
+    description: Identity path for serialization
+    items:
+      type: object
+      required:
+        - id
+        - model
+      properties:
+        id:
+          type: string
+          description: Entity identifier (matches entity_id)
+        label:
+          type: string
+          description: Slugified name
+        model:
+          type: string
+          const: Document
+
+$defs:
+  node:
+    type: object
+    description: A ProseMirror document node (recursive).
+    required:
+      - type
+    allOf:
+      # Restrict to known node types
+      - properties:
+          type:
+            enum: [doc, paragraph, blockquote, codeBlock, bulletList, orderedList, listItem, table, tableRow, tableCell, tableHeader, hardBreak, heading, image, cardEmbed, smartLink, text]
+      # heading
+      - if: { properties: { type: { const: heading } } }
+        then:
+          required: [type, attrs]
+          properties:
+            attrs:
+              type: object
+              required: [level]
+              properties:
+                level: { type: integer, minimum: 1, maximum: 6 }
+      # image
+      - if: { properties: { type: { const: image } } }
+        then:
+          required: [type, attrs]
+          properties:
+            attrs:
+              type: object
+              required: [src]
+              properties:
+                src: { type: string }
+                alt: { type: [string, "null"] }
+                title: { type: [string, "null"] }
+      # cardEmbed
+      - if: { properties: { type: { const: cardEmbed } } }
+        then:
+          required: [type, attrs]
+          properties:
+            attrs:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: array
+                  description: "Card reference: [{model: Card, id: entity_id}]"
+                  items:
+                    type: object
+                    required: [model, id]
+                    properties:
+                      model: { type: string, const: Card }
+                      id: { $ref: "common/id.yaml#/$defs/entity_id" }
+                  minItems: 1
+                  maxItems: 1
+                name: { type: [string, "null"] }
+      # smartLink
+      - if: { properties: { type: { const: smartLink } } }
+        then:
+          required: [type, attrs]
+          properties:
+            attrs:
+              type: object
+              required: [entityId, model]
+              properties:
+                entityId:
+                  type: array
+                  items:
+                    type: object
+                    required: [model, id]
+                    properties:
+                      model: { type: string }
+                      id: { type: string }
+                model: { type: string }
+      # text
+      - if: { properties: { type: { const: text } } }
+        then:
+          required: [type, text]
+    properties:
+      type:
+        type: string
+      content:
+        type: array
+        description: Child nodes (recursive)
+        items:
+          $ref: "#/$defs/node"
+      attrs:
+        type: object
+      text:
+        type: string
+      marks:
+        type: array
+        description: Inline formatting marks on text nodes
+        items:
+          $ref: "#/$defs/mark"
+
+  mark:
+    type: object
+    description: Inline formatting mark on a text node.
+    required:
+      - type
+    properties:
+      type:
+        type: string
+        description: "Mark type: bold, italic, code, link, underline, strike"
+      attrs:
+        type: object
+        description: Mark attributes (e.g., href for link marks)
+        properties:
+          href:
+            type: string
+        additionalProperties: true
