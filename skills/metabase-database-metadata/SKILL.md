@@ -2,23 +2,83 @@
 name: metabase-database-metadata
 description: Understands the Metabase Database Metadata Format — a YAML-based on-disk representation of databases, tables, and fields synced from a Metabase instance. Use when the user needs to read, edit, or understand metadata files produced by `@metabase/database-metadata`, or when reasoning about a project's schema (columns, types, FK relationships) through the `.metabase/databases` folder.
 model: opus
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion
 ---
 
 ## Metabase Database Metadata Format
 
 Metabase represents database metadata — synced databases, their tables, and their fields — as a tree of YAML files. Files are **diff-friendly**: numeric IDs are omitted entirely, and foreign keys use natural-key tuples like `["Sample Database", "PUBLIC", "ORDERS"]` instead of database identifiers.
 
-The format is defined by a specification hosted at [metabase/database-metadata](https://github.com/metabase/database-metadata) (see [`core-spec/v1/spec.md`](https://github.com/metabase/database-metadata/blob/main/core-spec/v1/spec.md)). The spec is the canonical reference — extract it on demand and read it before making non-trivial edits. The same repository also ships a CLI (`@metabase/database-metadata` on npm) that converts the raw JSON from `GET /api/database/metadata` into the YAML tree described by the spec.
+The format is defined by a specification bundled alongside this file as `spec.md` (upstream source: [metabase/database-metadata](https://github.com/metabase/database-metadata)). The same project ships a CLI (`@metabase/database-metadata` on npm) that converts the raw JSON from `GET /api/database/metadata` into the YAML tree described by the spec.
 
-## Conventions
+## Canonical layout
 
-By convention, metadata lives under `.metabase/` at the project root. **Assume it is already extracted**: a sync job refreshes it on a schedule or before the agent runs. The agent should read the tree, not refetch it.
+All metadata for a project lives under a top-level `.metabase/` directory:
 
 - **`.metabase/databases/`** — the YAML tree. **This is the canonical source for the agent.** Read these files to understand the schema, columns, types, and FK relationships.
-- **`.metabase/metadata.json`** — the raw API response. A single multi-megabyte JSON file with flat `databases` / `tables` / `fields` arrays. **Ignore this file.** It only exists so the CLI can regenerate the tree. Do not open it, grep it, or pass it to other tools — it will blow up the context for no benefit over the YAML.
+- **`.metabase/metadata.json`** — the raw API response. Potentially multi-megabyte (or multi-gigabyte) JSON with flat `databases` / `tables` / `fields` arrays. **Never open, grep, or pass it to tools.** It exists only as input to the extractor.
 
-**Do not run `GET /api/database/metadata` or `npx @metabase/database-metadata extract-metadata` unless the user explicitly asks to refresh the metadata.** The tree may be slightly stale, but that is the user's or CI's responsibility to refresh — not the agent's. If something seems out of date, mention it to the user rather than refetching silently.
+The `.metabase/` directory and the `.env` file described below should both be gitignored. On large warehouses the extracted metadata can reach gigabytes — committing it would make the repo painful or unusable.
+
+## First-time setup
+
+Do not run any of the steps below proactively at session start. Only run them when the user **explicitly asks** to fetch metadata, set up the workflow, or requests something that plainly requires knowledge of the database schema (e.g. "write a query against ORDERS", "describe what tables exist").
+
+When setup is triggered:
+
+### 1. Ensure a `.env` file with credentials
+
+Check whether `.env` exists at the repo root and contains both `METABASE_URL` and `METABASE_API_KEY`.
+
+- If `.env` is missing:
+  - If `.env.template` exists, ask the user to copy it and fill in the values.
+  - If neither exists, create `.env.template` with placeholders and ask the user to create `.env` from it:
+    ```env
+    METABASE_URL=https://metabase.example.com
+    METABASE_API_KEY=
+    ```
+- If `.env` exists but is missing one of the required variables, ask the user to add it.
+
+Do not invent, guess, or hardcode credentials. Always ask.
+
+### 2. Ensure `.env` and `.metabase/` are gitignored
+
+Read the repo's `.gitignore` and confirm both `.env` and `.metabase/` are listed. If either is missing, **ask the user before modifying `.gitignore`** — e.g.:
+
+> `.env` and `.metabase/` are not in `.gitignore`. Committing them would leak credentials or bloat the repo (metadata can be gigabytes). Shall I add them?
+
+Only edit `.gitignore` after the user confirms.
+
+### 3. Fetch and extract
+
+Once `.env` is valid and ignore rules are in place:
+
+```sh
+set -a; source .env; set +a
+
+mkdir -p .metabase
+curl -sf "$METABASE_URL/api/database/metadata" \
+  -H "X-API-Key: $METABASE_API_KEY" \
+  -o .metabase/metadata.json
+
+rm -rf .metabase/databases
+npx @metabase/database-metadata extract-metadata .metabase/metadata.json .metabase/databases
+```
+
+Then read the YAML tree under `.metabase/databases/` to answer the user's question.
+
+## Session start behaviour
+
+At the start of a session, do not run any fetch commands. Just observe what's on disk:
+
+- If `.metabase/metadata.json` **and** `.metabase/databases/` both exist, **assume the tree is sufficiently up to date** and use it directly. Do not refetch.
+- If the tree is missing or only partial, do nothing until the user asks for something that needs it — then fall into the first-time-setup flow above.
+
+If something in the tree looks stale or inconsistent while you're using it, mention it to the user and let them decide whether to refetch. Never refresh silently.
+
+## Refreshing (user-initiated only)
+
+If the user explicitly asks to refresh metadata, re-run step 3 from first-time setup. Always remove `.metabase/databases` before re-extracting so stale files are not left behind.
 
 ## Entities
 
@@ -50,29 +110,10 @@ Field-level FKs show up as `parent_id` (nested field parent) and `fk_target_fiel
 
 See the extracted spec for the full type hierarchy and available coercion strategies.
 
-## Extracting the spec
+## Reading the spec
 
-Extract the full spec to a file:
+This skill ships with a local snapshot of the spec as `spec.md`, alongside `SKILL.md`.
 
-```sh
-npx @metabase/database-metadata extract-spec --file <path>
-```
+**Read it on demand, not eagerly.** Open `spec.md` only when you actually need detail beyond what `SKILL.md` summarizes — e.g. the full base-type / semantic-type hierarchy, the complete list of coercion strategies, or the exact folder-path rules. Do not open it at session start, and do not open it for tasks unrelated to the metadata tree.
 
-Extract it to a temp location at the start of a session and reference it as needed — e.g. `mktemp -d` then point `--file` inside it.
-
-## Refreshing the tree (user-initiated only)
-
-The agent should not refresh metadata on its own. If the user explicitly asks for it, the pipeline is:
-
-```sh
-# 1. Refetch the JSON from a running Metabase
-curl -sf "$METABASE_URL/api/database/metadata" \
-  -H "X-API-Key: $METABASE_API_KEY" \
-  -o .metabase/metadata.json
-
-# 2. Rebuild the YAML tree
-rm -rf .metabase/databases
-npx @metabase/database-metadata extract-metadata .metabase/metadata.json .metabase/databases
-```
-
-Typically this is wired up in CI so the tree stays in sync automatically — the agent does not need to run it.
+If the bundled copy looks out of date with the upstream package, the skill's own `README.md` documents how to refresh it with `extract-spec`.
