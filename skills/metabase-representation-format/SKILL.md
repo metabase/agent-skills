@@ -75,21 +75,13 @@ If the bundled copy looks out of date with the upstream package, the skill's own
 
 ## Validating
 
-Two layers of validation — run them at different cadences.
-
-**Schema check (fast, run freely):**
+Validate edits with the built-in CLI:
 
 ```sh
 npx @metabase/representations validate-schema --folder <path>
 ```
 
 Pass the top-level export folder, or the git repository root. The tool walks the import paths listed above, reads `serdes/meta` on each file to pick the right validation rules, and exits non-zero on failure. Prefer running this over manually cross-checking field shapes. It's essentially instant, so invoke it whenever useful — after each edit, between edits, whenever the shape of a file feels uncertain. No reason to batch.
-
-**Semantic check (slow, run at the end):**
-
-Once you've finished editing representation YAML files, run the semantic checker (see the `metabase-semantic-checker` skill). `validate-schema` only checks per-file shape; it does **not** verify that `collection_id`, `parent_id`, `dashboard_id`, snippet references, transform tags, and the columns inside MBQL/native queries actually resolve. A change that passes schema validation can still break references — the semantic checker is what catches that.
-
-Run it once at the end of a batch of edits, not between edits: each invocation has ~1 minute of fixed JVM + metadata-loading overhead before it starts checking.
 
 ## Generating entity IDs
 

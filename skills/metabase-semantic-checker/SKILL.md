@@ -1,6 +1,6 @@
 ---
 name: metabase-semantic-checker
-description: Runs the Metabase semantic checker against a tree of Representation Format YAML files to verify that all references resolve — cross-entity references (collection_id, dashboard_id, parent_id, parameter source cards, snippet references, transform tags, etc.) and references to columns inside MBQL and native queries. Use when the user asks to "semantic check", "check references", "validate queries against the schema", or diagnose a broken reference. Requires database metadata on disk (by default `.metabase/metadata.json`).
+description: Runs the Metabase semantic checker against a tree of Representation Format YAML files to verify that all references resolve — cross-entity references (collection_id, dashboard_id, parent_id, parameter source cards, snippet references, transform tags, etc.) and references to columns inside MBQL and native queries. Slow (≥1 min per run). Only use when the user explicitly asks to verify entity references or column references in MBQL/SQL queries; in most cases this runs as a CI step, not locally. Requires database metadata on disk (by default `.metabase/metadata.json`).
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion
 ---
@@ -9,12 +9,14 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion
 
 The semantic checker validates a tree of **Metabase Representation Format** YAML files for referential integrity. Schema-level validation (shape of each file, required fields, enum values) is handled separately by `npx @metabase/representations validate-schema`; the semantic checker runs *after* schema validation and focuses on cross-file and cross-system consistency.
 
-It answers questions like:
+It compiles every MBQL query down to SQL against the database metadata and checks that each entity reference and each column reference resolves to something that actually exists. Concretely, it answers:
 
 - Does every `collection_id`, `parent_id`, `dashboard_id`, `document_id`, `based_on_card_id`, transform tag, snippet name, etc. resolve to an entity that actually exists in the tree?
-- For each MBQL query, do every `source-table`, field reference, join target, segment, measure, and expression resolve against the database schema?
+- For each MBQL query, do every `source-table`, field reference, join target, segment, measure, and expression resolve against the database schema? (Verified by compiling the query to SQL.)
 - For each native query, do the referenced tables, columns, and snippets exist?
 - Do dashboards' and documents' embedded card references point at real cards?
+
+Each run takes **1 minute or more** — roughly a minute of fixed JVM + metadata-loading overhead before any checks start, plus query-compilation time that scales with the tree.
 
 The checker ships inside the Metabase Enterprise JAR and is invoked via `--mode checker`. Default Docker image: `metabase/metabase-enterprise:latest`. Use `metabase/metabase-enterprise-head:latest` only when the user explicitly wants the in-development build — e.g. testing unreleased checker changes.
 
@@ -29,11 +31,18 @@ If `.metabase/metadata.json` is missing, do **not** run the checker. Instead, te
 
 ## When to run
 
-**Run the semantic checker once, after you are done making changes to representation YAML files** — editing a card's query, renaming a collection, re-parenting entities, adding/removing snippets or transform tags, etc. A passing schema check does not catch broken cross-entity references or query columns that no longer exist; the semantic checker does. Treat it as the second half of local validation, paired with `npx @metabase/representations validate-schema`.
+**Do not run the semantic checker by default when making edits.** It is slow (≥1 minute per run) and in most projects is wired up as a CI step that runs on every push or PR — that is where it belongs. Local runs are for targeted diagnosis, not routine validation.
 
-**Batch it — don't run between edits.** Each invocation spins up the Metabase JVM and loads the database metadata, which takes roughly a minute of fixed overhead before any checks run. Running it after every individual edit wastes that minute on each edit and bogs the session down. Make all the YAML changes you intend to make, then run the checker once at the end. If it surfaces issues, fix them and re-run — but again, fix everything you can see in one pass before re-running.
+Only run it locally when **the user explicitly asks** for one of these:
 
-Outside of that, do not run it proactively at session start. At session start, just observe what's on disk — do not refresh metadata, do not pull the Docker image. Only run when the user explicitly asks, or once you have finished a batch of YAML edits.
+- verify that all entity references resolve (collections, dashboards, cards, snippets, transform tags, etc.), or
+- verify that all column references in queries — MBQL or SQL — are correct.
+
+Phrasings that count as an explicit ask: "semantic check", "check references", "validate queries against the schema", "make sure the columns still exist", or diagnosing a broken reference the user already suspects. A bare "run the checker" does **not** count — by default "the checker" means the fast schema checker (`npx @metabase/representations validate-schema`). Only wording that explicitly names references or queries should trigger the semantic checker.
+
+Otherwise, skip it. After editing YAML, rely on `npx @metabase/representations validate-schema` for local feedback and leave the semantic check to CI. Do not run it proactively at session start, and do not run it as a self-imposed "finishing step" after edits unless the user asked for it.
+
+**If you do run it, batch.** Make all the YAML changes first, then run the checker once. Each invocation pays the ≥1-minute fixed overhead; running between edits multiplies that cost. If it surfaces issues, fix everything you can see in one pass before re-running.
 
 ## Running the checker
 
