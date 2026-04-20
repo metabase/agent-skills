@@ -85,9 +85,22 @@ Pass the top-level export folder, or the git repository root. The tool walks the
 
 ## Generating entity IDs
 
-Every entity needs a 21-character NanoID for `entity_id`. Generate one with:
+Every entity needs a 21-character NanoID for `entity_id`. Generate one (or several) with the bundled CLI:
 
 ```sh
-npx nanoid
+npx @metabase/representations generate-entity-id
 # → LZfXLFzPPR4NNrgjlWDxn
+
+npx @metabase/representations generate-entity-id --count 5
+```
+
+## Generating UUIDs
+
+Some fields in the format require v4 UUIDs rather than NanoIDs — notably `lib/uuid` on MBQL aggregation clauses (referenced from `order-by` and later stages) and the `id` on dashboard/card parameters. Generate them with:
+
+```sh
+npx @metabase/representations generate-uuid
+# → 1d4e9fdf-49ae-4fbe-ae27-05e7c6a5cfe8
+
+npx @metabase/representations generate-uuid --count 3
 ```

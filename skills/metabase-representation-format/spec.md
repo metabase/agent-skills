@@ -2254,7 +2254,6 @@ A card represents a Question, Model, or Metric in Metabase. Cards are the primar
 | `entity_id` | string | Yes | NanoID identifier |
 | `display` | string | Yes | Visualization type (see below) |
 | `creator_id` | string | Yes | User FK (email) |
-| `database_id` | string | Yes | Database FK (database name) |
 | `dataset_query` | object | Yes | Query definition — MBQL or native |
 | `visualization_settings` | map | Yes | Display settings (can be empty `{}`) |
 | `serdes/meta` | array | Yes | Identity path with `model: Card` |
@@ -2267,8 +2266,7 @@ A card represents a Question, Model, or Metric in Metabase. Cards are the primar
 | `collection_preview` | boolean | No | Show preview in collection (default: `true`) |
 | `dashboard_id` | string | No | Dashboard FK (entity_id). Card's `collection_id` must match the dashboard's `collection_id` |
 | `document_id` | string | No | Document FK (entity_id). Card's `collection_id` must match the document's `collection_id` |
-| `table_id` | array | No | Table FK matching source-table in query |
-| `source_card_id` | string | No | Card FK (entity_id) |
+| `database_id` | string | No | Database FK (database name). Only included when not derivable from `dataset_query` (e.g., empty query); re-derived from the query on import when present. |
 | `parameters` | array | No | Card parameters (see [Parameter](#parameter)) |
 | `parameter_mappings` | array | No | Unused, always empty `[]` |
 | `result_metadata` | array | No | Query result column metadata |
@@ -2279,7 +2277,6 @@ A card represents a Question, Model, or Metric in Metabase. Cards are the primar
 | `made_public_by_id` | string | No | User FK (email) |
 | `metabase_version` | string | No | Metabase version that created the card |
 | `card_schema` | integer | No | Internal card schema version |
-| `query_type` | string | No | `null`, `"query"`, or `"native"` |
 | `created_at` | string | No | ISO 8601 timestamp |
 
 ### Display Types
@@ -2298,7 +2295,6 @@ entity_id: f1C68pznmrpN1F5xFDj6d
 display: table
 creator_id: internal@metabase.com
 type: question
-database_id: Sample Database
 dataset_query:
   "lib/type": mbql/query
   database: Sample Database
@@ -2647,9 +2643,9 @@ Segments are stored under their table's directory: `databases/{db_slug}/schemas/
 | `name` | string | Yes | Segment name |
 | `entity_id` | string | Yes | NanoID identifier |
 | `creator_id` | string | Yes | User FK (email) |
-| `table_id` | array | Yes | Table FK `[database, schema, table]` — must match `source-table` in definition |
 | `definition` | object | Yes | Filter definition with `"lib/type": mbql/query`, `database`, and `stages` containing `source-table` and `filters` |
 | `serdes/meta` | array | Yes | Identity path with `model: Segment` |
+| `table_id` | array | No | Table FK `[database, schema, table]`. Only included when not derivable from `definition` (e.g., empty or broken definition); re-derived from the definition on import when present. |
 | `description` | string | No | Description |
 | `archived` | boolean | No | Whether archived (default: `false`) |
 | `created_at` | string | No | ISO 8601 timestamp |
@@ -2660,10 +2656,6 @@ Segments are stored under their table's directory: `databases/{db_slug}/schemas/
 name: Widget products
 entity_id: aB3kLmN9pQrStUvWxYz1a
 creator_id: internal@metabase.com
-table_id:
-- Sample Database
-- PUBLIC
-- PRODUCTS
 definition:
   "lib/type": mbql/query
   database: Sample Database
@@ -2706,9 +2698,9 @@ Measures are stored under their table's directory: `databases/{db_slug}/schemas/
 | `name` | string | Yes | Measure name |
 | `entity_id` | string | Yes | NanoID identifier |
 | `creator_id` | string | Yes | User FK (email) |
-| `table_id` | array | Yes | Table FK `[database, schema, table]` — must match `source-table` in definition |
 | `definition` | object | Yes | Aggregation definition with `"lib/type": mbql/query`, `database`, and `stages` containing `source-table` and exactly one `aggregation`. Measures cannot use `filters`. |
 | `serdes/meta` | array | Yes | Identity path with `model: Measure` |
+| `table_id` | array | No | Table FK `[database, schema, table]`. Only included when not derivable from `definition` (e.g., empty or broken definition); re-derived from the definition on import when present. |
 | `description` | string | No | Description |
 | `archived` | boolean | No | Whether archived (default: `false`) |
 | `created_at` | string | No | ISO 8601 timestamp |
@@ -2719,10 +2711,6 @@ Measures are stored under their table's directory: `databases/{db_slug}/schemas/
 name: Total revenue
 entity_id: xK7mPqR2sT4uVwXyZ9a1b
 creator_id: internal@metabase.com
-table_id:
-- Sample Database
-- PUBLIC
-- ORDERS
 definition:
   "lib/type": mbql/query
   database: Sample Database
