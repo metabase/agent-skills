@@ -8,7 +8,7 @@ Metabase database metadata is a read-only snapshot of databases, tables, and fie
 
 The format is designed to be **portable** and **reviewable**: numeric IDs are omitted or replaced with human-readable natural keys (database name, `[database, schema, table]` tuples, etc.). Files can be diffed, grepped, and edited by hand.
 
-The raw API response (`metadata.json`) is a single flat JSON document with `databases`, `tables`, and `fields` arrays, optimized for transport rather than reading. It can be arbitrarily large — tens or hundreds of megabytes on warehouses with many tables — and is not intended for direct consumption. Tools and humans should read the extracted YAML tree under `databases/` instead, where each entity lives in its own small file and foreign keys are resolved to natural-key tuples.
+The raw `table_metadata.json` (downloaded from the Metabase workspace page) is a single flat JSON document with `databases`, `tables`, and `fields` arrays, optimized for transport rather than reading. It can be arbitrarily large — tens or hundreds of megabytes on warehouses with many tables — and is not intended for direct consumption. Tools and humans should read the extracted YAML tree under `databases/` instead, where each entity lives in its own small file and foreign keys are resolved to natural-key tuples.
 
 ## Table of Contents
 
@@ -122,10 +122,10 @@ Common semantic types, grouped by purpose:
 
 ## Folder Structure
 
-By convention, metadata is extracted under a `.metabase/databases/` directory, with each database occupying its own folder. The exporter itself doesn't enforce this location; it writes the tree below into whatever folder the caller passes.
+By convention, metadata is extracted under a `.metadata/databases/` directory, with each database occupying its own folder. The exporter itself doesn't enforce this location; it writes the tree below into whatever folder the caller passes.
 
 ```
-.metabase/
+.metadata/
 └── databases/
     └── {database}/
         ├── {database}.yaml
