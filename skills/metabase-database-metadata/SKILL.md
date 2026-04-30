@@ -17,6 +17,7 @@ All metadata for a project lives under a top-level `.metabase/` directory:
 
 - **`.metabase/databases/`** — the YAML tree. **This is the canonical source for the agent.** Read these files to understand the schema, columns, types, and FK relationships.
 - **`.metabase/table_metadata.json`** — the raw JSON downloaded from the Metabase workspace page. Potentially multi-megabyte (or multi-gigabyte) JSON with flat `databases` / `tables` / `fields` arrays. **Never open, grep, or pass it to tools.** It exists only as input to the extractor.
+- **`.metabase/field_values.json`** — sampled distinct values per field, also downloaded from the Metabase workspace page. Optional but recommended; produces small per-field YAML files inside the tree (one per low-cardinality field) that the agent reads when it needs example values or filter vocabularies.
 
 The `.metabase/` directory should be gitignored. On large warehouses the extracted metadata can reach gigabytes — committing it would make the repo painful or unusable.
 
@@ -34,20 +35,22 @@ Read the repo's `.gitignore` and confirm `.metabase/` is listed. If it isn't, **
 
 Only edit `.gitignore` after the user confirms.
 
-### 2. Obtain `table_metadata.json`
+### 2. Obtain the metadata files
 
-Ask the user to download `table_metadata.json` from the Metabase workspace page (Workspaces → the relevant workspace → "Download table_metadata.json") and place it at `.metabase/table_metadata.json`. The file is the raw JSON with flat `databases` / `tables` / `fields` arrays.
+Ask the user to download both files from the Metabase workspace page (Workspaces → the relevant workspace → "Download table_metadata.json" / "Download field_values.json") and place them at `.metabase/table_metadata.json` and `.metabase/field_values.json`. `field_values.json` is optional — skip it if the user doesn't need example values per field — but `table_metadata.json` is required.
 
-Do not try to fetch it via API — there is no agent-runnable endpoint for this; the workspace page is the only source.
+Do not try to fetch them via API — there is no agent-runnable endpoint for these; the workspace page is the only source.
 
 ### 3. Extract
 
-Once `.metabase/table_metadata.json` is in place:
+Once `.metabase/table_metadata.json` (and optionally `.metabase/field_values.json`) is in place:
 
 ```sh
 mkdir -p .metabase
 rm -rf .metabase/databases
 npx @metabase/database-metadata extract-table-metadata .metabase/table_metadata.json .metabase/databases
+# Only when field_values.json is present:
+npx @metabase/database-metadata extract-field-values .metabase/table_metadata.json .metabase/field_values.json .metabase/databases
 ```
 
 Then read the YAML tree under `.metabase/databases/` to answer the user's question.
@@ -63,7 +66,7 @@ If something in the tree looks stale or inconsistent while you're using it, ment
 
 ## Refreshing (user-initiated only)
 
-If the user explicitly asks to refresh metadata, ask them to re-download `table_metadata.json` from the Metabase workspace page, then re-run the extract step. Always remove `.metabase/databases` before re-extracting so stale files are not left behind.
+If the user explicitly asks to refresh metadata, ask them to re-download `table_metadata.json` (and `field_values.json` if they were using it) from the Metabase workspace page, then re-run the extract step. Always remove `.metabase/databases` before re-extracting so stale files are not left behind.
 
 ## Entities
 
