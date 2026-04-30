@@ -122,10 +122,10 @@ Common semantic types, grouped by purpose:
 
 ## Folder Structure
 
-By convention, metadata is extracted under a `.metabase/databases/` directory, with each database occupying its own folder. The exporter itself doesn't enforce this location; it writes the tree below into whatever folder the caller passes.
+By convention, metadata is extracted under a `.metadata/databases/` directory, with each database occupying its own folder. The exporter itself doesn't enforce this location; it writes the tree below into whatever folder the caller passes.
 
 ```
-.metabase/
+.metadata/
 └── databases/
     └── {database}/
         ├── {database}.yaml

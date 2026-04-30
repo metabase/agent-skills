@@ -1,6 +1,6 @@
 ---
 name: metabase-semantic-checker
-description: Runs the Metabase semantic checker against a tree of Representation Format YAML files to verify that all references resolve — cross-entity references (collection_id, dashboard_id, parent_id, parameter source cards, snippet references, transform tags, etc.) and references to columns inside MBQL and native queries. Slow (≥1 min per run). Only use when the user explicitly asks to verify entity references or column references in MBQL/SQL queries; in most cases this runs as a CI step, not locally. Requires database metadata on disk (by default `.metabase/table_metadata.json`).
+description: Runs the Metabase semantic checker against a tree of Representation Format YAML files to verify that all references resolve — cross-entity references (collection_id, dashboard_id, parent_id, parameter source cards, snippet references, transform tags, etc.) and references to columns inside MBQL and native queries. Slow (≥1 min per run). Only use when the user explicitly asks to verify entity references or column references in MBQL/SQL queries; in most cases this runs as a CI step, not locally. Requires database metadata on disk (by default `.metadata/table_metadata.json`).
 model: opus
 allowed-tools: Read, Glob, Grep, Bash, AskUserQuestion
 ---
@@ -25,9 +25,9 @@ The checker ships inside the Metabase Enterprise JAR and is invoked via `--mode 
 Two inputs, both required:
 
 - **The representation tree** — the repo root containing `collections/`, `databases/`, `transforms/`, `python_libraries/`. This is what gets checked.
-- **The database metadata** — a JSON file downloaded from the Metabase workspace page. **By default located at `.metabase/table_metadata.json`.** The checker uses it to resolve column/table references inside queries; without it, query-level checks cannot run.
+- **The database metadata** — a JSON file downloaded from the Metabase workspace page. **By default located at `.metadata/table_metadata.json`.** The checker uses it to resolve column/table references inside queries; without it, query-level checks cannot run.
 
-If `.metabase/table_metadata.json` is missing, do **not** run the checker. Instead, tell the user it needs to be downloaded first and defer to the `metabase-database-metadata` skill (which handles where the file comes from and how to extract the YAML tree from it). Only run the checker once the metadata file is present on disk.
+If `.metadata/table_metadata.json` is missing, do **not** run the checker. Instead, tell the user it needs to be downloaded first and defer to the `metabase-database-metadata` skill (which handles where the file comes from and how to extract the YAML tree from it). Only run the checker once the metadata file is present on disk.
 
 ## When to run
 
@@ -46,7 +46,7 @@ Otherwise, skip it. After editing YAML, rely on `npx @metabase/representations v
 
 ## Running the checker
 
-Once `.metabase/table_metadata.json` exists and Docker is available:
+Once `.metadata/table_metadata.json` exists and Docker is available:
 
 ```sh
 docker pull metabase/metabase-enterprise:latest
@@ -59,7 +59,7 @@ docker run --rm \
   java -jar metabase.jar \
     --mode checker \
     --export /workspace \
-    --schema-dir /workspace/.metabase/table_metadata.json \
+    --schema-dir /workspace/.metadata/table_metadata.json \
     --schema-format concise
 ```
 
@@ -67,7 +67,7 @@ Flag reference:
 
 - **`--mode checker`** — selects semantic-check mode (skips server startup, import, etc.).
 - **`--export /workspace`** — path **inside the container** to the representation tree root. With the `-v "$PWD:/workspace"` mount above, this maps to the current repo root on the host.
-- **`--schema-dir /workspace/.metabase/table_metadata.json`** — path to the database metadata JSON. Despite the `-dir` suffix the flag accepts a single JSON file. Point it elsewhere only if the user has stored metadata at a non-default path.
+- **`--schema-dir /workspace/.metadata/table_metadata.json`** — path to the database metadata JSON. Despite the `-dir` suffix the flag accepts a single JSON file. Point it elsewhere only if the user has stored metadata at a non-default path.
 - **`--schema-format concise`** — format the input metadata is in. `concise` matches what `@metabase/database-metadata` and the workspace-page download produce. Do not change unless the user explicitly has a different dump format.
 
 The container needs no network access for the check itself — pull the image first if the host is offline-prone.
@@ -76,7 +76,7 @@ Exit code is non-zero on findings. Surface the checker's stdout/stderr verbatim 
 
 ## Common failure modes
 
-- **"Database metadata not found" / schema load errors** — `.metabase/table_metadata.json` is missing, stale, or malformed. Refer the user to the `metabase-database-metadata` skill for a fresh download.
+- **"Database metadata not found" / schema load errors** — `.metadata/table_metadata.json` is missing, stale, or malformed. Refer the user to the `metabase-database-metadata` skill for a fresh download.
 - **Unknown collection / card / dashboard / snippet / tag reference** — the referenced `entity_id` or name does not exist in the tree. Either the target YAML is missing, or the reference is a typo; grep the tree for the id/name to confirm which.
 - **Unknown table or field inside a query** — the query references a column that the database metadata doesn't know about. Either the warehouse schema has drifted (refetch metadata), or the query itself is wrong.
 - **Docker image missing / not pulled** — run `docker pull metabase/metabase-enterprise:latest` first. On slow networks warn the user; the image is multi-hundred-MB.
@@ -84,5 +84,5 @@ Exit code is non-zero on findings. Surface the checker's stdout/stderr verbatim 
 ## Relationship to other skills
 
 - **`metabase-representation-format`** — defines the YAML shape the checker reads. Use it when the user is editing or creating representation files.
-- **`metabase-database-metadata`** — owns the `.metabase/table_metadata.json` file and the download/refresh flow. Invoke it whenever the metadata file is missing, stale, or the user explicitly asks to refresh it before re-running the checker.
+- **`metabase-database-metadata`** — owns the `.metadata/table_metadata.json` file and the download/refresh flow. Invoke it whenever the metadata file is missing, stale, or the user explicitly asks to refresh it before re-running the checker.
 - **Schema-level validation** (`npx @metabase/representations validate-schema`) — the fast, local-only check that runs in the `Schema Check` CI workflow and does not need database metadata. Essentially instant; run it freely between edits. The semantic checker assumes schema-valid input, so run schema validation first if a file looks structurally wrong.
