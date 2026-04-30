@@ -47,7 +47,7 @@ Once `.metabase/table_metadata.json` is in place:
 ```sh
 mkdir -p .metabase
 rm -rf .metabase/databases
-npx @metabase/database-metadata extract-metadata .metabase/table_metadata.json .metabase/databases
+npx @metabase/database-metadata extract-table-metadata .metabase/table_metadata.json .metabase/databases
 ```
 
 Then read the YAML tree under `.metabase/databases/` to answer the user's question.
