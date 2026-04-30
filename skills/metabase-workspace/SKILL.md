@@ -22,14 +22,43 @@ If either is missing, stop and ask the user to complete it first — the skill c
 
 ## Variables the local container needs
 
-The container reads two things from the host:
+The container reads two things from the host's `.env`:
 
 - **`MB_PREMIUM_EMBEDDING_TOKEN`** — the EE license token. Sensitive.
 - **`MB_CONFIG_FILE_PATH`** — the **host** path to `config.yml` (the file the user downloaded). Defaults to `./config.yml` at the repo root if the user hasn't placed it elsewhere.
 
-Both values live in `.env` at the repo root. Both `.env` and the `config.yml` it points to **must be gitignored** — they contain the EE token and the bundled database credentials, neither of which can be safely committed.
+Both `.env` and the `config.yml` it points to **must be gitignored** — they contain the EE token and the bundled database credentials, neither of which can be safely committed.
 
 > Never `Read` or `cat` the `.env` file. Never echo or print its contents. Always source it inside a single `bash` command and reference the variables from there. The skill checks for the presence of keys with `grep -q`, never by reading values.
+
+The remote-sync settings are **not** in `.env`. They're set directly in the docker-run script:
+
+- `MB_REMOTE_SYNC_URL` — always `file:///workspace/.git` (the repo is mounted into the container at `/workspace`).
+- `MB_REMOTE_SYNC_BRANCH` — captured at start time from `git rev-parse --abbrev-ref HEAD`. If the user switches branches and wants the dev instance to follow, recreate the container.
+- `MB_REMOTE_SYNC_TYPE` — left unset. Metabase defaults to `:read-only`, which is what we want; the dev instance reads from the local repo and never pushes back.
+
+Auto-import is intentionally **not** enabled. The user pulls new commits manually from the dev-instance UI (see the iteration section below) — that keeps imports under their control and avoids surprise sync runs while they're editing.
+
+### Important: committing changes and pulling them into the dev instance
+
+Git-sync reads from the repo's `.git` folder, not the working tree, and this skill leaves auto-import off — so a change is **invisible to the dev instance until two things happen**:
+
+1. The change is committed on the branch the container was started against.
+2. The user manually pulls it from the dev-instance UI: **Admin → Settings → Remote sync → click "Pull changes now"**.
+
+Typical iteration cycle:
+
+```sh
+# edit files in your editor
+git add <files>
+git commit -m "iterate"
+# then in the dev instance UI: Admin → Settings → Remote sync → "Pull changes now"
+```
+
+If the user reports "I changed X but the dev instance doesn't see it", check (in order):
+1. Did they commit?
+2. Are they on the same branch the container was started against?
+3. Did they click "Pull changes now" in the dev instance after committing?
 
 ## When the user asks to set up / configure / start
 
@@ -51,7 +80,14 @@ If missing, ask the user:
 
 ### Step 2 — Ensure `.env` exists with the required keys
 
-Check that `.env` exists and has both `MB_PREMIUM_EMBEDDING_TOKEN` and `MB_CONFIG_FILE_PATH`. Use grep — do not read values.
+Two keys this skill expects in `.env`:
+
+| Key | Source |
+|---|---|
+| `MB_PREMIUM_EMBEDDING_TOKEN` | user-supplied (license) |
+| `MB_CONFIG_FILE_PATH` | user-supplied (path to `config.yml`) |
+
+Check presence with grep — do not read values:
 
 ```bash
 [ -f .env ] && echo "env-present" || echo "env-missing"
@@ -59,14 +95,16 @@ grep -q '^MB_PREMIUM_EMBEDDING_TOKEN=' .env 2>/dev/null && echo "has-token" || e
 grep -q '^MB_CONFIG_FILE_PATH='        .env 2>/dev/null && echo "has-path"  || echo "no-path"
 ```
 
-- If `.env` is missing: create `.env.template` with placeholders (do **not** write the real `.env` for them — they need to fill in the EE token themselves), and ask the user to copy it:
-  ```env
-  MB_PREMIUM_EMBEDDING_TOKEN=
-  MB_CONFIG_FILE_PATH=./config.yml
-  ```
-  Tell them: *"I created `.env.template`. Copy it to `.env` and fill in `MB_PREMIUM_EMBEDDING_TOKEN` from your Metabase license. Adjust `MB_CONFIG_FILE_PATH` if `config.yml` lives elsewhere. Let me know when done."*
-- If `.env` exists but a key is missing, ask the user to add it (don't insert it for them — you don't know the token value).
-- If both keys are present, continue.
+**If `.env` is missing**, create `.env.template` (do **not** write the real `.env` for them — they need to fill in the EE token themselves):
+
+```env
+MB_PREMIUM_EMBEDDING_TOKEN=
+MB_CONFIG_FILE_PATH=./config.yml
+```
+
+Tell them: *"I created `.env.template`. Copy it to `.env` and fill in `MB_PREMIUM_EMBEDDING_TOKEN` from your Metabase license. Adjust `MB_CONFIG_FILE_PATH` if `config.yml` lives elsewhere. Let me know when done."*
+
+If `.env` exists but a key is missing, ask the user to add it — you don't have the values. Continue once both keys are present.
 
 ### Step 3 — Ensure both files are gitignored
 
@@ -80,71 +118,106 @@ Only edit `.gitignore` after the user confirms. Use the user-supplied `MB_CONFIG
 
 ### Step 4 — Start the developer instance
 
-Use a fixed container name (`metabase-workspace-dev`) so subsequent start/stop/recreate commands can find it.
+Use a fixed container name (`metabase-workspace`) so subsequent start/stop/recreate commands can find it.
 
 If a container with that name already exists, decide what to do:
 
 ```bash
-docker ps -a --filter "name=^metabase-workspace-dev$" --format '{{.Status}}'
+docker ps -a --filter "name=^metabase-workspace$" --format '{{.Status}}'
 ```
 
 - **Empty output** → no container, run a fresh one (below).
-- **Starts with `Up `** → already running. Tell the user the URL (`http://localhost:3000`) and stop. Don't restart anything.
-- **Starts with `Exited`** → previously stopped. `docker start metabase-workspace-dev`.
+- **Starts with `Up `** → already running. Skip to Step 5 to wait for `/api/health` and tell the user the URL.
+- **Starts with `Exited`** → previously stopped. `docker start metabase-workspace`, then go to Step 5.
 
-To run a fresh container, source `.env` and exec docker in **one** command so the secrets stay in env vars and never reach the conversation:
+The container needs to see the host repo so it can git-sync from the local `.git` folder. Mount the repo read-only at `/workspace`, and pin the sync branch to whatever is currently checked out:
 
 ```bash
 ( set -a; source .env; set +a;
+  branch=$(git rev-parse --abbrev-ref HEAD);
+  if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
+    echo "Could not determine current git branch (detached HEAD?)" >&2; exit 1;
+  fi;
   docker run -d -p 3000:3000 \
-    --name metabase-workspace-dev \
+    --name metabase-workspace \
     -v "$MB_CONFIG_FILE_PATH:/config.yml" \
+    -v "$PWD:/workspace:ro" \
     -e MB_CONFIG_FILE_PATH=/config.yml \
     -e MB_PREMIUM_EMBEDDING_TOKEN \
+    -e MB_REMOTE_SYNC_URL=file:///workspace/.git \
+    -e MB_REMOTE_SYNC_BRANCH="$branch" \
     metabase/metabase-enterprise:latest )
 ```
 
-Note `-e MB_PREMIUM_EMBEDDING_TOKEN` (no value) — this passes through the host env var without exposing it on the command line.
+Notes:
+- `-e MB_PREMIUM_EMBEDDING_TOKEN` (no value) passes through the host env var without exposing it on the command line.
+- `MB_REMOTE_SYNC_TYPE` is intentionally not set — Metabase defaults to `:read-only`, which is what this skill wants.
+- `MB_REMOTE_SYNC_BRANCH` is captured fresh from `git rev-parse` at start time. If the user switches branches later, the container won't follow until it's recreated (see the recreate section).
+- The bind mount uses `:ro` because the dev instance never pushes back.
 
-After the command returns, tell the user the container is starting and that Metabase will be available at `http://localhost:3000` once boot finishes. Suggest `docker logs -f metabase-workspace-dev` if they want to watch progress.
+After the command returns, tell the user the container started and is booting. Suggest `docker logs -f metabase-workspace` if they want to watch progress, then go to Step 5.
 
-### Step 5 — Boot may fail if databases aren't reachable
+### Step 5 — Wait until the instance is actually ready
 
-The container connects to the workspace's databases on startup. If they aren't reachable from the user's machine, the container will exit shortly after starting. Watch for this:
+Container start ≠ Metabase ready. The instance does app-DB migrations, applies `config.yml` (which can take seconds for warehouses with many tables), and only then begins serving real traffic. Poll Metabase's own readiness endpoint, `GET /api/health`:
+
+- While booting it returns **`503`** with `{"status": "initializing", "progress": 0..1}`.
+- Once ready it returns **`200`** with `{"status": "ok"}`.
+- If the app DB connection fails it returns `503` with a different `status` message.
+
+Poll for up to ~3 minutes, surfacing progress occasionally so the user knows things are moving:
 
 ```bash
-sleep 5
-docker ps --filter "name=^metabase-workspace-dev$" --format '{{.Status}}'
+deadline=$(( $(date +%s) + 180 ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  resp=$(curl -fsS -o /tmp/mb-health.json -w '%{http_code}' http://localhost:3000/api/health 2>/dev/null || echo "000")
+  if [ "$resp" = "200" ]; then
+    echo "ready"; cat /tmp/mb-health.json; echo; break
+  fi
+  status=$(docker inspect -f '{{.State.Status}}' metabase-workspace 2>/dev/null || echo "missing")
+  if [ "$status" != "running" ]; then
+    echo "container-$status"; break
+  fi
+  echo "waiting... http=$resp $(cat /tmp/mb-health.json 2>/dev/null)"
+  sleep 5
+done
 ```
 
-If the container is no longer in `docker ps` (or shows `Exited`), tail the logs and tell the user:
+Branches:
+- **`ready`** → tell the user *"The dev instance is ready at http://localhost:3000."* Done.
+- **`container-exited` / `container-missing`** → the container died during boot. The most common cause is that one of the databases in `config.yml` isn't reachable from the user's machine (VPN, firewall, or the hostname only resolves inside the production network). Run `docker logs --tail 100 metabase-workspace` and tell the user:
 
-> The container exited. The most common cause is that one of the databases listed in `config.yml` isn't reachable from your machine — VPN, firewall, or the database hostname only resolving inside production. Please verify connectivity to the databases your workspace exposes, then ask me to start it again.
+  > The container exited during boot. Check that the databases your workspace exposes are reachable from this machine, then ask me to start it again.
 
-Don't auto-retry — let the user fix it and re-trigger.
+- **Loop hit the deadline** → still 503 after 3 minutes. Don't keep waiting; tell the user to check `docker logs -f metabase-workspace`.
+
+Don't auto-retry on failure — let the user fix the underlying issue and re-trigger.
 
 ## When the user asks to stop
 
 Just stop the container; don't remove it. The user may want to restart it later with the same config.
 
 ```bash
-docker stop metabase-workspace-dev
+docker stop metabase-workspace
 ```
 
 If they explicitly say "remove the container", "delete it", or "tear it down", then also `docker rm` it.
 
-## When the user downloads a new `config.yml`
+## When the dev instance needs to be recreated
 
-Whenever the workspace's database list, schemas, or the workspace name itself changes in production, the user re-downloads `config.yml`. To pick that up, the local container has to be **fully recreated** — `docker restart` is not enough because the config is read once at boot and the bundled database credentials may have rotated.
+`docker restart` is not enough — the workspace config and the synced branch are both read once at boot. Recreate when:
+
+- The user re-downloads `config.yml` (workspace databases / schemas / name changed in production).
+- The user has switched git branches and wants the dev instance to follow.
 
 Confirm with the user before destroying the existing container, then:
 
 ```bash
-docker stop metabase-workspace-dev 2>/dev/null
-docker rm   metabase-workspace-dev 2>/dev/null
+docker stop metabase-workspace 2>/dev/null
+docker rm   metabase-workspace 2>/dev/null
 ```
 
-…then run the fresh-container command from Step 4 again.
+…then run the fresh-container command from Step 4 again — it will pick up the current `git rev-parse --abbrev-ref HEAD` automatically.
 
 ## What the user can ask, and what you do
 
