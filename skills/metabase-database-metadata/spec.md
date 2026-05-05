@@ -8,7 +8,7 @@ Metabase database metadata is a read-only snapshot of databases, tables, and fie
 
 The format is designed to be **portable** and **reviewable**: numeric IDs are omitted or replaced with human-readable natural keys (database name, `[database, schema, table]` tuples, etc.). Files can be diffed, grepped, and edited by hand.
 
-The raw `table_metadata.json` (downloaded from the Metabase workspace page) is a single flat JSON document with `databases`, `tables`, and `fields` arrays, optimized for transport rather than reading. It can be arbitrarily large — tens or hundreds of megabytes on warehouses with many tables — and is not intended for direct consumption. Tools and humans should read the extracted YAML tree under `databases/` instead, where each entity lives in its own small file and foreign keys are resolved to natural-key tuples.
+The raw `metadata.json` is a single flat JSON document with `databases`, `tables`, and `fields` arrays, optimized for transport rather than reading. It can be arbitrarily large — tens or hundreds of megabytes on warehouses with many tables — and is not intended for direct consumption. Tools and humans should read the extracted YAML tree under `databases/` instead, where each entity lives in its own small file.
 
 ## Table of Contents
 
@@ -252,3 +252,4 @@ parent_id:
   - DATA
   - user
 ```
+

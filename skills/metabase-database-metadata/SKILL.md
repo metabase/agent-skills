@@ -9,15 +9,14 @@ allowed-tools: Read, Edit, Glob, Grep, Bash, AskUserQuestion
 
 Metabase represents database metadata — synced databases, their tables, and their fields — as a tree of YAML files. Files are **diff-friendly**: numeric IDs are omitted entirely, and foreign keys use natural-key tuples like `["Sample Database", "PUBLIC", "ORDERS"]` instead of database identifiers.
 
-The format is defined by a specification bundled alongside this file as `spec.md` (upstream source: [metabase/database-metadata](https://github.com/metabase/database-metadata)). The same project ships a CLI (`@metabase/database-metadata` on npm) that converts the raw JSON downloaded from a Metabase workspace page into the YAML tree described by the spec.
+The format is defined by a specification bundled alongside this file as `spec.md` (upstream source: [metabase/database-metadata](https://github.com/metabase/database-metadata)). The same project ships a CLI (`@metabase/database-metadata` on npm) that converts the raw JSON exported from a Metabase instance into the YAML tree described by the spec.
 
 ## Canonical layout
 
 All metadata for a project lives under a top-level `.metadata/` directory:
 
 - **`.metadata/databases/`** — the YAML tree. **This is the canonical source for the agent.** Read these files to understand the schema, columns, types, and FK relationships.
-- **`.metadata/table_metadata.json`** — the raw JSON downloaded from the Metabase workspace page. Potentially multi-megabyte (or multi-gigabyte) JSON with flat `databases` / `tables` / `fields` arrays. **Never open, grep, or pass it to tools.** It exists only as input to the extractor.
-- **`.metadata/field_values.json`** — sampled distinct values per field, also downloaded from the Metabase workspace page. Optional but recommended; produces small per-field YAML files inside the tree (one per low-cardinality field) that the agent reads when it needs example values or filter vocabularies.
+- **`.metadata/metadata.json`** — the raw JSON exported from the Metabase instance. Potentially multi-megabyte (or multi-gigabyte) JSON with flat `databases` / `tables` / `fields` arrays. **Never open, grep, or pass it to tools.** It exists only as input to the extractor.
 
 The `.metadata/` directory should be gitignored. On large warehouses the extracted metadata can reach gigabytes — committing it would make the repo painful or unusable.
 
@@ -35,22 +34,26 @@ Read the repo's `.gitignore` and confirm `.metadata/` is listed. If it isn't, **
 
 Only edit `.gitignore` after the user confirms.
 
-### 2. Obtain the metadata files
+### 2. Export the metadata from Metabase
 
-Ask the user to download both files from the Metabase workspace page (Workspaces → the relevant workspace → "Download table_metadata.json" / "Download field_values.json") and place them at `.metadata/table_metadata.json` and `.metadata/field_values.json`. `field_values.json` is optional — skip it if the user doesn't need example values per field — but `table_metadata.json` is required.
-
-Do not try to fetch them via API — there is no agent-runnable endpoint for these; the workspace page is the only source.
-
-### 3. Extract
-
-Once `.metadata/table_metadata.json` (and optionally `.metadata/field_values.json`) is in place:
+Fetch `metadata.json` by calling `POST /api/ee/serialization/metadata/export` on the Metabase instance and writing the response to `.metadata/metadata.json`. The user supplies the base URL and an API key (e.g. via `METABASE_URL` and `METABASE_API_KEY` env vars):
 
 ```sh
 mkdir -p .metadata
+curl -sf -X POST "$METABASE_URL/api/ee/serialization/metadata/export" \
+  -H "X-API-Key: $METABASE_API_KEY" \
+  -o .metadata/metadata.json
+```
+
+If the user has not provided credentials, ask for them before running the call.
+
+### 3. Extract
+
+Once `.metadata/metadata.json` is in place:
+
+```sh
 rm -rf .metadata/databases
-npx @metabase/database-metadata extract-table-metadata .metadata/table_metadata.json .metadata/databases
-# Only when field_values.json is present:
-npx @metabase/database-metadata extract-field-values .metadata/table_metadata.json .metadata/field_values.json .metadata/databases
+npx @metabase/database-metadata extract-table-metadata .metadata/metadata.json .metadata/databases
 ```
 
 Then read the YAML tree under `.metadata/databases/` to answer the user's question.
@@ -59,14 +62,14 @@ Then read the YAML tree under `.metadata/databases/` to answer the user's questi
 
 At the start of a session, do not run any fetch commands. Just observe what's on disk:
 
-- If `.metadata/table_metadata.json` **and** `.metadata/databases/` both exist, **assume the tree is sufficiently up to date** and use it directly. Do not refetch.
+- If `.metadata/metadata.json` **and** `.metadata/databases/` both exist, **assume the tree is sufficiently up to date** and use it directly. Do not refetch.
 - If the tree is missing or only partial, do nothing until the user asks for something that needs it — then fall into the first-time-setup flow above.
 
 If something in the tree looks stale or inconsistent while you're using it, mention it to the user and let them decide whether to refetch. Never refresh silently.
 
 ## Refreshing (user-initiated only)
 
-If the user explicitly asks to refresh metadata, ask them to re-download `table_metadata.json` (and `field_values.json` if they were using it) from the Metabase workspace page, then re-run the extract step. Always remove `.metadata/databases` before re-extracting so stale files are not left behind.
+If the user explicitly asks to refresh metadata, re-run the export call to overwrite `.metadata/metadata.json`, then re-run the extract step. Always remove `.metadata/databases` before re-extracting so stale files are not left behind.
 
 ## Entities
 
@@ -96,7 +99,7 @@ Field-level FKs show up as `parent_id` (nested field parent) and `fk_target_fiel
 - **`coercion_strategy`** — the rule producing `effective_type` from `base_type` (e.g. `Coercion/ISO8601->DateTime`, `Coercion/UNIXMilliSeconds->DateTime`).
 - **`semantic_type`** — business-domain label (`type/PK`, `type/FK`, `type/Email`, `type/Category`, `type/Latitude`, etc.). Drives UI and some analytical behavior.
 
-See the extracted spec for the full type hierarchy and available coercion strategies.
+See the bundled spec for the full type hierarchy and available coercion strategies.
 
 ## Reading the spec
 
