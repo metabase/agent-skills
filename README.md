@@ -20,6 +20,12 @@ npx skills add metabase/agent-skills --skill metabase-modular-embedding-version-
 
 Always review and validate the changes made by a skill. Depending on your application's complexity, a skill may not work properly in all cases. Check that your application builds, tests pass, and the embedding works as expected before committing.
 
+### CLI
+
+[metabase-cli](./skills/metabase-cli/SKILL.md)
+
+Drives a Metabase instance from the terminal via the official `metabase` CLI: authenticate with profiles, list/get/create/update/delete cards, dashboards, transforms, databases, settings, run queries, search content, sync content to and from a remote git repo, manage Enterprise workspaces, translate entity ids. Bundles workspace lifecycle and transform authoring as on-demand reference files.
+
 ### Database metadata
 
 [metabase-database-metadata](./skills/metabase-database-metadata/SKILL.md)
