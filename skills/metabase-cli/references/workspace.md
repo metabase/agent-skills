@@ -197,6 +197,18 @@ Every entry's `status` must be `provisioned`.
 
 Before running `start`, ask the user about Remote Sync (see "Always ask about Remote Sync before starting" at the top of this file). The bind mount is decided at container-create time and cannot be added later without recreate.
 
+### Pick a free port up front
+
+Despite the `--port` flag's "auto-shifts up if taken" hint, in practice `workspace start` fails with `docker start failed for metabase-workspace-<id>` when the host port is occupied — typically by a stale workspace container from a prior session. **List local containers first** and pass an explicit free `--port`:
+
+```bash
+metabase workspace ps --profile <parent>          # → currently-running workspace containers + their host ports
+docker ps --filter "name=metabase-workspace" \
+  --format "{{.Names}}\t{{.Ports}}\t{{.Status}}"  # also surfaces stopped containers
+```
+
+If 3000 is taken, pass e.g. `--port 3322`. The child's URL in `workspace credentials` and `workspace url` reflects the chosen port automatically.
+
 ```bash
 # No sync:
 metabase workspace start <ws-id> --wait --profile <parent>
@@ -212,7 +224,7 @@ metabase workspace start <ws-id> --repo /path/to/repo --repo-branch dev --repo-m
 
 | Flag                  | Purpose                                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `--port <n>`          | Host port (default 3000; auto-shifts up if taken).                                                                     |
+| `--port <n>`          | Host port (default 3000; **does not** auto-shift reliably — pass an explicit free port if 3000 might be taken).        |
 | `--wait`              | Block until `/api/health` reports ready before returning.                                                              |
 | `--no-pull`           | Skip `docker pull` (image already present).                                                                            |
 | `--no-metadata`       | Skip the warehouse metadata export.                                                                                    |
@@ -303,6 +315,25 @@ metabase workspace logs <ws-id> --tail 300 --profile <parent> | grep -iE "advanc
 | `Spec assertion failed ... :input ... :output`                   | Parent emits keys the child's spec doesn't accept (server-side).     | File against the parent. Not a CLI issue.                                                                                 |
 | `Connection refused` / `unknown host` against the warehouse host | Container can't reach the source DB.                                 | Source DB credentials configured on the parent use a host that doesn't resolve from inside docker. Use a routable hostname. |
 | `Invalid token` / `License expired`                              | EE license bad or unset on the parent (forwarded into the child).    | Re-set on the parent: `metabase license set` (operator pastes).                                                           |
+
+### `workspace credentials` returns values that don't authenticate
+
+Symptom: right after `workspace start`, the API key returned by `metabase workspace credentials <ws-id>` is rejected by the child (`Unauthenticated` on `/api/user/current`, or `Invalid or unauthorized API key` from `metabase auth login --skip-verify` followed by any verb). The admin password from the same response also fails (`did not match stored password`). The values inside the container's `/mw-config/credentials.json` match what the parent reports, but the child's app db has different state.
+
+This is a parent↔child credential drift bug — the parent's record for the workspace can desync from the child's app db, especially after a rapid `start` → `start --force` sequence on the same port. **`start --force` alone does not fix it** (the volume persists across the recreate; the api-key already exists from the prior init and the new credentials.json is ignored).
+
+Recovery (works reliably):
+
+```bash
+metabase workspace remove <ws-id> --yes --profile <parent>     # destroys container + volume; keeps parent record + provisioned dbs
+metabase workspace start  <ws-id> --port <fresh-port> --wait --profile <parent>  # different port from the bad attempt
+metabase workspace credentials <ws-id> --profile <parent> --json | jq -r '.api_key' \
+  | xargs -I{} curl -s -H "x-api-key: {}" http://localhost:<fresh-port>/api/user/current   # smoke check
+```
+
+Why "different port": empirically, restarting on the same port after the drifted attempt can cling to the same broken state; switching ports forces a clean parent-side handoff. If you must reuse the original port, `workspace remove --yes` plus a brief pause (a few seconds) before `start` increases the success rate.
+
+`workspace remove --yes` is destructive — it drops the container *and* the app db volume — but in the bring-up window (before any user content has been imported) there's nothing to lose. The provisioned-database records on the parent survive the remove and don't need to be re-created.
 
 ### Container exited shortly after `start`
 

@@ -241,7 +241,30 @@ metabase card archive <id> --profile <n>                    # soft-delete; not u
 
 `--export-format csv|xlsx` bypasses the JSON envelope and streams the raw export — pipe to a file. There is no permanent-delete; `archive` is the only delete verb.
 
-**MBQL 5 pre-flight on `card create`:** when `dataset_query` has `lib/type: "mbql/query"`, the body is validated against the same schema as `metabase query` before sending. On failure, exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `dataset_query` shapes (MBQL 4, native) skip pre-flight. Author MBQL 5 by fetching the schema via `metabase query --print-schema` and iterating with `metabase query --dry-run`. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority.
+**There is no `card update` verb.** The CLI surface is `list | get | query | create | archive`. To change a card's `dataset_query`, `display`, `name`, etc., archive the old one and `create` a fresh one (you'll get a new id; update any dashcards that referenced the old card).
+
+**MBQL 5 `dataset_query` is a *flat* `mbql/query`, not a legacy envelope.** This is the most common authoring mistake — the legacy MBQL4 shape `{type:"query", database:N, query:{...}}` looks similar but the server *will silently double-wrap* an MBQL5 body submitted that way (you'll see the second-level `stages` nested inside an outer empty stage on `card get`), and queries fail with `"Initial MBQL stage must have either :source-table or :source-card"`. The right shape:
+
+```json
+{
+  "name": "Total shipments",
+  "display": "scalar",
+  "collection_id": 8,
+  "dataset_query": {
+    "lib/type": "mbql/query",
+    "database": 2,
+    "stages": [
+      { "lib/type": "mbql.stage/mbql", "source-table": 190,
+        "aggregation": [["count", {"lib/uuid": "..."}]] }
+    ]
+  },
+  "visualization_settings": {}
+}
+```
+
+`dataset_query` is the mbql/query value itself — no `type:"query"` envelope, no `query:` nesting.
+
+**MBQL 5 pre-flight on `card create`:** when `dataset_query` has `lib/type: "mbql/query"`, the body is validated against the same schema as `metabase query` before sending. On failure, exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `dataset_query` shapes (MBQL 4, native) skip pre-flight. Author MBQL 5 by fetching the schema via `metabase query --print-schema` and iterating with `metabase query --dry-run`. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority. (The pre-flight does **not** catch the double-wrap mistake above — it validates the inner `query`, not the dataset_query envelope shape.)
 
 ### `dashboard` — dashboards and dashcards
 
@@ -256,6 +279,8 @@ metabase dashboard update-dashcard <dashboard-id> <dashcard-id> --body '{"row":4
 ```
 
 A "dashcard" is a card placement on a dashboard — its own id, position (`row`/`col`), and size (`size_x`/`size_y`). Dashcards are nested inside the parent dashboard's response; the API has no per-dashcard endpoint, so dashcard edits round-trip through `PUT /api/dashboard/:id`.
+
+**`dashboard create` silently ignores `dashcards` in the body.** The create endpoint only sets the dashboard's metadata (name, description, collection, parameters). To add cards, follow `create` with `dashboard update <id> --body '{"dashcards":[…]}'` — same body shape as below. Verify with `dashboard cards <id>` afterwards; if the list is empty when you expected dashcards, this is what happened.
 
 Two ways to edit dashcards:
 
@@ -298,6 +323,8 @@ metabase setting set <key> --body '"<string-value>"' --profile <n>  # value pars
 ```
 
 The value is parsed as strict JSON: a string setting is `'"value"'` (note the inner double quotes), not `value`. Booleans are `true` / `false`, numbers bare. Wrong quoting silently produces a parse error — confirm with `setting get <key>` after.
+
+**`setting get --json` errors on string-valued settings on some builds.** The underlying `/api/setting/<key>` endpoint returns the bare value (`agent/shipments-analysis`, `file:///mnt/repo`, `read-write`, …) instead of a JSON-quoted string, and the CLI's JSON parser rejects it with `invalid JSON: Unexpected token …`. The same bug bites `sync status --json` (which reads `remote-sync-branch` internally). Workaround: drop `--json` for settings that hold a bare string — the human-readable output prints the value cleanly. The error message itself includes the value (`Unexpected token 'a', "agent/ship"...`), so you can recover it from stderr in a pinch.
 
 ### `search` — content search across types
 
