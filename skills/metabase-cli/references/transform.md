@@ -13,7 +13,7 @@ A transform has two halves:
 
 Native SQL is the simplest source and the easiest to author by hand. MBQL is what the Metabase UI emits and is much more verbose; pull a sample with `metabase transform get <id> --full --json` if you need its shape.
 
-If `source.query` is **MBQL 5** (`lib/type: "mbql/query"`), `transform create` and `transform update` validate it against the bundled query schema before sending; failure exits 2 with `{ ok, errors: [{path, message}] }` on stdout. To author MBQL 5 by hand: fetch the schema via `metabase query --print-schema --profile <n>`, iterate the body with `metabase query --file q.json --dry-run --profile <n>` until `ok: true`, then drop it into `source.query`. Legacy MBQL 4 and native sources skip pre-flight.
+If `source.query` is **MBQL 5** (`lib/type: "mbql/query"`), `transform create` and `transform update` validate it against the bundled query schema before sending; failure exits 2 with `{ ok, errors: [{path, message}] }` on stdout. To author MBQL 5 by hand: fetch the schema via `metabase query --print-schema --profile <n>`, iterate the body with `metabase query --file q.json --dry-run --profile <n>` until `ok: true`, then drop it into `source.query`. Legacy MBQL 4 and native sources skip pre-flight. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority — useful when the bundled schema disagrees with what the server actually accepts.
 
 ## Create + run (native SQL)
 

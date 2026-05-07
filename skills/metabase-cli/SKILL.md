@@ -224,6 +224,8 @@ Validation error envelope (same shape across `query`, `card create`, `transform 
 
 Exit codes: `0` valid + ran, `2` validation failed / malformed body, `1` server-side error after a valid pre-flight.
 
+**`--skip-validate`** is an escape hatch: bypasses the pre-flight and sends the body as-is. Use only when the bundled schema disagrees with what the server actually accepts (drift, false negative). Mutually exclusive with `--dry-run`. Same flag works on `metabase card create` and `metabase transform create / update`.
+
 ### `card` — questions, models, metrics
 
 ```bash
@@ -239,7 +241,7 @@ metabase card archive <id> --profile <n>                    # soft-delete; not u
 
 `--export-format csv|xlsx` bypasses the JSON envelope and streams the raw export — pipe to a file. There is no permanent-delete; `archive` is the only delete verb.
 
-**MBQL 5 pre-flight on `card create`:** when `dataset_query` has `lib/type: "mbql/query"`, the body is validated against the same schema as `metabase query` before sending. On failure, exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `dataset_query` shapes (MBQL 4, native) skip pre-flight. Author MBQL 5 by fetching the schema via `metabase query --print-schema` and iterating with `metabase query --dry-run`.
+**MBQL 5 pre-flight on `card create`:** when `dataset_query` has `lib/type: "mbql/query"`, the body is validated against the same schema as `metabase query` before sending. On failure, exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `dataset_query` shapes (MBQL 4, native) skip pre-flight. Author MBQL 5 by fetching the schema via `metabase query --print-schema` and iterating with `metabase query --dry-run`. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority.
 
 ### `dashboard` — dashboards and dashcards
 
@@ -283,7 +285,7 @@ metabase transform run <id> --wait --profile <n> --json
 metabase transform-job list --profile <n> --json
 ```
 
-**MBQL 5 pre-flight on `transform create` / `update`:** when `source.query` has `lib/type: "mbql/query"`, it's validated against the same schema as `metabase query` before sending; failures exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `source.query` shapes and Python sources skip pre-flight.
+**MBQL 5 pre-flight on `transform create` / `update`:** when `source.query` has `lib/type: "mbql/query"`, it's validated against the same schema as `metabase query` before sending; failures exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `source.query` shapes and Python sources skip pre-flight. Pass `--skip-validate` to bypass.
 
 For the body shape, run-with-wait pattern, schedule authoring, and inspection see `references/transform.md`.
 
