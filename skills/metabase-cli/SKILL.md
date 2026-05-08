@@ -272,6 +272,16 @@ metabase card archive <id> --profile <n>                    # soft-delete; not u
 
 **MBQL 5 pre-flight on `card create` / `card update`:** when `dataset_query` has `lib/type: "mbql/query"`, the body is validated against the same schema as `metabase query` before sending. On failure, exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `dataset_query` shapes (MBQL 4, native) skip pre-flight. The pre-flight also rejects the double-wrap mistake above (MBQL 5 nested inside a legacy `{type:"query", query:…}` envelope) with a `ConfigError` pointing at the right shape — no `--skip-validate` will get that past pre-flight. Author MBQL 5 by fetching the schema via `metabase query --print-schema` and iterating with `metabase query --dry-run`. Pass `--skip-validate` to bypass the pre-flight on schema-shape disagreements and let the server be the authority.
 
+**Visualization settings.** The valid keys for `visualization_settings` are scoped by the card's `display` value (`scalar`, `bar`, `line`, `area`, `combo`, `pie`, `table`, `pivot`, `row`, `waterfall`, `scatter`, `boxplot`, …). The CLI does not validate this object client-side — the schema lives in the **`metabase-representation-format`** skill, `spec.md` "Visualization Settings" section (graph / series / table / pivot / pie / scalar subsections, plus common `column_settings`). Load that skill if it isn't active when authoring viz keys. Common keys you'll reach for:
+
+- `bar` / `line` / `area` / `combo` / `scatter` / `waterfall` / `row` / `boxplot`: `graph.dimensions`, `graph.metrics`, `graph.show_values`, `graph.x_axis.title_text`, `graph.y_axis.title_text`, `graph.show_goal`, `graph.goal_value`, `stackable.stack_type`, plus per-series settings (`series_settings`).
+- `pie`: `pie.dimension`, `pie.metric`, `pie.show_total`, `pie.percent_visibility`, `pie.show_legend`.
+- `scalar`: `scalar.prefix`, `scalar.suffix`, `scalar.decimals`, plus `column_settings` for number formatting on the displayed column.
+- `table`: `table.columns` (order + visibility), `table.column_formatting` (conditional formatting), `column_settings` for per-column display.
+- `pivot`: `pivot_table.column_split` (rows / columns / values), `pivot.show_row_totals`, `pivot.show_column_totals`.
+
+Empty `{}` is always valid; defaults apply.
+
 ### `dashboard` — dashboards and dashcards
 
 ```bash
@@ -286,6 +296,8 @@ metabase dashboard update-dashcard <dashboard-id> <dashcard-id> --body '{"row":4
 ```
 
 A "dashcard" is a card placement on a dashboard — its own id, position (`row`/`col`), and size (`size_x`/`size_y`). Dashcards are nested inside the parent dashboard's response; the API has no per-dashcard endpoint, so dashcard edits round-trip through `PUT /api/dashboard/:id`.
+
+A dashcard's `visualization_settings` overrides the underlying card's — same key list as the `card` section above. Dashcards can additionally set `click_behavior` for cell-level navigation; see the `metabase-representation-format` skill's "Click Behavior" subsection for that schema.
 
 **`dashboard create` accepts `dashcards` and `tabs` in the body.** The create endpoint itself only sets dashboard metadata (name, description, collection, parameters); when the body carries `dashcards` or `tabs`, the CLI chains a `PUT /api/dashboard/:id` automatically and renders the hydrated `DashboardDetail` response. No second call needed. Use a negative id (`-1`, `-2`, …) for new dashcards.
 
@@ -350,6 +362,8 @@ metabase transform-job list --profile <n> --json
 ```
 
 **MBQL 5 pre-flight on `transform create` / `update`:** when `source.query` has `lib/type: "mbql/query"`, it's validated against the same schema as `metabase query` before sending; failures exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `source.query` shapes and Python sources skip pre-flight. Pass `--skip-validate` to bypass.
+
+**Iterate via `transform update`, not re-`create`.** When a `transform run` fails and you want to retry with a fixed body, patch the existing transform with `transform update <id> --file new-body.json` rather than `transform delete <id>` + `transform create`. Update keeps the same row, `entity_id`, materialized table, and on-disk YAML filename — `sync export` produces one clean commit, and you avoid the `_2` suffix the YAML serializer mints when two same-named transforms exist on disk. See `references/transform.md` "Iterating on a failing transform".
 
 For the body shape, run-with-wait pattern, schedule authoring, and inspection see `references/transform.md`.
 

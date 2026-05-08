@@ -15,22 +15,6 @@ Native SQL is the simplest source and the easiest to author by hand. MBQL is wha
 
 If `source.query` is **MBQL 5** (`lib/type: "mbql/query"`), `transform create` and `transform update` validate it against the bundled query schema before sending; failure exits 2 with `{ ok, errors: [{path, message}] }` on stdout. To author MBQL 5 by hand: fetch the schema via `metabase query --print-schema --profile <n>`, iterate the body with `metabase query --file q.json --dry-run --profile <n>` until `ok: true`, then drop it into `source.query`. Legacy MBQL 4 and native sources skip pre-flight. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority — useful when the bundled schema disagrees with what the server actually accepts.
 
-## Workspace caveat: native SQL transforms can't reference *other* transforms' output tables
-
-In a workspace, MBQL queries and ad-hoc native queries (run via `metabase query`) get their canonical references (`public.foo`) rewritten to the per-workspace isolation schema (`mb__isolation_<hash>_<ws-id>`) at execution time. **Transform execution of a native-SQL source does not get this rewrite.** The transform runs the SQL "raw" against the warehouse — fine for source tables that exist canonically in the warehouse, but it fails for the materialized output of *other* transforms (which only exist in the isolation schema, named `<canonical_schema>__<table>`).
-
-Symptom: a native-SQL transform `SELECT … FROM public.shipments_enriched` (where `shipments_enriched` is itself a transform output) fails with:
-
-```
-Error executing raw queries: ERROR: relation "public.shipments_enriched" does not exist
-```
-
-…even though `metabase query --file q.json --skip-validate` against the same SQL works fine (because that path goes through the QP).
-
-Fix: **author transform-of-transform sources as MBQL 5**, with a numeric `source-table` referring to the upstream transform's table id (look it up via `metabase table list --db-id <id> --profile <ws-name> --json` after the upstream transform has run — the materialized table will appear under the canonical schema). The MBQL execution path goes through the QP and the rewrite applies. Native SQL is fine when the transform reads only from canonical source tables (`public.orders`, `public.shipments`, …) — those exist in the warehouse under the canonical name and don't need rewriting.
-
-Don't reach for the workspace's isolation-schema name as a workaround — it changes per workspace and breaks portability. See `workspace.md`'s "Don't" list.
-
 ## MBQL 5 aggregations: name your output columns
 
 Default MBQL 5 aggregations materialize as `count`, `count_where`, `count_where_2`, `avg`, `avg_2`, `sum`, … — ugly when the result is a transform target. Pass `name` and `display-name` in the aggregation's options object to control them:
@@ -93,8 +77,11 @@ metabase transform run "$TRANSFORM_ID" --wait --profile <name> --json
 Notes:
 - `<db-id>` comes from `metabase database list --profile <name> --json`. Database ids are per-instance — a workspace child re-numbers them independently of the parent.
 - Target `schema` is the **canonical** name (e.g. `public`). In a workspace, the QP rewrites it to the per-workspace isolation schema (`mb__isolation_<hash>_<ws-id>`) at execution time — don't hard-code that prefix.
-- `--wait` on `transform run` polls until status is `succeeded` or `failed`. Without it you only get `{run_id, message: "Transform run started"}` and have to poll yourself.
+- `--wait` on `transform run` polls until status is `succeeded` or `failed`. Without it you only get `{message: "Transform run started", run_id, final: null}` and have to poll yourself.
+- The `--json` envelope is shape-stable: `{message, run_id, final}`. `final` is always present — `null` when `--wait` is omitted or the run never started, otherwise a full `TransformRun` object with `status` and `message`. On a failed run (`final.status` ∈ {`failed`, `timeout`, `canceled`}) the CLI exits 1 and writes a one-line summary `transform run <id> failed` to stderr; the failure detail lives only in `final.message` on stdout, so `jq -r '.final.message'` is where to look.
 - The heredoc with single-quoted `'EOF'` prevents shell from interpolating any `$vars` inside the SQL.
+- `transform create --json` returns the agent-facing compact projection: `{id, name, description, source_type, target: {type, database, schema, name}, target_db_id}`. Read `target.schema`/`target.name` directly off the create output — no follow-up `transform get` needed to verify where the transform will write.
+- If a transform with the same `name` already has a YAML representation on disk under the configured remote-sync repo, `create` mints a `_2` suffix on the exported filename (the new transform gets a fresh `entity_id`; the prior one isn't touched). For "iterate on the same concept" workflows, prefer `transform update <id>` — see "Iterating on a failing transform" below.
 
 ## Inspect
 
@@ -104,6 +91,84 @@ metabase transform get <id> --profile <name> --full --json     # full transform 
 ```
 
 After a run, the materialized table is queryable via `metabase` (`card create` against it, native query against `<schema>.<name>`, etc.). Columns and types are inferred from the result set; if you change the SELECT shape, drop the table first or the next run will fail on a column-mismatch error.
+
+## Update body: send only writable keys, never round-trip the GET body
+
+`transform update <id>` is **PATCH semantics** — only send the fields you actually want to change. The endpoint accepts exactly these writable keys:
+
+```
+name, description, source, target, run_trigger,
+tag_ids, collection_id, owner_user_id, owner_email
+```
+
+**Don't paste the output of `transform get` into a `transform update` body.** The GET response carries server-side fields (`id`, `entity_id`, `created_at`, `updated_at`, `creator_id`, `last_run`, `target_db_id`, `target_table_id`, `source_type`, `source_database_id`, `source_readable`, `creator`, `owner`, `table`, …) that the PUT endpoint isn't built to handle. Currently, unknown top-level keys flow into `t2/update!` and produce a leaked H2 SQL error like:
+
+```
+Column "TAGS" not found; SQL statement:
+UPDATE "TRANSFORM" SET "TAGS" = (), "UPDATED_AT" = NOW() WHERE "ID" = ? [42122-214]
+```
+
+Two specific footguns:
+
+- **`tags` is not a key on the REST API.** The serdes/YAML representation uses `tags`; the REST contract uses `tag_ids` (an array of integer ids). If you pulled a YAML representation and want to PUT it, translate `tags: [...]` → `tag_ids: [...]` first (or omit it entirely if you're not changing tag membership).
+- **`source_type`, `target_db_id`, `target_table_id`, `entity_id`** are derived/computed by the server. They appear in GET responses for the agent's benefit; the server doesn't accept them on update.
+
+Right shape — patch only what changes:
+
+```bash
+# Rename only:
+metabase transform update <id> --body '{"name":"renamed"}' --profile <name> --json
+
+# Rewrite the SQL only:
+cat > /tmp/patch.json <<'EOF'
+{ "source": { "type": "query", "query": { "type": "native",
+    "database": <db-id>,
+    "native": { "query": "SELECT … FROM public.orders" } } } }
+EOF
+metabase transform update <id> --file /tmp/patch.json --profile <name> --json
+
+# Change tag membership (note: tag_ids, not tags):
+metabase transform update <id> --body '{"tag_ids":[1,3]}' --profile <name> --json
+```
+
+If you really must round-trip, project to the writable subset:
+
+```bash
+metabase transform get <id> --full --profile <name> --json \
+  | jq '{name, description, source, target, run_trigger, tag_ids, collection_id, owner_user_id, owner_email}
+        | with_entries(select(.value != null))' \
+  > /tmp/patch.json
+```
+
+## Iterating on a failing transform
+
+When `transform run` fails and you want to retry with a fixed body, **prefer `transform update <id> --file body.json` over `transform delete <id>` + `transform create`.** Update keeps the same row, the same `entity_id`, the same materialized table, and the same on-disk YAML filename. Concretely this means:
+
+- `sync export` produces **one** clean commit containing only the fix, instead of "broken transform" + "remove broken transform" landing as two commits in `git log`.
+- You don't have to chase `_2` suffixes minted when two YAMLs share a `name` on disk (see the `transform create` notes above).
+- The materialized output table either updates in place or, if the SELECT shape changed incompatibly, errors loudly on the next run rather than landing in a parallel `..._2` table the agent has to clean up. (`transform delete-table <id>` resets the column shape if you need a clean slate.)
+
+Recipe:
+
+```bash
+# 1. Try once
+ID=$(metabase transform create --file /tmp/t.json --profile <n> --json | jq -r '.id')
+metabase transform run "$ID" --wait --profile <n> --json     # → failed
+
+# 2. Fix the body in place; PATCH only what changed.
+#    Source-only patch — keeps name, target, tags untouched on the server.
+cat > /tmp/source-patch.json <<'EOF'
+{ "source": { "type": "query", "query": { "type": "native",
+    "database": <db-id>,
+    "native": { "query": "<fixed SQL here>" } } } }
+EOF
+metabase transform update "$ID" --file /tmp/source-patch.json --profile <n> --json
+
+# 3. Re-run
+metabase transform run "$ID" --wait --profile <n> --json     # → succeeded
+```
+
+If you really must `create + delete` instead, do the `delete` **before** the first `sync export` so the failed entity never lands in git history. Order matters: agents reflex to "export to checkpoint progress," but for transforms an export of a soft-failed state is mostly noise that needs a follow-up cleanup commit. See `references/sync.md` "Read state before mutating" for the ordering rule.
 
 ## Drop the materialized table (keep the transform)
 
@@ -130,3 +195,4 @@ A schedule lives in a separate resource (`transform-job`) and references one or 
 - Don't put `transform run` calls in tight polling loops — pass `--wait` and let the CLI handle the polling. Manual loops without `--wait` will hammer the server.
 - Don't author MBQL 4 (the legacy nested `{ type: "query", query: {...} }` shape) by hand — pull a sample with `metabase transform get <id> --full --json`. MBQL 5 (`lib/type: "mbql/query"`) **is** authorable by hand thanks to the `metabase query --print-schema` + `--dry-run` feedback loop; for non-trivial pipelines you may still prefer building in the UI and exporting.
 - Don't write the workspace isolation schema into `target.schema` or SQL. See `workspace.md` for the canonical-name rule.
+- Don't paste a `transform get` body into `transform update` — the PUT endpoint only accepts writable keys, and unknown keys (notably `tags`, `source_type`, `entity_id`, `created_at`, `last_run`) leak as raw SQL errors. See "Update body: send only writable keys" above. Use `tag_ids` (not `tags`) on the REST contract.

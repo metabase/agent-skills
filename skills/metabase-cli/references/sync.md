@@ -16,6 +16,8 @@ metabase sync dirty               --profile <n> --json   # → list the dirty ob
 metabase sync current-task        --profile <n> --json   # → in-flight task (or idle)
 ```
 
+**Clean up before exporting.** If you've created entities you intend to delete (a failed transform you're going to retry, a card you authored to test a body shape, a draft dashboard) — do the deletes *before* the first `sync export`. Once committed, the cleanup needs a second commit, and the failed entity stays visible in `git log` forever. For the transform case specifically, prefer `transform update <id>` over `delete + create` so iteration never produces "broken-then-fixed" pairs in git history; see `references/transform.md` "Iterating on a failing transform".
+
 ## Import (remote → instance)
 
 ```bash
@@ -97,7 +99,7 @@ When the workspace exports against a host bind mount, the in-container serialize
 - Index: still matches the *previous* HEAD (whatever the user had staged before).
 - Working tree: still matches the *previous* HEAD.
 
-`git status` then shows "Changes to be committed" that look like the export's content reverting back — purely a display artifact, not an actual revert. The container does this on purpose to avoid clobbering work-in-progress on the host.
+`git status` then shows "Changes to be committed" that look like the export's content reverting back — purely a display artifact, not an actual revert. The container does this on purpose to avoid clobbering work-in-progress on the host. **Realigning is *applying* the new HEAD's content to your worktree, not discarding work** — the new commit was written by the exporter, not by your local edits, and your tree/index are stale relative to the new HEAD until you realign.
 
 **Surface this to the user** after an export against a `--repo` workspace — don't leave them staring at a confusing `git status`. Offer to realign.
 

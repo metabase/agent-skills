@@ -375,7 +375,7 @@ You opened the URL before health passed and walked through the wizard, which cre
 
 ### `git status` on the host shows confusing "staged changes" after `sync export`
 
-The in-container exporter writes the new commit object directly into the bind-mounted `.git/` and advances HEAD, but does not update the host's working tree or index. The host then shows the export's content as "Changes to be committed" reverting to the prior commit — display artifact, not a real revert. See `references/sync.md` "Working-tree drift on `--repo` bind-mount workspaces" for the realignment commands (typically `git -C <repo> reset --hard HEAD`, with the standard caveats about destructive resets).
+The in-container exporter writes the new commit object directly into the bind-mounted `.git/` and advances HEAD, but does not update the host's working tree or index. The host then shows the export's content as "Changes to be committed" reverting to the prior commit — display artifact, not a real revert. The non-destructive realignment is `git -C <repo> restore --staged --worktree .` (only touches paths that disagree with HEAD; refuses on unmerged paths; does not move HEAD). See `references/sync.md` "Working-tree drift on `--repo` bind-mount workspaces" for the full decision tree (when to stash first, when `reset --hard` is acceptable).
 
 ## Don't (workspace-specific)
 
