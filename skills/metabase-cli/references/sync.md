@@ -78,7 +78,7 @@ Workspace work is conventionally done on a feature branch — exporting to `main
 
 Reading the current branch:
 - For a `--repo` bind-mount workspace, `git -C <repo-path> symbolic-ref --short HEAD` is the most reliable read — that's what the workspace's `remote-sync-branch` was bound to at start time.
-- Otherwise: `metabase sync status --profile <n> --json | jq -r '.branch'`. (Note: on some builds, `sync status` errors with `invalid JSON: Unexpected token …` when the underlying setting endpoint returns a bare string instead of JSON. If you hit that, fall back to `metabase setting get remote-sync-branch --profile <n>` without `--json`, or read the host's `git symbolic-ref` for `--repo` workspaces.)
+- Otherwise: `metabase sync status --profile <n> --json | jq -r '.branch'`.
 
 If the branch is `main` or `master`, prompt with `AskUserQuestion`:
 

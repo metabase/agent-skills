@@ -1,6 +1,6 @@
 ---
 name: metabase-cli
-description: Drive a Metabase instance from the command line via the official `metabase` CLI. Authenticate with named profiles; inspect databases, tables, and fields; list, get, create, archive, and run cards (questions, models, metrics) returning JSON, CSV, or XLSX; list, create, and update dashboards and patch individual dashcards; author, update, and run transforms and schedule transform-jobs; read and update settings; search content (cards, dashboards, collections, transforms, metrics); manage Enterprise workspaces; and remote-sync content to and from a git remote (status, dirty checks, import, export, branches, stash). Use whenever the user wants to interact with a Metabase from the terminal — "log into metabase", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "search metabase for X", "spin up a workspace", "import the latest changes", "set a setting", or anything hitting `metabase <verb>`.
+description: Drive a Metabase instance from the command line via the official `metabase` CLI. Authenticate with named profiles and list configured profiles; inspect databases, tables, and fields; list, get, create, update, archive, and run cards (questions, models, metrics) returning JSON, CSV, or XLSX; list, create, and update dashboards and patch individual dashcards; author, update, and run transforms and schedule transform-jobs; read and update settings; search content (cards, dashboards, collections, transforms, metrics); manage Enterprise workspaces; and remote-sync content to and from a git remote (status, dirty checks, import, export, branches, stash). Use whenever the user wants to interact with a Metabase from the terminal — "log into metabase", "what profiles do I have", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "search metabase for X", "spin up a workspace", "import the latest changes", "set a setting", or anything hitting `metabase <verb>`.
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
 ---
 
@@ -28,11 +28,14 @@ For everything else (parent profile, staging, prod, anything pointing at a Metab
 ### Discover what's already configured
 
 ```bash
+metabase auth list --json                      # → {data: [{profile, url, present}], returned, total}
 metabase auth status --json                    # → {profile, present, url} for the default profile
 metabase auth status --profile <name> --json   # → status of a specific profile
 ```
 
-If `present: false` or the user has no profile set up, **stop and ask them to log in themselves**:
+`auth list` is the primary enumeration path — one call returns every configured profile with sanitized URL and `present` flag. Use it before asking the user which profile to pick. `auth status` is a single-profile probe; reach for it when you know the name and want a quick health check.
+
+If `auth list` returns an empty `data: []` or the user has no profile set up, **stop and ask them to log in themselves**:
 
 > Please run, yourself, `metabase auth login --url <your-base-url> --profile <name>`. Tell me the profile name when you're done.
 
@@ -40,7 +43,7 @@ Don't suggest a base URL, paste an API key, or run `auth login` on their behalf.
 
 ### Pick the profile to use
 
-If multiple profiles exist and the user hasn't named one, ask via `AskUserQuestion`. Once a name is established, pass `--profile <name>` to **every** subsequent command.
+Run `metabase auth list --json` first. If exactly one profile is configured and the user's intent doesn't disambiguate, use it. If multiple profiles exist and the user hasn't named one, ask via `AskUserQuestion`, presenting the names from `auth list` as options. Once a name is established, pass `--profile <name>` to **every** subsequent command.
 
 ### Other secrets (license, warehouse passwords)
 
@@ -236,12 +239,15 @@ metabase card query <id> --profile <n> --export-format csv  > /tmp/results.csv
 metabase card query <id> --profile <n> --export-format xlsx > /tmp/results.xlsx
 metabase card query <id> --profile <n> --parameters '[{"type":"category","value":"A","target":["variable",["template-tag","c"]]}]'
 metabase card create --file body.json --profile <n> --json
+metabase card update <id> --body '{"name":"renamed"}' --profile <n> --json
+metabase card update <id> --body '{"display":"bar"}' --profile <n> --json
+metabase card update <id> --body '{"archived":false}' --profile <n> --json    # unarchive
 metabase card archive <id> --profile <n>                    # soft-delete; not undoable from the CLI
 ```
 
-`--export-format csv|xlsx` bypasses the JSON envelope and streams the raw export — pipe to a file. There is no permanent-delete; `archive` is the only delete verb.
+`--export-format csv|xlsx` bypasses the JSON envelope and streams the raw export — pipe to a file. There is no permanent-delete; `archive` is the only delete verb (and `update --body '{"archived":false}'` is the unarchive path).
 
-**There is no `card update` verb.** The CLI surface is `list | get | query | create | archive`. To change a card's `dataset_query`, `display`, `name`, etc., archive the old one and `create` a fresh one (you'll get a new id; update any dashcards that referenced the old card).
+**`card update <id>`** patches a partial subset of the create shape (`name`, `display`, `dataset_query`, `visualization_settings`, `description`, `archived`, `collection_id`, `dashboard_id`, `cache_ttl`, `parameters`, `parameter_mappings`, …). Only the keys you send are touched. If `dataset_query` is MBQL 5 (`lib/type: "mbql/query"`) it goes through the same pre-flight validation as `card create` and `metabase query`; pass `--skip-validate` to bypass.
 
 **MBQL 5 `dataset_query` is a *flat* `mbql/query`, not a legacy envelope.** This is the most common authoring mistake — the legacy MBQL4 shape `{type:"query", database:N, query:{...}}` looks similar but the server *will silently double-wrap* an MBQL5 body submitted that way (you'll see the second-level `stages` nested inside an outer empty stage on `card get`), and queries fail with `"Initial MBQL stage must have either :source-table or :source-card"`. The right shape:
 
@@ -264,7 +270,7 @@ metabase card archive <id> --profile <n>                    # soft-delete; not u
 
 `dataset_query` is the mbql/query value itself — no `type:"query"` envelope, no `query:` nesting.
 
-**MBQL 5 pre-flight on `card create`:** when `dataset_query` has `lib/type: "mbql/query"`, the body is validated against the same schema as `metabase query` before sending. On failure, exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `dataset_query` shapes (MBQL 4, native) skip pre-flight. Author MBQL 5 by fetching the schema via `metabase query --print-schema` and iterating with `metabase query --dry-run`. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority. (The pre-flight does **not** catch the double-wrap mistake above — it validates the inner `query`, not the dataset_query envelope shape.)
+**MBQL 5 pre-flight on `card create` / `card update`:** when `dataset_query` has `lib/type: "mbql/query"`, the body is validated against the same schema as `metabase query` before sending. On failure, exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `dataset_query` shapes (MBQL 4, native) skip pre-flight. The pre-flight also rejects the double-wrap mistake above (MBQL 5 nested inside a legacy `{type:"query", query:…}` envelope) with a `ConfigError` pointing at the right shape — no `--skip-validate` will get that past pre-flight. Author MBQL 5 by fetching the schema via `metabase query --print-schema` and iterating with `metabase query --dry-run`. Pass `--skip-validate` to bypass the pre-flight on schema-shape disagreements and let the server be the authority.
 
 ### `dashboard` — dashboards and dashcards
 
@@ -274,13 +280,14 @@ metabase dashboard list   --filter archived --profile <n> --json
 metabase dashboard get    <id> --profile <n> --full --json    # --full hydrates dashcards + tabs
 metabase dashboard cards  <id> --profile <n> --json           # list of dashcards on the dashboard
 metabase dashboard create --file body.json --profile <n> --json
+metabase dashboard create --body '{"name":"D","dashcards":[{"id":-1,"card_id":42,"row":0,"col":0,"size_x":12,"size_y":6}]}' --profile <n> --json
 metabase dashboard update <id> --body '{"name":"renamed"}' --profile <n> --json
 metabase dashboard update-dashcard <dashboard-id> <dashcard-id> --body '{"row":4,"col":2}' --profile <n> --json
 ```
 
 A "dashcard" is a card placement on a dashboard — its own id, position (`row`/`col`), and size (`size_x`/`size_y`). Dashcards are nested inside the parent dashboard's response; the API has no per-dashcard endpoint, so dashcard edits round-trip through `PUT /api/dashboard/:id`.
 
-**`dashboard create` silently ignores `dashcards` in the body.** The create endpoint only sets the dashboard's metadata (name, description, collection, parameters). To add cards, follow `create` with `dashboard update <id> --body '{"dashcards":[…]}'` — same body shape as below. Verify with `dashboard cards <id>` afterwards; if the list is empty when you expected dashcards, this is what happened.
+**`dashboard create` accepts `dashcards` and `tabs` in the body.** The create endpoint itself only sets dashboard metadata (name, description, collection, parameters); when the body carries `dashcards` or `tabs`, the CLI chains a `PUT /api/dashboard/:id` automatically and renders the hydrated `DashboardDetail` response. No second call needed. Use a negative id (`-1`, `-2`, …) for new dashcards.
 
 Two ways to edit dashcards:
 
@@ -324,7 +331,7 @@ metabase setting set <key> --body '"<string-value>"' --profile <n>  # value pars
 
 The value is parsed as strict JSON: a string setting is `'"value"'` (note the inner double quotes), not `value`. Booleans are `true` / `false`, numbers bare. Wrong quoting silently produces a parse error — confirm with `setting get <key>` after.
 
-**`setting get --json` errors on string-valued settings on some builds.** The underlying `/api/setting/<key>` endpoint returns the bare value (`agent/shipments-analysis`, `file:///mnt/repo`, `read-write`, …) instead of a JSON-quoted string, and the CLI's JSON parser rejects it with `invalid JSON: Unexpected token …`. The same bug bites `sync status --json` (which reads `remote-sync-branch` internally). Workaround: drop `--json` for settings that hold a bare string — the human-readable output prints the value cleanly. The error message itself includes the value (`Unexpected token 'a', "agent/ship"...`), so you can recover it from stderr in a pinch.
+**`setting get --json` works on every value type.** String-valued settings (e.g., `remote-sync-branch=agent/shipments-analysis`, `remote-sync-url=file:///mnt/repo`) come back from `/api/setting/<key>` as bare text rather than a JSON-quoted string; the CLI sniffs the response Content-Type and wraps bare text into the `{key, value}` envelope so `--json` is uniform. The same fix applies to `sync status --json` (which reads `remote-sync-branch` internally).
 
 ### `search` — content search across types
 
