@@ -1,6 +1,6 @@
 ---
 name: metabase-cli
-description: Drive a Metabase instance from the terminal via the `metabase` CLI. Authenticate with named profiles; inspect databases, tables, fields; list/get/create/update/archive cards (questions, models, metrics) and run them as JSON/CSV/XLSX; list/get/create/update dashboards and patch dashcards; list/get/create collections and traverse the hierarchy by id, entity_id, or "root"/"trash" (with items and recursive tree); author/update/run transforms and schedule transform-jobs; read/update settings; search content (cards, dashboards, collections, transforms, metrics); manage Enterprise workspaces; remote-sync to/from a git remote (status, dirty, import, export, branches, stash). Use whenever the user wants to interact with a Metabase from the terminal — "log into metabase", "what profiles do I have", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "list collections", "what's in collection 4", "show the collection tree", "search metabase for X", "spin up a workspace", "import the latest changes", "set a setting", or anything hitting `metabase <verb>`.
+description: Drive a Metabase instance from the terminal via the `metabase` CLI. Authenticate with named profiles; inspect databases (list, get, full metadata rollup, schemas, tables in a schema) and trigger manual schema sync / field-values rescan; inspect tables, fields; list/get/create/update/archive cards (questions, models, metrics) and run them as JSON/CSV/XLSX; list/get/create/update dashboards and patch dashcards; list/get/create collections and traverse the hierarchy by id, entity_id, or "root"/"trash" (with items and recursive tree); list/get/create/update/archive native query snippets, segments, and measures; author/update/run transforms and schedule transform-jobs; read/update settings; search content (cards, dashboards, collections, transforms, metrics); manage Enterprise workspaces; remote-sync to/from a git remote (status, dirty, import, export, branches, stash, add/remove a collection from sync). Use whenever the user wants to interact with a Metabase from the terminal — "log into metabase", "what profiles do I have", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "list collections", "what's in collection 4", "show the collection tree", "list snippets", "create a segment", "archive a measure", "search metabase for X", "spin up a workspace", "import the latest changes", "add a directory to remote sync", "set a setting", "what schemas are in this database", "trigger a sync", "rescan field values", or anything hitting `metabase <verb>`.
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
 ---
 
@@ -11,7 +11,7 @@ The official Metabase CLI (`metabase`) drives a Metabase instance over its REST 
 Top-level command groups (run `metabase <group> --help` to discover verbs):
 
 ```
-auth | license | db | table | field | query | card | dashboard | collection | transform | transform-job
+auth | license | db | table | field | query | card | dashboard | snippet | segment | measure | collection | transform | transform-job
 setting | search | sync | workspace | setup | api-key | eid
 ```
 
@@ -176,10 +176,18 @@ The CLI exposes the Metabase REST API in 13 command groups beyond `auth` / `lice
 
 ```bash
 metabase database list --profile <n> --json
+metabase database list --include tables --profile <n> --full --json     # hydrate each db with its tables
+metabase database list --saved --profile <n> --json                     # include the Saved Questions virtual db (id -1337)
 metabase database get <db-id> --profile <n> --full --json
+metabase database get <db-id> --include tables.fields --profile <n> --full --json
+metabase database metadata <db-id> --profile <n> --full --json          # tables + fields rolled up in one call
+metabase database schemas <db-id> --profile <n> --json                  # list schema names
+metabase database schema-tables <db-id> <schema> --profile <n> --json   # tables in one schema
+metabase database sync-schema <db-id> --profile <n>                     # POST /sync_schema; queues async work, returns {status:"ok"}
+metabase database rescan-values <db-id> --profile <n>                   # POST /rescan_values; queues async work, returns {status:"ok"}
 ```
 
-Read-only. Returns the `database_id` you need for `table list`, `card create`, `transform create`, etc.
+Mostly read-only. `database list` / `get` / `metadata` / `schemas` / `schema-tables` give you the `database_id` you need for `table list`, `card create`, `transform create`, etc. `database metadata` is the one-shot warehouse introspection — full hydrated tables and fields in one call. `sync-schema` / `rescan-values` are the two manual triggers admins reach for after warehouse-side changes; both queue work and return immediately.
 
 ### `table` — list and inspect tables
 
@@ -188,9 +196,9 @@ metabase table list --db-id <db-id> --profile <n> --json
 metabase table get <table-id> --profile <n> --full --json    # bundles fields
 ```
 
-To enumerate the schemas the parent already syncs for a database:
+To enumerate the schemas the parent already syncs for a database, prefer the dedicated command:
 ```bash
-metabase table list --db-id <db-id> --profile <n> --json | jq -r '[.data[].schema] | unique | .[]'
+metabase database schemas <db-id> --profile <n> --json
 ```
 
 ### `field` — single field detail
@@ -321,6 +329,50 @@ Patch fields supported by `update-dashcard`:
 
 Empty-object patches are rejected client-side before any network call.
 
+### `snippet` — native query snippets (reusable SQL fragments)
+
+```bash
+metabase snippet list  --profile <n> --json
+metabase snippet list  --archived --profile <n> --json   # → ONLY archived (mutually exclusive with active)
+metabase snippet get   <id> --profile <n> --full --json
+metabase snippet create --body '{"name":"active","content":"WHERE active = true"}' --profile <n> --json
+metabase snippet update <id> --body '{"name":"renamed"}' --profile <n> --json
+metabase snippet update <id> --body '{"archived":false}' --profile <n> --json   # unarchive
+metabase snippet archive <id> --profile <n>                                     # soft-delete
+```
+
+Hits `/api/native-query-snippet`. A snippet is a named, reusable piece of native (SQL) query text — referenced from cards via `{{snippet: Name}}`. **`--archived` is a swap, not a union**: list returns either active (default) or archived rows, never both. Compact projection: `id`, `name`, `description`, `archived`, `collection_id`. Create body required fields: `name`, `content`. Update body is partial — `name`, `content`, `description`, `archived`, `collection_id`.
+
+### `segment` — saved MBQL filter macros
+
+```bash
+metabase segment list  --profile <n> --json
+metabase segment get   <id> --profile <n> --full --json
+metabase segment create --file segment.json --profile <n> --json
+metabase segment update <id> --body '{"name":"renamed","revision_message":"rename"}' --profile <n> --json
+metabase segment archive <id> --profile <n>                                                # default audit message
+metabase segment archive <id> --revision-message "deprecated" --profile <n>                # custom audit message
+```
+
+Hits `/api/segment`. A segment is a saved MBQL filter macro tied to a table — used in card filters to share a reusable predicate. Create body required: `name`, `table_id`, `definition` (MBQL filter object), optional `description`. **Update bodies MUST include `revision_message`** (a non-blank string captured in the audit log); the CLI does not synthesize it. The `archive` verb hardcodes `"Archived via metabase CLI"` by default — override with `--revision-message`.
+
+Compact projection: `id`, `name`, `description`, `archived`, `table_id`. The list response is bare; only the get/list responses hydrate `creator` and (list-only) `definition_description`.
+
+### `measure` — saved MBQL aggregation macros
+
+```bash
+metabase measure list  --profile <n> --json
+metabase measure get   <id> --profile <n> --full --json
+metabase measure create --file measure.json --profile <n> --json
+metabase measure update <id> --body '{"name":"renamed","revision_message":"rename"}' --profile <n> --json
+metabase measure archive <id> --profile <n>
+metabase measure archive <id> --revision-message "deprecated" --profile <n>
+```
+
+Hits `/api/measure`. A measure is a saved MBQL aggregation (a single `:aggregation` clause) tied to a table — referenced from cards and metrics to share a reusable computation. Create body required: `name`, `table_id`, `definition` (MBQL aggregation object), optional `description`. Same `revision_message` requirement on update / archive as `segment`.
+
+Compact projection: `id`, `name`, `description`, `archived`, `table_id`. The full response on `get` adds `dimensions`, `dimension_mappings`, `result_column_name`; the list response adds `definition_description` instead. Measure `get --full` responses can be large (hydrated dimensions); pass `--max-bytes 0` if a 65 KB cap clips the JSON.
+
 ### `collection` — folder hierarchy for cards, dashboards, sub-collections
 
 ```bash
@@ -358,6 +410,9 @@ For dashboard / card / collection enumeration, prefer the dedicated `collection 
 ```bash
 metabase transform list --profile <n> --json
 metabase transform run <id> --wait --profile <n> --json
+metabase transform runs --transform-id <id> --profile <n> --json   # recent runs, optionally filtered
+metabase transform get-run <run-id> --profile <n> --json            # single run by RUN id (not transform id)
+metabase transform cancel <id> --profile <n> --json                 # cancel the in-flight run for a transform
 metabase transform-job list --profile <n> --json
 ```
 
@@ -399,7 +454,7 @@ metabase sync export   -m "commit message" --profile <n>
 metabase sync branches --profile <n> --json
 ```
 
-12 verbs (status / is-dirty / has-remote-changes / dirty / current-task / cancel-task / wait / import / export / stash / branches / create-branch). Both `import --force` and `export --force` are **lossy** — confirm with the user before either. For the dirty-check workflow and stash semantics, see `references/sync.md`.
+14 verbs (status / is-dirty / has-remote-changes / dirty / current-task / cancel-task / wait / import / export / stash / branches / create-branch / add-collection / remove-collection). Both `import --force` and `export --force` are **lossy** — confirm with the user before either. `add-collection <id>` / `remove-collection <id>` toggle a collection's `is_remote_synced` and cascade to descendants by location prefix; the server rejects them in the default read-only mode (`metabase setting set remote-sync-type '"read-write"'` first). For the dirty-check workflow, stash semantics, and the full collection-toggle prerequisites, see `references/sync.md`.
 
 ### `workspace` — Enterprise workspaces (parent-side + local child)
 

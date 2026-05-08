@@ -92,6 +92,26 @@ metabase transform get <id> --profile <name> --full --json     # full transform 
 
 After a run, the materialized table is queryable via `metabase` (`card create` against it, native query against `<schema>.<name>`, etc.). Columns and types are inferred from the result set; if you change the SELECT shape, drop the table first or the next run will fail on a column-mismatch error.
 
+## Inspect runs and cancel an in-flight run
+
+```bash
+# Recent runs across all transforms (drains all pages by default; cap with --limit):
+metabase transform runs --profile <name> --json
+metabase transform runs --transform-id <id> --limit 10 --profile <name> --json
+
+# Fetch one run by RUN id (NOT transform id — the run id comes from `transform run` or `transform runs`):
+metabase transform get-run <run-id> --profile <name> --json
+
+# Cancel the currently-running run for a transform:
+metabase transform cancel <id> --profile <name> --json
+```
+
+Notes:
+- `transform runs` and `transform get-run` parse against the same `TransformRun` schema, so `get-run` returns the same per-run shape as one entry of `runs`. The compact projection is `{id, transform_id, status, run_method, start_time, end_time, message}`. Pass `--full` on `get-run` for the hydrated row including `is_active`, `user_id`, `transform_name`, `transform_entity_id`, `checkpoint_*` fields, and a nested `transform: {id, name, …}` block.
+- `transform cancel` takes the **transform** id and 404s with `Endpoint not found — is this a Metabase instance?` if there is no active run. The response shape is `{canceled: true, id: <transform-id>}`.
+- For native-SQL transforms, cancel marks the run as `canceling` but does **not** kill the warehouse query mid-flight — the query runs to completion, then the run lands as `canceled` (or stays `succeeded` if the cancel arrived after the writer committed). For Python transforms the worker is interrupted directly. Don't expect cancel to free warehouse resources instantly on long native queries; expect it to flip state and prevent downstream consumers from treating the result as good.
+- The `--transform-id` filter on `runs` accepts a single integer; the CLI translates to the server's `transform-ids` query vector. To cross-filter multiple transforms, run `transform runs --json` and `jq` post-hoc.
+
 ## Update body: send only writable keys, never round-trip the GET body
 
 `transform update <id>` is **PATCH semantics** — only send the fields you actually want to change. The endpoint accepts exactly these writable keys:

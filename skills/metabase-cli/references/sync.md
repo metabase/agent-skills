@@ -4,6 +4,33 @@ Metabase content (cards, dashboards, transforms, snippets, collections, …) can
 
 This file covers the import/export workflow. The general flag conventions and auth setup live in `../SKILL.md`. To author content YAML by hand, also load the `metabase-representation-format` skill — it covers the file-tree layout and per-resource YAML shape.
 
+## Adding / removing a directory (collection) to remote sync
+
+The set of directories under sync is governed by which **collections** carry `is_remote_synced: true`. Every collection so flagged serializes to its own folder under `collections/` in the repo; everything outside that set is local-only. The CLI exposes per-collection toggles that route to the underlying bulk endpoint (`PUT /api/ee/remote-sync/settings`):
+
+```bash
+metabase sync add-collection    <collection-id> --profile <n> --json
+metabase sync remove-collection <collection-id> --profile <n> --json
+```
+
+`<collection-id>` is a **positive integer**. The bulk endpoint's schema is `pos-int? → boolean`; nano-id / `root` / `trash` refs (which `collection get` accepts) are not supported here. Get the id from `metabase collection list --profile <n> --json` first.
+
+Both verbs return `{ success: true, task_id?: <id> }`. The optional `task_id` only appears when the toggle triggered a follow-up task (e.g., a finalization import after switching to read-only mode); for a normal add/remove in read-write, expect `{ success: true }` and nothing else.
+
+**Cascade.** A toggle on a parent cascades to every descendant by `location` prefix — `add-collection 4` flips `4` plus every collection nested under it. `remove-collection 4` is the symmetric inverse. There is no per-leaf-only mode.
+
+**Mode prerequisite.** The server rejects toggles while `remote-sync-type` is `:read-only` (the install default). If `metabase sync add-collection 12` returns `Metabase returned 400 … Cannot change synced collections when remote-sync-type is read-only.`, switch first with:
+
+```bash
+metabase setting set remote-sync-type '"read-write"' --profile <n>
+```
+
+(Mind the inner double quotes — `setting set` parses the value as strict JSON.) The server also rejects switching to `:read-only` while the Remote Sync collection is dirty; export or `--force` import first if you're going the other way.
+
+**Verifying the result.** The CLI's `Collection` schema doesn't yet expose `is_remote_synced`, so `collection get --json` won't show the flag. The pragmatic confirmation paths are:
+- `metabase sync is-dirty --profile <n> --json` after editing a card in the now-synced collection — a `true` reading proves it's tracked.
+- The Metabase Admin UI's Remote Sync page renders the per-collection toggles.
+
 ## Read state before mutating
 
 Always run `status` (or `is-dirty` + `has-remote-changes`) before `import` or `export`. Importing on a dirty instance silently rejects unless you pass `--force`; exporting when the instance is behind the remote pushes a stale state.
@@ -148,3 +175,4 @@ Use `wait` after `import --no-wait` / `export --no-wait`. Use `cancel-task` if a
 - Don't omit `-m` on `export` if the user wants a meaningful commit message — the default server-generated message is generic.
 - Don't `sync export` to `main`/`master` without explicit user confirmation — workspace work is conventionally on a feature branch. See "Branch guard" above.
 - Don't pretend the host's `git status` is clean after `sync export` against a `--repo` bind mount — the export advances HEAD but leaves the working tree + index behind. See "Working-tree drift" above.
+- Don't reach for `metabase setting set` to mark a collection as remote-synced — that endpoint writes single-key settings, not the bulk `collections` map. Use `metabase sync add-collection <id>` / `metabase sync remove-collection <id>` (see "Adding / removing a directory (collection) to remote sync" above), and remember the toggle cascades to descendants.
