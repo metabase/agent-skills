@@ -16,7 +16,7 @@ The format is defined by a specification bundled alongside this file as `spec.md
 All metadata for a project lives under a top-level `.metadata/` directory:
 
 - **`.metadata/databases/`** — the YAML tree. **This is the canonical source for the agent.** Read these files to understand the schema, columns, types, and FK relationships.
-- **`.metadata/metadata.json`** — the raw JSON exported from the Metabase instance. Potentially multi-megabyte (or multi-gigabyte) JSON with flat `databases` / `tables` / `fields` arrays. **Never open, grep, or pass it to tools.** It exists only as input to the extractor.
+- **`.metadata/table_metadata.json`** — the raw JSON exported from the Metabase instance. Potentially multi-megabyte (or multi-gigabyte) JSON with flat `databases` / `tables` / `fields` arrays. **Never open, grep, or pass it to tools.** It exists only as input to the extractor.
 
 The `.metadata/` directory should be gitignored. On large warehouses the extracted metadata can reach gigabytes — committing it would make the repo painful or unusable.
 
@@ -36,24 +36,30 @@ Only edit `.gitignore` after the user confirms.
 
 ### 2. Export the metadata from Metabase
 
-Fetch `metadata.json` by calling `POST /api/ee/serialization/metadata/export` on the Metabase instance and writing the response to `.metadata/metadata.json`. The user supplies the base URL and an API key (e.g. via `METABASE_URL` and `METABASE_API_KEY` env vars):
+Fetch `table_metadata.json` by calling `GET /api/ee/serialization/metadata/export` on the Metabase instance and writing the response to `.metadata/table_metadata.json`. The endpoint accepts three boolean query parameters that opt sections in or out — they all default to `false`, so requests must explicitly set the sections they want:
+
+- `with-databases` — include the `databases` array.
+- `with-tables` — include the `tables` array.
+- `with-fields` — include the `fields` array.
+
+A typical full export sets all three to `true`. The user supplies the base URL and an API key (e.g. via `METABASE_URL` and `METABASE_API_KEY` env vars):
 
 ```sh
 mkdir -p .metadata
-curl -sf -X POST "$METABASE_URL/api/ee/serialization/metadata/export" \
+curl -sf "$METABASE_URL/api/ee/serialization/metadata/export?with-databases=true&with-tables=true&with-fields=true" \
   -H "X-API-Key: $METABASE_API_KEY" \
-  -o .metadata/metadata.json
+  -o .metadata/table_metadata.json
 ```
 
 If the user has not provided credentials, ask for them before running the call.
 
 ### 3. Extract
 
-Once `.metadata/metadata.json` is in place:
+Once `.metadata/table_metadata.json` is in place:
 
 ```sh
 rm -rf .metadata/databases
-npx @metabase/database-metadata extract-table-metadata .metadata/metadata.json .metadata/databases
+npx @metabase/database-metadata extract-table-metadata .metadata/table_metadata.json .metadata/databases
 ```
 
 Then read the YAML tree under `.metadata/databases/` to answer the user's question.
@@ -62,14 +68,14 @@ Then read the YAML tree under `.metadata/databases/` to answer the user's questi
 
 At the start of a session, do not run any fetch commands. Just observe what's on disk:
 
-- If `.metadata/metadata.json` **and** `.metadata/databases/` both exist, **assume the tree is sufficiently up to date** and use it directly. Do not refetch.
+- If `.metadata/table_metadata.json` **and** `.metadata/databases/` both exist, **assume the tree is sufficiently up to date** and use it directly. Do not refetch.
 - If the tree is missing or only partial, do nothing until the user asks for something that needs it — then fall into the first-time-setup flow above.
 
 If something in the tree looks stale or inconsistent while you're using it, mention it to the user and let them decide whether to refetch. Never refresh silently.
 
 ## Refreshing (user-initiated only)
 
-If the user explicitly asks to refresh metadata, re-run the export call to overwrite `.metadata/metadata.json`, then re-run the extract step. Always remove `.metadata/databases` before re-extracting so stale files are not left behind.
+If the user explicitly asks to refresh metadata, re-run the export call to overwrite `.metadata/table_metadata.json`, then re-run the extract step. Always remove `.metadata/databases` before re-extracting so stale files are not left behind.
 
 ## Entities
 
