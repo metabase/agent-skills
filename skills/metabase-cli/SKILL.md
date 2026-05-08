@@ -1,6 +1,6 @@
 ---
 name: metabase-cli
-description: Drive a Metabase instance from the command line via the official `metabase` CLI. Authenticate with named profiles and list configured profiles; inspect databases, tables, and fields; list, get, create, update, archive, and run cards (questions, models, metrics) returning JSON, CSV, or XLSX; list, create, and update dashboards and patch individual dashcards; author, update, and run transforms and schedule transform-jobs; read and update settings; search content (cards, dashboards, collections, transforms, metrics); manage Enterprise workspaces; and remote-sync content to and from a git remote (status, dirty checks, import, export, branches, stash). Use whenever the user wants to interact with a Metabase from the terminal — "log into metabase", "what profiles do I have", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "search metabase for X", "spin up a workspace", "import the latest changes", "set a setting", or anything hitting `metabase <verb>`.
+description: Drive a Metabase instance from the terminal via the `metabase` CLI. Authenticate with named profiles; inspect databases, tables, fields; list/get/create/update/archive cards (questions, models, metrics) and run them as JSON/CSV/XLSX; list/get/create/update dashboards and patch dashcards; list/get/create collections and traverse the hierarchy by id, entity_id, or "root"/"trash" (with items and recursive tree); author/update/run transforms and schedule transform-jobs; read/update settings; search content (cards, dashboards, collections, transforms, metrics); manage Enterprise workspaces; remote-sync to/from a git remote (status, dirty, import, export, branches, stash). Use whenever the user wants to interact with a Metabase from the terminal — "log into metabase", "what profiles do I have", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "list collections", "what's in collection 4", "show the collection tree", "search metabase for X", "spin up a workspace", "import the latest changes", "set a setting", or anything hitting `metabase <verb>`.
 allowed-tools: Read, Write, Edit, Bash, AskUserQuestion
 ---
 
@@ -11,7 +11,7 @@ The official Metabase CLI (`metabase`) drives a Metabase instance over its REST 
 Top-level command groups (run `metabase <group> --help` to discover verbs):
 
 ```
-auth | license | db | table | field | query | card | dashboard | transform | transform-job
+auth | license | db | table | field | query | card | dashboard | collection | transform | transform-job
 setting | search | sync | workspace | setup | api-key | eid
 ```
 
@@ -309,6 +309,38 @@ Patch fields supported by `update-dashcard`:
 
 Empty-object patches are rejected client-side before any network call.
 
+### `collection` — folder hierarchy for cards, dashboards, sub-collections
+
+```bash
+metabase collection list   --profile <n> --json
+metabase collection list   --filter archived  --profile <n> --json     # → just the trash collection
+metabase collection list   --filter personal  --profile <n> --json     # → only personal collections
+metabase collection get    <ref> --profile <n> --json --full
+metabase collection items  <ref> --profile <n> --json
+metabase collection items  <ref> --models card,dashboard --pinned-state is_pinned --profile <n> --json
+metabase collection tree   --profile <n>                                # → JSON only, recursive
+metabase collection create --body '{"name":"My Collection","parent_id":4}' --profile <n> --json
+```
+
+`<ref>` (the positional id on `get` and `items`) accepts **four** forms — anything else is rejected client-side with a `ConfigError` before any HTTP call:
+
+| Form                  | Example                  | Notes                                                                                                                  |
+| --------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Positive integer      | `4`                      | Database id of the collection.                                                                                         |
+| `root`                | `metabase collection get root` | The virtual "Our analytics" root. Returns a stripped-down shape — `archived`, `description`, `location`, `type`, etc. are *absent*, not `null`. |
+| `trash`               | `metabase collection get trash` | The trash collection — paradoxically returns `archived: false`, `type: "trash"`. Filter via `list --filter archived` to enumerate it.        |
+| 21-char entity_id     | `voo1If9y8Sld0lXej6xl0`  | NanoID form (regex `^[A-Za-z0-9_-]{21}$`). Works wherever an int does — Metabase resolves it server-side via the same route. |
+
+**`collection items` is auto-paginated.** The CLI drains all pages of `/api/collection/:id/items` by default; pass `--limit <n>` to cap the total returned. With `--limit` set, the result envelope omits `total` (true total is unknown after early-stop). Items at the root level (`collection items root`) carry `collection_id: null`.
+
+**`collection tree` is JSON-only.** The recursive `{id, name, location, here, children, …}` structure does not render meaningfully as a key/value table; passing `--format text` is rejected with `ConfigError` so the user gets a clear signal rather than silent JSON.
+
+**Compact projection** (default for `list` / `get`): `id`, `name`, `description`, `archived`, `location`, `parent_id`, `type`, `authority_level`, `is_personal`. Use `--full` for hydrated fields like `slug`, `entity_id`, `can_write`, `namespace`, `personal_owner_id`. The compact projection on items is even tighter: `id`, `model`, `name`, `description`, `archived`, `collection_id`.
+
+**`collection create` body** accepts the same fields as `POST /api/collection`: `name` (required, non-empty), `description`, `parent_id` (omit or `null` for the root), `namespace`, `authority_level`. Note: the create response does *not* hydrate `parent_id` (only `location` reflects the parent path); use `collection get <id>` if you need `parent_id` populated.
+
+For dashboard / card / collection enumeration, prefer the dedicated `collection list` / `dashboard list` / `card list` verbs over `metabase search --models collection` — search is for ranking against a query string or cross-resource lookup, not bulk enumeration.
+
 ### `transform` and `transform-job`
 
 ```bash
@@ -342,7 +374,7 @@ metabase search "drafts" --archived --verified --profile <n> --json
 metabase search "orders" --table-db-id <db-id> --profile <n> --json
 ```
 
-`--models` filters: `card,dataset,metric,dashboard,collection,database,table,segment,measure,snippet,document,action,transform,indexed-entity`. For plain dashboard enumeration / inspection, prefer the dedicated `dashboard list` / `dashboard get` verbs above; reach for `search --models dashboard` only when you need ranking against a query string or a cross-resource lookup.
+`--models` filters: `card,dataset,metric,dashboard,collection,database,table,segment,measure,snippet,document,action,transform,indexed-entity`. For plain enumeration / inspection of cards, dashboards, or collections, prefer the dedicated `card list` / `dashboard list` / `collection list` verbs above; reach for `search --models <kind>` only when you need ranking against a query string or a cross-resource lookup.
 
 ### `sync` — remote-sync (representations ↔ instance)
 
