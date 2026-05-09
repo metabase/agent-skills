@@ -229,7 +229,7 @@ metabase workspace start <ws-id> --repo /path/to/repo --repo-branch dev --repo-m
 | `--no-pull`           | Skip `docker pull` (image already present).                                                                            |
 | `--no-metadata`       | Skip the warehouse metadata export.                                                                                    |
 | `--force`             | Recreate even if a container for this workspace exists. Preserves the app db.                                          |
-| `--timeout <ms>`      | `--wait` deadline (default 180000).                                                                                    |
+| `--timeout <ms>`      | Per-phase readiness deadline (default 240000). Covers the post-create config-consumption wait and (with `--wait`) the `/api/health` probe. Bump if the first cold boot exceeds the default — image pull + JVM startup can stretch on slow disks/networks. |
 | `--repo <host-path>`  | Bind-mount a host directory at `/mnt/repo` and inject `remote-sync-url=file:///mnt/repo` into config.yml.              |
 | `--repo-branch <name>`| `remote-sync-branch` value. Default: current branch of the host repo (`git symbolic-ref --short HEAD`).                |
 | `--repo-mode <mode>`  | `read-write` (default) or `read-only`. Also flips the bind mount's mount mode.                                         |
