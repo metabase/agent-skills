@@ -69,14 +69,21 @@ Workflow:
 
 ### First import on a fresh workspace
 
-After `workspace start --repo …` brings up a brand-new workspace, **always run a `sync import`** — without it the instance never picks up the repo content, and subsequent edits will diverge from what's on disk.
+After `workspace start --repo …` brings up a brand-new workspace, the repo content **must be applied** before any other work — without it the instance has none of the repo content and subsequent edits will diverge from what's on disk.
 
-The first import on a fresh instance often reports `status: conflict` (typically `conflicts: ["Transforms"]`) even when nothing is dirty. The boot-time auto-import leaves a stale task record that the first explicit import collides with. Retry the same command once; the second call usually succeeds. If it keeps reporting conflict, `sync import --force` is safe in this specific case because the workspace is empty — there's no instance-side work for `--force` to discard. (This is a narrow exception to the usual "confirm with the user before `--force`" rule.)
+The container runs a boot-time auto-import on first start, so in most cases the import has already completed by the time `workspace start --wait` returns. Check `sync status` first — if `current_task.sync_task_type == "import"` with `status == "successful"` and `.branch` matches the host's branch, you're done; skip the explicit call (it's a wasted round-trip). Only run the explicit `sync import` when the auto-import hasn't landed yet.
+
+When you do need the explicit import, the first one on a fresh instance can report `status: conflict` (typically `conflicts: ["Transforms"]`) even when nothing is dirty — the boot-time auto-import sometimes leaves a stale task record that the first explicit import collides with. Retry the same command once; the second call usually succeeds. If it keeps reporting conflict, `sync import --force` is safe in this specific case because the workspace is empty — there's no instance-side work for `--force` to discard. (This is a narrow exception to the usual "confirm with the user before `--force`" rule.)
 
 ```bash
-metabase sync import --branch <branch> --profile <ws-name> --json \
-  || metabase sync import --branch <branch> --profile <ws-name> --json \
-  || metabase sync import --branch <branch> --force --profile <ws-name> --json
+HOST_BRANCH=$(git -C <repo-path> symbolic-ref --short HEAD)
+SYNC_STATUS=$(metabase sync status --profile <ws-name> --json)
+if ! echo "$SYNC_STATUS" | jq -e --arg b "$HOST_BRANCH" \
+     '.current_task.sync_task_type == "import" and .current_task.status == "successful" and (.branch == $b)' >/dev/null; then
+  metabase sync import --branch "$HOST_BRANCH" --profile <ws-name> --json \
+    || metabase sync import --branch "$HOST_BRANCH" --profile <ws-name> --json \
+    || metabase sync import --branch "$HOST_BRANCH" --force --profile <ws-name> --json
+fi
 ```
 
 ## Export (instance → remote)

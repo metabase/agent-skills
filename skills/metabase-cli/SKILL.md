@@ -104,7 +104,7 @@ Every list/get verb supports the same output flags:
 | `--json`            | Emit full JSON envelope; safe for piping into `jq`. Default is human-readable text.         |
 | `--full`            | Include every field (compact projection is the default for list/get).                       |
 | `--fields a,b.c.d`  | Project specific dot-paths. Mutually exclusive with `--full`.                               |
-| `--max-bytes <n>`   | Cap output size; `0` disables. Default 65 536.                                              |
+| `--max-bytes <n>`   | Cap **list** output size (drops trailing items, sets `truncated`). Default 65 536; `0` disables. Single-item commands (`get`, `metadata`) never truncate — they only emit a stderr advisory when the body is over the cap. |
 
 List envelope shape:
 
@@ -371,7 +371,7 @@ metabase measure archive <id> --revision-message "deprecated" --profile <n>
 
 Hits `/api/measure`. A measure is a saved MBQL aggregation (a single `:aggregation` clause) tied to a table — referenced from cards and metrics to share a reusable computation. Create body required: `name`, `table_id`, `definition` (MBQL aggregation object), optional `description`. Same `revision_message` requirement on update / archive as `segment`.
 
-Compact projection: `id`, `name`, `description`, `archived`, `table_id`. The full response on `get` adds `dimensions`, `dimension_mappings`, `result_column_name`; the list response adds `definition_description` instead. Measure `get --full` responses can be large (hydrated dimensions); pass `--max-bytes 0` if a 65 KB cap clips the JSON.
+Compact projection: `id`, `name`, `description`, `archived`, `table_id`. The full response on `get` adds `dimensions`, `dimension_mappings`, `result_column_name`; the list response adds `definition_description` instead.
 
 ### `collection` — folder hierarchy for cards, dashboards, sub-collections
 
