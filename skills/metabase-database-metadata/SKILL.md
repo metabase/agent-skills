@@ -36,7 +36,7 @@ Only edit `.gitignore` after the user confirms.
 
 ### 2. Export the metadata from Metabase
 
-Fetch `table_metadata.json` by calling `GET /api/ee/serialization/metadata/export` on the Metabase instance and writing the response to `.metadata/table_metadata.json`. The endpoint accepts three boolean query parameters that opt sections in or out — they all default to `false`, so requests must explicitly set the sections they want:
+Fetch `table_metadata.json` by calling `POST /api/ee/serialization/metadata/export` on the Metabase instance and writing the response to `.metadata/table_metadata.json`. The endpoint accepts three boolean query parameters that opt sections in or out — they all default to `false`, so requests must explicitly set the sections they want:
 
 - `with-databases` — include the `databases` array.
 - `with-tables` — include the `tables` array.
@@ -46,7 +46,7 @@ A typical full export sets all three to `true`. The user supplies the base URL a
 
 ```sh
 mkdir -p .metadata
-curl -sf "$METABASE_URL/api/ee/serialization/metadata/export?with-databases=true&with-tables=true&with-fields=true" \
+curl -sf -X POST "$METABASE_URL/api/ee/serialization/metadata/export?with-databases=true&with-tables=true&with-fields=true" \
   -H "X-API-Key: $METABASE_API_KEY" \
   -o .metadata/table_metadata.json
 ```
