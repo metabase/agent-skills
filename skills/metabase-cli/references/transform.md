@@ -15,34 +15,43 @@ Native SQL is the simplest source and the easiest to author by hand. MBQL is wha
 
 If `source.query` is **MBQL 5** (`lib/type: "mbql/query"`), `transform create` and `transform update` validate it against the bundled query schema before sending; failure exits 2 with `{ ok, errors: [{path, message}] }` on stdout. To author MBQL 5 by hand: fetch the schema via `metabase query --print-schema --profile <n>`, iterate the body with `metabase query --file q.json --dry-run --profile <n>` until `ok: true`, then drop it into `source.query`. Legacy MBQL 4 and native sources skip pre-flight. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority — useful when the bundled schema disagrees with what the server actually accepts.
 
+**Mint UUIDs for `lib/uuid` slots before assembling the body — never invent, hard-code, or reuse them.** Every clause options object carries a `lib/uuid` (UUID v4); the bundled schema enforces RFC 4122 format strictly, so placeholder strings fail `--dry-run`. Workflow: count the slots, run `metabase uuid --count <N> --json`, substitute each minted value into its slot. The examples below use `<UUID:label>` sentinels (NOT valid UUIDs) so the assembly step is unambiguous — replace each sentinel with a freshly-minted UUID before sending. Same `<UUID:label>` token must be replaced with the same minted UUID (used for aggregation-ref ↔ aggregation pairing); distinct sentinels get distinct UUIDs.
+
+**Clause shape: opts always second, args after.** Every clause is `[op, {options}, ...args]`. Field refs are `["field", {options}, fieldId]` (id third), not the legacy MBQL 4 shape `["field", id, opts]`. The same rule holds for aggregations, filters, order-by — the options object never moves out of slot 1.
+
 ## MBQL 5 aggregations: name your output columns
 
-Default MBQL 5 aggregations materialize as `count`, `count_where`, `count_where_2`, `avg`, `avg_2`, `sum`, … — ugly when the result is a transform target. Pass `name` and `display-name` in the aggregation's options object to control them:
+Default MBQL 5 aggregations materialize as `count`, `count_where`, `count_where_2`, `avg`, `avg_2`, `sum`, … — ugly when the result is a transform target. Pass `name` and `display-name` in the aggregation's options object to control them. Mint 4 UUIDs (`metabase uuid --count 4 --json`) for the slots below before assembling:
 
 ```json
 ["count",
- {"lib/uuid": "...-1111", "name": "shipments_shipped", "display-name": "Shipments shipped"}]
+ {"lib/uuid": "<UUID:agg-shipped>", "name": "shipments_shipped", "display-name": "Shipments shipped"}]
 
 ["count-where",
- {"lib/uuid": "...-2222", "name": "shipments_delivered", "display-name": "Shipments delivered"},
- ["=", {"lib/uuid": "...-2222a"}, ["field", {"base-type": "type/Text", "lib/uuid": "...-2222b"}, 1779], "delivered"]]
+ {"lib/uuid": "<UUID:agg-delivered>", "name": "shipments_delivered", "display-name": "Shipments delivered"},
+ ["=", {"lib/uuid": "<UUID:eq-filter>"},
+  ["field", {"base-type": "type/Text", "lib/uuid": "<UUID:status-field>"}, 1779],
+  "delivered"]]
 ```
 
 The `name` value becomes the warehouse column name on the materialized table. The `display-name` is the column header in the UI.
 
 ## MBQL 5 order-by referencing an aggregation
 
-Order by an aggregation column with an `["aggregation", {…}, "<aggregation-uuid>"]` ref — the third arg is the **string UUID** of the target aggregation's `lib/uuid`, **not** its numeric position:
+Order by an aggregation column with an `["aggregation", {…}, "<aggregation-uuid>"]` ref — the third arg is the **string UUID** of the target aggregation's `lib/uuid`, **not** its numeric position. The aggregation's own `lib/uuid` and the ref's third element must be the same minted UUID (string equality); the order-by clause itself and the ref clause each carry their own separate `lib/uuid` in their options. Mint 3 UUIDs and substitute — note that `<UUID:agg-count>` appears twice and gets the same minted value:
 
 ```json
-"aggregation": [["count", {"lib/uuid": "agg-uuid-001"}]],
+"aggregation": [
+  ["count", {"lib/uuid": "<UUID:agg-count>"}]
+],
 "order-by": [
-  ["desc", {"lib/uuid": "..."},
-    ["aggregation", {"lib/uuid": "..."}, "agg-uuid-001"]]
+  ["desc", {"lib/uuid": "<UUID:order-desc>"},
+    ["aggregation", {"lib/uuid": "<UUID:agg-ref>"},
+     "<UUID:agg-count>"]]
 ]
 ```
 
-A numeric index (`["aggregation", {…}, 0]`) fails pre-flight with `must be string` at `/stages/0/order-by/0/2/2`.
+A numeric index (`["aggregation", {…}, 0]`) fails pre-flight with `must be the target aggregation's lib/uuid (string), not a numeric position` at `/stages/0/order-by/0/2/2`.
 
 ## Create + run (native SQL)
 

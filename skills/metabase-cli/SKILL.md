@@ -237,6 +237,26 @@ Exit codes: `0` valid + ran, `2` validation failed / malformed body, `1` server-
 
 **`--skip-validate`** is an escape hatch: bypasses the pre-flight and sends the body as-is. Use only when the bundled schema disagrees with what the server actually accepts (drift, false negative). Mutually exclusive with `--dry-run`. Same flag works on `metabase card create` and `metabase transform create / update`.
 
+**MBQL 5 clause shape — opts always second.** Every clause is `[op, {options}, ...args]`: options object is the **second** element, not the third. Field refs are `["field", {options}, fieldId]` (id third), not the legacy MBQL 4 shape `["field", id, opts]`. The same `[op, {options}, …]` rule applies to aggregations (`["count", {options}]`, `["sum", {options}, <expr>]`), filters (`["=", {options}, <a>, <b>]`), order-by (`["asc", {options}, <expr>]`), and every other clause. Slot-1 violations surface from `--dry-run` as `must be the field options object` / `must be the clause options object` at `/stages/0/<verb>/<n>/1`.
+
+### `uuid` — mint UUID v4 strings for `lib/uuid` slots
+
+```bash
+metabase uuid                          # one UUID, v4 from crypto.randomUUID
+metabase uuid --count 5                # five UUIDs (one per line in TTY, JSON when piped)
+metabase uuid --count 5 --json         # ["uuid1", "uuid2", …]
+```
+
+**Hard rule for agents: never generate, invent, hard-code, or reuse UUID values.** Always call `metabase uuid` for fresh UUIDs at the moment you need them. Do not copy UUIDs from documentation examples, prior conversations, prior queries you authored, or anywhere else — every `lib/uuid` slot gets a freshly-minted value. The bundled schema enforces RFC 4122 format strictly, so placeholder strings (`"a1"`, `"uuid-1"`, `"agg-uuid-001"`, …) fail pre-flight with `must be a UUID v4 (RFC 4122) — run \`metabase uuid\` …`. The same rule applies to native template-tag `id` fields, parameter ids, and any other `format: "uuid"` slot.
+
+Workflow when assembling an MBQL 5 body:
+
+1. Count the `lib/uuid` slots you need (one per clause options object, plus aggregation-ref ↔ aggregation pairings — those two share the same string).
+2. `metabase uuid --count <N> --json` — mint exactly that many in one call.
+3. Substitute each minted value into its slot as you build the JSON.
+
+Aggregation-ref pairing: the `["aggregation", {options}, "<uuid>"]` ref's third arg must equal the target aggregation's own `lib/uuid` (string equality). Mint the aggregation's `lib/uuid` once, then reuse that *same minted value* for the ref — that's the only legitimate "reuse" pattern, and it's intra-body, not across bodies or sessions.
+
 ### `card` — questions, models, metrics
 
 ```bash
@@ -269,7 +289,7 @@ metabase card archive <id> --profile <n>                    # soft-delete; not u
     "database": 2,
     "stages": [
       { "lib/type": "mbql.stage/mbql", "source-table": 190,
-        "aggregation": [["count", {"lib/uuid": "..."}]] }
+        "aggregation": [["count", {"lib/uuid": "<mint via `metabase uuid`>"}]] }
     ]
   },
   "visualization_settings": {}
@@ -307,14 +327,14 @@ A "dashcard" is a card placement on a dashboard — its own id, position (`row`/
 
 A dashcard's `visualization_settings` overrides the underlying card's — same key list as the `card` section above. Dashcards can additionally set `click_behavior` for cell-level navigation; see the `metabase-representation-format` skill's "Click Behavior" subsection for that schema.
 
-**`dashboard create` accepts `dashcards` and `tabs` in the body.** The create endpoint itself only sets dashboard metadata (name, description, collection, parameters); when the body carries `dashcards` or `tabs`, the CLI chains a `PUT /api/dashboard/:id` automatically and renders the hydrated `DashboardDetail` response. No second call needed. Use a negative id (`-1`, `-2`, …) for new dashcards.
+**`dashboard create` accepts `dashcards` and `tabs` in the body.** The create endpoint itself only sets dashboard metadata (name, description, collection, parameters); when the body carries `dashcards` or `tabs`, the CLI chains a `PUT /api/dashboard/:id` automatically and renders the hydrated dashboard back. The compact projection includes the resulting `dashcards` and `tabs` arrays (each entry projected to id / position / size / card_id / tab_id), so the agent can confirm the placements landed without a second call. Use `--full` to also see dashboard-level metadata (width, embedding flags, parameters, …). Use a negative id (`-1`, `-2`, …) for new dashcards.
 
 Two ways to edit dashcards:
 
 - **`dashboard update <id> --body { "dashcards": [...] }`** — replaces the entire dashcard set. IDs in the array are kept (and updated to the values you send); IDs **absent** are deleted server-side. Use a negative id (`-1`, `-2`, …) for cards the server should create. You must include every existing dashcard you want to preserve.
 - **`dashboard update-dashcard <dashboard-id> <dashcard-id>`** — patches a single dashcard's layout / settings without touching the others. Internally: GET dashboard → merge patch into the targeted dashcard → PUT the whole array. Safer than hand-rolling the full-array variant if you only meant to nudge one card.
 
-`dashboard list` is a thin filter helper (`--filter all|mine|archived`; default `all`). The list endpoint omits `dashcards` / `tabs` — use `dashboard get <id> --full` (or `dashboard cards <id>`) to inspect them.
+`dashboard list` is a thin filter helper (`--filter all|mine|archived`; default `all`). The list endpoint omits `dashcards` / `tabs`; `dashboard get <id>` includes them as compact projections, and `dashboard get <id> --full` (or `dashboard cards <id>`) gives the full hydrated form.
 
 Patch fields supported by `update-dashcard`:
 
