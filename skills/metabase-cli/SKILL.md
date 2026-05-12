@@ -120,6 +120,8 @@ List envelope shape:
 
 Use `jq '.data[] | { ... }'` to slice it. The compact item projection is the agent-facing contract — for full Metabase fields, add `--full`.
 
+`total` is best-effort and may be omitted or `null` — the server returns `null` for empty/permissions-filtered collections, and `--limit` early-stop omits it because the true total is unknown. Don't depend on it being a number; use `returned` for the count you actually got back and `data.length` for the rendered slice.
+
 ## Body input (create / update / run)
 
 Verbs that take a payload accept it from one of four sources, **first non-empty wins**:
@@ -174,32 +176,51 @@ The CLI exposes the Metabase REST API in 13 command groups beyond `auth` / `lice
 
 ### `db` (alias `database`) — list and inspect databases
 
+**Default agent traversal (granular, scales to real warehouses):**
+
 ```bash
-metabase database list --profile <n> --json
-metabase database list --include tables --profile <n> --full --json     # hydrate each db with its tables
+metabase database list --profile <n> --json                             # discover db ids
+metabase database schemas <db-id> --profile <n> --json                  # list schema names in one db
+metabase database schema-tables <db-id> <schema> --profile <n> --json   # tables in ONE schema (compact)
+metabase table get <table-id> --include fields --profile <n> --json     # fields for ONE table (see `table` section)
+```
+
+This is the path to use. A production Metabase typically has dozens of schemas, hundreds of tables, and dozens of fields per table — walking three levels and pulling one table's fields at a time keeps each response in the kilobytes. The rollup endpoints below pull megabytes and will blow the context window on any real warehouse.
+
+**Other commands:**
+
+```bash
 metabase database list --saved --profile <n> --json                     # include the Saved Questions virtual db (id -1337)
-metabase database get <db-id> --profile <n> --full --json
-metabase database get <db-id> --include tables.fields --profile <n> --full --json
-metabase database metadata <db-id> --profile <n> --full --json          # tables + fields rolled up in one call
-metabase database schemas <db-id> --profile <n> --json                  # list schema names
-metabase database schema-tables <db-id> <schema> --profile <n> --json   # tables in one schema
+metabase database get <db-id> --profile <n> --json                      # db record only (no tables)
 metabase database sync-schema <db-id> --profile <n>                     # POST /sync_schema; queues async work, returns {status:"ok"}
 metabase database rescan-values <db-id> --profile <n>                   # POST /rescan_values; queues async work, returns {status:"ok"}
 ```
 
-Mostly read-only. `database list` / `get` / `metadata` / `schemas` / `schema-tables` give you the `database_id` you need for `table list`, `card create`, `transform create`, etc. `database metadata` is the one-shot warehouse introspection — full hydrated tables and fields in one call. `sync-schema` / `rescan-values` are the two manual triggers admins reach for after warehouse-side changes; both queue work and return immediately.
+**Rollup commands — only on small/dev warehouses:**
+
+```bash
+metabase database list --include tables --profile <n> --full --json                    # every db with its full table list
+metabase database get <db-id> --include tables.fields --profile <n> --full --json      # one db, every table, every field
+metabase database metadata <db-id> --profile <n> --full --json                         # alias for the above, server-rolled
+```
+
+Reach for these only when you know the db is small (a seeded dev instance, a sample db, a freshly-bootstrapped test fixture) or when you genuinely need every column of every table in one shot. On a real warehouse the response will exceed the agent context — use the granular traversal instead.
+
+`sync-schema` / `rescan-values` are the two manual triggers admins reach for after warehouse-side changes; both queue work and return immediately.
 
 ### `table` — list and inspect tables
 
 ```bash
-metabase table list --db-id <db-id> --profile <n> --json
-metabase table get <table-id> --profile <n> --full --json    # bundles fields
+metabase table list --db-id <db-id> --profile <n> --json                # all tables in a db (compact, no fields)
+metabase table get <table-id> --profile <n> --json                      # table-level metadata only
+metabase table get <table-id> --include fields --profile <n> --json     # bundles compact-projected fields  ← default for field-listing
+metabase table fields <table-id> --profile <n> --json                   # just the fields, as a list envelope
+metabase table metadata <table-id> --profile <n> --json                 # fields + FKs + dimensions hydrated (heavier)
 ```
 
-To enumerate the schemas the parent already syncs for a database, prefer the dedicated command:
-```bash
-metabase database schemas <db-id> --profile <n> --json
-```
+`table get` hits `/api/table/:id` and never returns fields on its own — `--full` only widens the projection over the already-fetched object. Pass `--include fields` for the field shape needed to author a card, transform, or measure; the hydrated path goes through `/api/table/:id/query_metadata`. Use `table fields` when you want just the field array (no surrounding table metadata) and `table metadata` only when you also need FKs and dimensions hydrated.
+
+`table list --db-id <db-id>` returns every table across every schema as a flat compact list. On a real warehouse with hundreds of tables this is still smaller than `database get --include tables.fields`, but `database schema-tables <db-id> <schema>` is the right starting point when you know which schema you want.
 
 ### `field` — single field detail
 
@@ -207,7 +228,7 @@ metabase database schemas <db-id> --profile <n> --json
 metabase field get <field-id> --profile <n> --full --json
 ```
 
-No `list` — fields come bundled with `table get`.
+No `list` — fields are per-table, so use `table get <table-id> --include fields` (compact) or `table fields <table-id>` (list envelope). Never try to enumerate fields across an entire database — that's what blows up the context.
 
 ### `query` — run ad-hoc MBQL with pre-flight validation
 
@@ -328,6 +349,10 @@ A "dashcard" is a card placement on a dashboard — its own id, position (`row`/
 A dashcard's `visualization_settings` overrides the underlying card's — same key list as the `card` section above. Dashcards can additionally set `click_behavior` for cell-level navigation; see the `metabase-representation-format` skill's "Click Behavior" subsection for that schema.
 
 **`dashboard create` accepts `dashcards` and `tabs` in the body.** The create endpoint itself only sets dashboard metadata (name, description, collection, parameters); when the body carries `dashcards` or `tabs`, the CLI chains a `PUT /api/dashboard/:id` automatically and renders the hydrated dashboard back. The compact projection includes the resulting `dashcards` and `tabs` arrays (each entry projected to id / position / size / card_id / tab_id), so the agent can confirm the placements landed without a second call. Use `--full` to also see dashboard-level metadata (width, embedding flags, parameters, …). Use a negative id (`-1`, `-2`, …) for new dashcards.
+
+**Card-reference pre-flight on `dashboard create` / `dashboard update`.** Before either command sends anything, every positive `card_id` referenced from `dashcards` is checked against `GET /api/card/:id` in parallel (de-duplicated per id). Cards that don't exist, are archived, or aren't readable fail pre-flight: the CLI writes a `{ok:false, errors:[{path, message}]}` envelope to stdout (one entry per offending dashcard, `path` = JSON pointer like `/dashcards/3/card_id`) and exits **2** with `dashboard card-reference pre-flight failed: N error(s) — fix the dashcard card_id values listed above` on stderr. No dashboard is created or modified on a pre-flight miss — this is the contract that eliminates orphan dashboards from chained creates. The pre-flight is non-bypassable: it queries live server state (no bundled schema), so there is no `--skip-validate` escape hatch. If pre-flight rejects something you believe is valid, the input is stale — `card list --json` to confirm, then re-author.
+
+**Chained-PUT failures call out the orphan risk explicitly.** If the chained `PUT /api/dashboard/:id` fails after the `POST /api/dashboard` already created the row (rare with pre-flight, but possible on permission / 5xx / network mid-flight), the user-facing error becomes `dashboard <id> created but follow-up PUT /api/dashboard/<id> failed: <reason>; dashcards not applied`. Recovery: `metabase dashboard get <id>` to confirm the empty row, then either `dashboard update <id> --body '{"dashcards":[...]}'` to retry the dashcards, or `dashboard update <id> --body '{"archived":true}'` to archive the orphan. Split-into-two recipe for debugging: `dashboard create` with a metadata-only body, then `dashboard update <id>` with the `dashcards` array — isolates which leg of the chain is at fault.
 
 Two ways to edit dashcards:
 
