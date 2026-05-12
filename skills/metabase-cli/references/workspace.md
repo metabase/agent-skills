@@ -29,7 +29,7 @@ Do not skip this question — silently picking "no sync" loses the user's repo c
 
 ## Branch guard before `--repo`
 
-When the user picks a `--repo` option (current dir or custom path), check the host's branch before `workspace start`. `--repo` reads `git -C <path> symbolic-ref --short HEAD` and injects it as the workspace's `remote-sync-branch` setting; that branch then becomes the default target for every subsequent `sync import` and `sync export`. If the host is on `main` (or `master`), every export commits straight to it — usually not what the user wants for ephemeral workspace work.
+When the user picks a `--repo` option (current dir or custom path), check the host's branch before `workspace start`. `--repo` reads `git -C <path> symbolic-ref --short HEAD` and injects it as the workspace's `remote-sync-branch` setting; that branch then becomes the default target for every subsequent `remote-sync import` and `remote-sync export`. If the host is on `main` (or `master`), every export commits straight to it — usually not what the user wants for ephemeral workspace work.
 
 ```bash
 HOST_BRANCH=$(git -C <repo-path> symbolic-ref --short HEAD)
@@ -40,9 +40,9 @@ If `HOST_BRANCH` is `main` or `master`, ask the user via `AskUserQuestion`:
 > "The host repo is on `<branch>` — the workspace will track and export to that branch by default. Switch to a feature branch first?"
 > 1. **Create + checkout a feature branch on the host** — agent suggests a name (e.g., `agent/<task>`); run `git -C <repo-path> checkout -b <name>` then proceed with `workspace start --repo …` so the workspace tracks `<name>`.
 > 2. **Pin the workspace to a specific branch** — pass `--repo-branch <name>` on `workspace start` to override host HEAD. The branch must exist **locally** in the bind-mounted host repo before `workspace start` (create it first with `git -C <repo-path> branch <name>` or `git -C <repo-path> checkout -b <name>`); it does **not** need to exist on `origin`. Local-only branches are fine — the workspace never pushes, and the remote side gets created on the user's first `git push` later.
-> 3. **Proceed on `main`/`master`** — explicitly accepted; downstream `sync export` will commit to that branch unless overridden per-call.
+> 3. **Proceed on `main`/`master`** — explicitly accepted; downstream `remote-sync export` will commit to that branch unless overridden per-call.
 
-Skip this question only when the user's instructions already named the branch (e.g., they explicitly asked to work against `main`). The same guard applies later at `sync export` time — see `references/sync.md` "Branch guard".
+Skip this question only when the user's instructions already named the branch (e.g., they explicitly asked to work against `main`). The same guard applies later at `remote-sync export` time — see `references/remote-sync.md` "Branch guard".
 
 ## Quick start (copy-pasteable, end-to-end)
 
@@ -96,11 +96,11 @@ metabase database list --profile "$WS_NAME" --json
 
 # 6. (If REPO_FLAGS was set) Verify sync is wired:
 metabase setting get remote-sync-url --profile "$WS_NAME" --json    # → "file:///mnt/repo"
-metabase sync status --profile "$WS_NAME" --json                    # → branch, dirty, current task
+metabase remote-sync status --profile "$WS_NAME" --json                    # → branch, dirty, current task
 
 # 7. (If REPO_FLAGS was set) Ensure the repo has been applied to the fresh workspace.
 #    The container's boot-time auto-import usually handles this on its own, so check
-#    `sync status` first — if `current_task` already shows a successful `import` for
+#    `remote-sync status` first — if `current_task` already shows a successful `import` for
 #    the current branch, skip the explicit call (it's a no-op round-trip).
 #    Only when the auto-import hasn't landed yet do you need an explicit import.
 #    The first explicit import on a fresh instance can spuriously report
@@ -109,16 +109,16 @@ metabase sync status --profile "$WS_NAME" --json                    # → branch
 #    Skipping the import entirely is *not* safe — without it the instance has none
 #    of the repo content and subsequent edits will diverge.
 HOST_BRANCH=$(git -C "$(pwd)" symbolic-ref --short HEAD)
-SYNC_STATUS=$(metabase sync status --profile "$WS_NAME" --json)
+SYNC_STATUS=$(metabase remote-sync status --profile "$WS_NAME" --json)
 if ! echo "$SYNC_STATUS" | jq -e --arg b "$HOST_BRANCH" \
      '.current_task.sync_task_type == "import" and .current_task.status == "successful" and (.branch == $b)' >/dev/null; then
-  metabase sync import --branch "$HOST_BRANCH" --profile "$WS_NAME" --json \
-    || metabase sync import --branch "$HOST_BRANCH" --profile "$WS_NAME" --json \
-    || metabase sync import --branch "$HOST_BRANCH" --force --profile "$WS_NAME" --json
+  metabase remote-sync import --branch "$HOST_BRANCH" --profile "$WS_NAME" --json \
+    || metabase remote-sync import --branch "$HOST_BRANCH" --profile "$WS_NAME" --json \
+    || metabase remote-sync import --branch "$HOST_BRANCH" --force --profile "$WS_NAME" --json
 fi
 ```
 
-After step 5, drive the child via `metabase <verb> --profile $WS_NAME` for everything (cards, transforms, queries, …). To author a transform on the workspace, see `references/transform.md`. To use the sync flow (import host commits, export instance changes), see `references/sync.md`.
+After step 5, drive the child via `metabase <verb> --profile $WS_NAME` for everything (cards, transforms, queries, …). To author a transform on the workspace, see `references/transform.md`. To use the sync flow (import host commits, export instance changes), see `references/remote-sync.md`.
 
 ## Setup (steps in order)
 
@@ -248,7 +248,7 @@ metabase workspace start <ws-id> --repo /path/to/repo --repo-branch dev --repo-m
 - The host path must be a directory and must already exist. The CLI does not create or initialize a git repo for you.
 - For `--repo-branch` auto-detection, the path needs to be a git repo (a `.git/` ancestor); otherwise pass `--repo-branch` explicitly.
 - The `--repo-branch` value must name a branch that already exists **locally** in the host repo. Local-only branches (never pushed to `origin`) are fine — the workspace operates against the bind-mounted working tree, never pushes anywhere itself, and the remote side is created on the user's first `git push` later. If the branch doesn't exist locally yet, create it before `workspace start`: `git -C <repo-path> branch <name>` (or `checkout -b <name>` if you also want to switch HEAD).
-- File-permission gotcha (Linux only): the Metabase container runs as uid 2000 by default; the host directory must be writable by that uid for `sync export` to succeed. macOS Docker Desktop / OrbStack / Colima handle this via their file-sharing layer.
+- File-permission gotcha (Linux only): the Metabase container runs as uid 2000 by default; the host directory must be writable by that uid for `remote-sync export` to succeed. macOS Docker Desktop / OrbStack / Colima handle this via their file-sharing layer.
 
 ## Interact with a running workspace
 
@@ -383,9 +383,9 @@ metabase workspace list --profile <parent> --full --json \
 
 You opened the URL before health passed and walked through the wizard, which created a fresh app db and bypassed the workspace bring-up. `metabase workspace remove <ws-id> --yes --profile <parent>` then `start --wait` again. Don't open the URL before `state: "running"`.
 
-### `git status` on the host shows confusing "staged changes" after `sync export`
+### `git status` on the host shows confusing "staged changes" after `remote-sync export`
 
-The in-container exporter writes the new commit object directly into the bind-mounted `.git/` and advances HEAD, but does not update the host's working tree or index. The host then shows the export's content as "Changes to be committed" reverting to the prior commit — display artifact, not a real revert. The non-destructive realignment is `git -C <repo> restore --staged --worktree .` (only touches paths that disagree with HEAD; refuses on unmerged paths; does not move HEAD). See `references/sync.md` "Working-tree drift on `--repo` bind-mount workspaces" for the full decision tree (when to stash first, when `reset --hard` is acceptable).
+The in-container exporter writes the new commit object directly into the bind-mounted `.git/` and advances HEAD, but does not update the host's working tree or index. The host then shows the export's content as "Changes to be committed" reverting to the prior commit — display artifact, not a real revert. The non-destructive realignment is `git -C <repo> restore --staged --worktree .` (only touches paths that disagree with HEAD; refuses on unmerged paths; does not move HEAD). See `references/remote-sync.md` "Working-tree drift on `--repo` bind-mount workspaces" for the full decision tree (when to stash first, when `reset --hard` is acceptable).
 
 ## Don't (workspace-specific)
 

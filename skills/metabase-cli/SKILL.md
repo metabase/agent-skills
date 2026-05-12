@@ -12,7 +12,7 @@ Top-level command groups (run `metabase <group> --help` to discover verbs):
 
 ```
 auth | license | db | table | field | query | card | dashboard | snippet | segment | measure | collection | transform | transform-job
-setting | search | sync | workspace | setup | api-key | eid
+setting | search | remote-sync | workspace | setup | api-key | eid
 ```
 
 The general patterns below — auth, flag conventions, output flags, body input, common verb shapes — apply across **every** group. Two flows have enough surface to warrant their own reference files; load them on demand (see "Reference files" near the bottom).
@@ -216,19 +216,33 @@ metabase table get <table-id> --profile <n> --json                      # table-
 metabase table get <table-id> --include fields --profile <n> --json     # bundles compact-projected fields  ← default for field-listing
 metabase table fields <table-id> --profile <n> --json                   # just the fields, as a list envelope
 metabase table metadata <table-id> --profile <n> --json                 # fields + FKs + dimensions hydrated (heavier)
+metabase table update <table-id> --body '{"display_name":"Customers"}' --profile <n> --json
 ```
 
 `table get` hits `/api/table/:id` and never returns fields on its own — `--full` only widens the projection over the already-fetched object. Pass `--include fields` for the field shape needed to author a card, transform, or measure; the hydrated path goes through `/api/table/:id/query_metadata`. Use `table fields` when you want just the field array (no surrounding table metadata) and `table metadata` only when you also need FKs and dimensions hydrated.
 
 `table list --db-id <db-id>` returns every table across every schema as a flat compact list. On a real warehouse with hundreds of tables this is still smaller than `database get --include tables.fields`, but `database schema-tables <db-id> <schema>` is the right starting point when you know which schema you want.
 
-### `field` — single field detail
+`table update <id>` patches table-level metadata only — `display_name`, `description`, `caveats`, `points_of_interest`, `entity_type`, `visibility_type` (`normal`/`hidden`/`details-only`/`technical`/`cruft`), `field_order` (`alphabetical`/`custom`/`database`/`smart`), `show_in_getting_started`. Only the keys you send are touched. The underlying physical schema (the columns themselves) is not editable here — that's the warehouse's responsibility.
+
+### `field` — inspect a single field, edit metadata, peek at distinct values
 
 ```bash
-metabase field get <field-id> --profile <n> --full --json
+metabase field get     <field-id> --profile <n> --full --json
+metabase field values  <field-id> --profile <n> --json                       # cached distinct values (FieldValues)
+metabase field summary <field-id> --profile <n> --json                       # {field_id, count, distincts} — live from the warehouse
+metabase field update  <field-id> --body '{"semantic_type":"type/Email"}'   --profile <n> --json
+metabase field update  <field-id> --body '{"fk_target_field_id":<other-id>}' --profile <n> --json
+metabase field update  <field-id> --body '{"description":"customer email"}'  --profile <n> --json
 ```
 
 No `list` — fields are per-table, so use `table get <table-id> --include fields` (compact) or `table fields <table-id>` (list envelope). Never try to enumerate fields across an entire database — that's what blows up the context.
+
+`field update` patches metadata only — `display_name`, `description`, `caveats`, `points_of_interest`, `semantic_type` (Metabase type hierarchy: `type/Email`, `type/Category`, `type/PK`, `type/FK`, …), `coercion_strategy`, `fk_target_field_id` (the foreign-key target field), `visibility_type` (`normal`/`hidden`/`details-only`/`sensitive`/`retired`), `has_field_values` (`list`/`search`/`none`/`auto-list`), `settings`, `nfc_path`, `json_unfolding`. Only the keys you send are touched. `base_type` is not editable — that's the column's type as the warehouse reports it.
+
+`field values` returns the *cached* distinct values populated by the most recent field-values scan (`metabase db rescan-values <db-id>` triggers a refresh). Useful when authoring a filter and you need the closed set of categorical values. Returns `{values, field_id, has_more_values, has_field_values}` — `has_more_values: true` means the cache was truncated; consider widening the cap server-side rather than treating the snapshot as exhaustive.
+
+`field summary` returns `{field_id, count, distincts}` — cardinality straight from the warehouse, not the cache. Cheap pre-flight when deciding whether a column makes sense as a `list`-widget filter (low cardinality) or a `search` widget (high cardinality), and a quick way to spot a field that's effectively constant before you build a card around it.
 
 ### `query` — run ad-hoc MBQL with pre-flight validation
 
@@ -240,11 +254,11 @@ metabase query --file q.json --profile <n> --json               # validate + run
 
 The canonical agent-side path for ad-hoc MBQL. Three modes:
 
-- `--print-schema` — emits `{ mode, schema, defs }` where `defs` carries `id.yaml` / `parameter.yaml` / `ref.yaml` / `temporal_bucketing.yaml` keyed by the path used in the schema's `$ref`s. Use this **first** when authoring a non-trivial query — it's cheaper than guess-and-fail.
+- `--print-schema` — emits `{ schema, defs }` where `defs` carries `id.yaml` / `parameter.yaml` / `ref.yaml` / `temporal_bucketing.yaml` keyed by the path used in the schema's `$ref`s. Use this **first** when authoring a non-trivial query — it's cheaper than guess-and-fail.
 - `--dry-run` — validates and emits `{ ok, errors: [{path, message}] }`. Exit 0 if valid, 2 if not. No request sent.
 - run (no flag) — validates, then on success runs the query. On validation failure: same envelope on stdout, exit 2, **never sends** the request.
 
-Two MBQL flavors. Default is **internal** (numeric IDs: `database: 1`, `source-table: 7`). Pass `--external` for string-FK form (`database: "My DB"`, `source-table: ["My DB", null, "orders"]`). `--print-schema` defaults to internal too; pair with `--external` for the FK-form schema.
+MBQL 5 bodies use numeric IDs (`database: 1`, `source-table: 7`) and POST to `/api/dataset`. The bundled schema's `id.yaml` is overridden to require positive integers for every ID `$def`.
 
 Validation error envelope (same shape across `query`, `card create`, `transform create/update`):
 
@@ -256,7 +270,9 @@ Validation error envelope (same shape across `query`, `card create`, `transform 
 
 Exit codes: `0` valid + ran, `2` validation failed / malformed body, `1` server-side error after a valid pre-flight.
 
-**`--skip-validate`** is an escape hatch: bypasses the pre-flight and sends the body as-is. Use only when the bundled schema disagrees with what the server actually accepts (drift, false negative). Mutually exclusive with `--dry-run`. Same flag works on `metabase card create` and `metabase transform create / update`.
+**Any non-MBQL 5 body skips pre-flight automatically.** Legacy MBQL 4 (`{type:"query", database:N, query:{source-table:T, …}}`), legacy native (`{type:"native", database:N, native:{query:"…"}}`), and any other shape that doesn't carry `lib/type:"mbql/query"` are accepted by `/api/dataset` as-is and normalized server-side by `lib-be/normalize-query` (the same normalizer that backs `card create` / `transform create`, so behavior is symmetric across endpoints). The bundled schema only models MBQL 5; the CLI skips validation for the rest. Just `metabase query --file probe.json` works for ad-hoc native SQL or legacy MBQL 4 probes; no `--skip-validate` needed. `--dry-run` on a non-MBQL 5 body returns `{ ok: true, errors: [] }`. The double-wrap footgun (`{type:"query", query:{lib/type:"mbql/query",…}}`) is still rejected with a `ConfigError` before send.
+
+**`--skip-validate`** is the escape hatch for MBQL 5 bodies: bypasses the pre-flight and sends the body as-is. Use only when the bundled schema disagrees with what the server actually accepts (drift, false negative). Mutually exclusive with `--dry-run`. Same flag works on `metabase card create` and `metabase transform create / update`.
 
 **MBQL 5 clause shape — opts always second.** Every clause is `[op, {options}, ...args]`: options object is the **second** element, not the third. Field refs are `["field", {options}, fieldId]` (id third), not the legacy MBQL 4 shape `["field", id, opts]`. The same `[op, {options}, …]` rule applies to aggregations (`["count", {options}]`, `["sum", {options}, <expr>]`), filters (`["=", {options}, <a>, <b>]`), order-by (`["asc", {options}, <expr>]`), and every other clause. Slot-1 violations surface from `--dry-run` as `must be the field options object` / `must be the clause options object` at `/stages/0/<verb>/<n>/1`.
 
@@ -463,7 +479,7 @@ metabase transform-job list --profile <n> --json
 
 **MBQL 5 pre-flight on `transform create` / `update`:** when `source.query` has `lib/type: "mbql/query"`, it's validated against the same schema as `metabase query` before sending; failures exit 2 with the standard `{ ok, errors }` envelope on stdout. Legacy `source.query` shapes and Python sources skip pre-flight. Pass `--skip-validate` to bypass.
 
-**Iterate via `transform update`, not re-`create`.** When a `transform run` fails and you want to retry with a fixed body, patch the existing transform with `transform update <id> --file new-body.json` rather than `transform delete <id>` + `transform create`. Update keeps the same row, `entity_id`, materialized table, and on-disk YAML filename — `sync export` produces one clean commit, and you avoid the `_2` suffix the YAML serializer mints when two same-named transforms exist on disk. See `references/transform.md` "Iterating on a failing transform".
+**Iterate via `transform update`, not re-`create`.** When a `transform run` fails and you want to retry with a fixed body, patch the existing transform with `transform update <id> --file new-body.json` rather than `transform delete <id>` + `transform create`. Update keeps the same row, `entity_id`, materialized table, and on-disk YAML filename — `remote-sync export` produces one clean commit, and you avoid the `_2` suffix the YAML serializer mints when two same-named transforms exist on disk. See `references/transform.md` "Iterating on a failing transform".
 
 For the body shape, run-with-wait pattern, schedule authoring, and inspection see `references/transform.md`.
 
@@ -477,7 +493,7 @@ metabase setting set <key> --body '"<string-value>"' --profile <n>  # value pars
 
 The value is parsed as strict JSON: a string setting is `'"value"'` (note the inner double quotes), not `value`. Booleans are `true` / `false`, numbers bare. Wrong quoting silently produces a parse error — confirm with `setting get <key>` after.
 
-**`setting get --json` works on every value type.** String-valued settings (e.g., `remote-sync-branch=agent/shipments-analysis`, `remote-sync-url=file:///mnt/repo`) come back from `/api/setting/<key>` as bare text rather than a JSON-quoted string; the CLI sniffs the response Content-Type and wraps bare text into the `{key, value}` envelope so `--json` is uniform. The same fix applies to `sync status --json` (which reads `remote-sync-branch` internally).
+**`setting get --json` works on every value type.** String-valued settings (e.g., `remote-sync-branch=agent/shipments-analysis`, `remote-sync-url=file:///mnt/repo`) come back from `/api/setting/<key>` as bare text rather than a JSON-quoted string; the CLI sniffs the response Content-Type and wraps bare text into the `{key, value}` envelope so `--json` is uniform. The same fix applies to `remote-sync status --json` (which reads `remote-sync-branch` internally).
 
 ### `search` — content search across types
 
@@ -490,16 +506,16 @@ metabase search "orders" --table-db-id <db-id> --profile <n> --json
 
 `--models` filters: `card,dataset,metric,dashboard,collection,database,table,segment,measure,snippet,document,action,transform,indexed-entity`. For plain enumeration / inspection of cards, dashboards, or collections, prefer the dedicated `card list` / `dashboard list` / `collection list` verbs above; reach for `search --models <kind>` only when you need ranking against a query string or a cross-resource lookup.
 
-### `sync` — remote-sync (representations ↔ instance)
+### `remote-sync` — remote-sync (representations ↔ instance)
 
 ```bash
-metabase sync status   --profile <n> --json
-metabase sync import   --branch <branch> --profile <n>     # --wait is the default
-metabase sync export   -m "commit message" --profile <n>
-metabase sync branches --profile <n> --json
+metabase remote-sync status   --profile <n> --json
+metabase remote-sync import   --branch <branch> --profile <n>     # --wait is the default
+metabase remote-sync export   -m "commit message" --profile <n>
+metabase remote-sync branches --profile <n> --json
 ```
 
-14 verbs (status / is-dirty / has-remote-changes / dirty / current-task / cancel-task / wait / import / export / stash / branches / create-branch / add-collection / remove-collection). Both `import --force` and `export --force` are **lossy** — confirm with the user before either. `add-collection <id>` / `remove-collection <id>` toggle a collection's `is_remote_synced` and cascade to descendants by location prefix; the server rejects them in the default read-only mode (`metabase setting set remote-sync-type '"read-write"'` first). For the dirty-check workflow, stash semantics, and the full collection-toggle prerequisites, see `references/sync.md`.
+14 verbs (status / is-dirty / has-remote-changes / dirty / current-task / cancel-task / wait / import / export / stash / branches / create-branch / add-collection / remove-collection). Both `import --force` and `export --force` are **lossy** — confirm with the user before either. `add-collection <id>` / `remove-collection <id>` toggle a collection's `is_remote_synced` and cascade to descendants by location prefix; the server rejects them in the default read-only mode (`metabase setting set remote-sync-type '"read-write"'` first). For the dirty-check workflow, stash semantics, and the full collection-toggle prerequisites, see `references/remote-sync.md`.
 
 ### `workspace` — Enterprise workspaces (parent-side + local child)
 
@@ -531,13 +547,13 @@ Walks the `/api/setup` endpoint with a default user. **Don't run this against an
 
 ## Reference files (load on demand)
 
-The main SKILL.md is enough for any single-command task. Specialized flows live in `references/`. **Read the relevant file proactively when the user's intent matches** — don't wing the workspace lifecycle, transform body, or sync workflow from this overview alone.
+The main SKILL.md is enough for any single-command task. Specialized flows live in `references/`. **Read the relevant file proactively when the user's intent matches** — don't wing the workspace lifecycle, transform body, or remote-sync workflow from this overview alone.
 
 | Read this file            | When the user's intent matches                                                                        |
 | ------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `references/workspace.md` | "spin up a workspace", "provision", "start a local Metabase against my prod", anything `metabase workspace …`. **Mandatory** before running `workspace start` — it tells you to ask the user about Remote Sync (current dir / custom path / none) up front, since the bind mount can only be set at container create. |
 | `references/transform.md` | "create a transform", "run a transform", authoring transform body JSON, run inspection                |
-| `references/sync.md`      | "import the latest changes", "export to git", "remote sync", "dirty check", "stash before pulling"   |
+| `references/remote-sync.md` | "import the latest changes", "export to git", "remote sync", "dirty check", "stash before pulling"  |
 
 If a task spans more than one (e.g., "spin up `my_ws`, sync transforms from `main`, run them"), read each. Reference files assume you've internalized the general flag conventions above and won't repeat them.
 

@@ -173,7 +173,7 @@ metabase transform get <id> --full --profile <name> --json \
 
 When `transform run` fails and you want to retry with a fixed body, **prefer `transform update <id> --file body.json` over `transform delete <id>` + `transform create`.** Update keeps the same row, the same `entity_id`, the same materialized table, and the same on-disk YAML filename. Concretely this means:
 
-- `sync export` produces **one** clean commit containing only the fix, instead of "broken transform" + "remove broken transform" landing as two commits in `git log`.
+- `remote-sync export` produces **one** clean commit containing only the fix, instead of "broken transform" + "remove broken transform" landing as two commits in `git log`.
 - You don't have to chase `_2` suffixes minted when two YAMLs share a `name` on disk (see the `transform create` notes above).
 - The materialized output table either updates in place or, if the SELECT shape changed incompatibly, errors loudly on the next run rather than landing in a parallel `..._2` table the agent has to clean up. (`transform delete-table <id>` resets the column shape if you need a clean slate.)
 
@@ -197,7 +197,7 @@ metabase transform update "$ID" --file /tmp/source-patch.json --profile <n> --js
 metabase transform run "$ID" --wait --profile <n> --json     # → succeeded
 ```
 
-If you really must `create + delete` instead, do the `delete` **before** the first `sync export` so the failed entity never lands in git history. Order matters: agents reflex to "export to checkpoint progress," but for transforms an export of a soft-failed state is mostly noise that needs a follow-up cleanup commit. See `references/sync.md` "Read state before mutating" for the ordering rule.
+If you really must `create + delete` instead, do the `delete` **before** the first `remote-sync export` so the failed entity never lands in git history. Order matters: agents reflex to "export to checkpoint progress," but for transforms an export of a soft-failed state is mostly noise that needs a follow-up cleanup commit. See `references/remote-sync.md` "Read state before mutating" for the ordering rule.
 
 ## Drop the materialized table (keep the transform)
 
