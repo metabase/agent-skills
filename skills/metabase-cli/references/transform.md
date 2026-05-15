@@ -11,17 +11,17 @@ A transform has two halves:
 - `source` — the query to run (`type: "query"`, with `query.type` of `native` or `mbql`).
 - `target` — the warehouse destination (`type: "table"`, with `database`, `schema`, `name`).
 
-Native SQL is the simplest source and the easiest to author by hand. MBQL is what the Metabase UI emits and is much more verbose; pull a sample with `metabase transform get <id> --full --json` if you need its shape.
+Native SQL is the simplest source and the easiest to author by hand. MBQL is what the Metabase UI emits and is much more verbose; pull a sample with `mb transform get <id> --full --json` if you need its shape.
 
-If `source.query` is **MBQL 5** (`lib/type: "mbql/query"`), `transform create` and `transform update` validate it against the bundled query schema before sending; failure exits 2 with `{ ok, errors: [{path, message}] }` on stdout. To author MBQL 5 by hand: fetch the schema via `metabase query --print-schema --profile <n>`, iterate the body with `metabase query --file q.json --dry-run --profile <n>` until `ok: true`, then drop it into `source.query`. Legacy MBQL 4 and native sources skip pre-flight. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority — useful when the bundled schema disagrees with what the server actually accepts.
+If `source.query` is **MBQL 5** (`lib/type: "mbql/query"`), `transform create` and `transform update` validate it against the bundled query schema before sending; failure exits 2 with `{ ok, errors: [{path, message}] }` on stdout. To author MBQL 5 by hand: fetch the schema via `mb query --print-schema --profile <n>`, iterate the body with `mb query --file q.json --dry-run --profile <n>` until `ok: true`, then drop it into `source.query`. Legacy MBQL 4 and native sources skip pre-flight. Pass `--skip-validate` to bypass the pre-flight and let the server be the authority — useful when the bundled schema disagrees with what the server actually accepts.
 
-**Mint UUIDs for `lib/uuid` slots before assembling the body — never invent, hard-code, or reuse them.** Every clause options object carries a `lib/uuid` (UUID v4); the bundled schema enforces RFC 4122 format strictly, so placeholder strings fail `--dry-run`. Workflow: count the slots, run `metabase uuid --count <N> --json`, substitute each minted value into its slot. The examples below use `<UUID:label>` sentinels (NOT valid UUIDs) so the assembly step is unambiguous — replace each sentinel with a freshly-minted UUID before sending. Same `<UUID:label>` token must be replaced with the same minted UUID (used for aggregation-ref ↔ aggregation pairing); distinct sentinels get distinct UUIDs.
+**Mint UUIDs for `lib/uuid` slots before assembling the body — never invent, hard-code, or reuse them.** Every clause options object carries a `lib/uuid` (UUID v4); the bundled schema enforces RFC 4122 format strictly, so placeholder strings fail `--dry-run`. Workflow: count the slots, run `mb uuid --count <N> --json`, substitute each minted value into its slot. The examples below use `<UUID:label>` sentinels (NOT valid UUIDs) so the assembly step is unambiguous — replace each sentinel with a freshly-minted UUID before sending. Same `<UUID:label>` token must be replaced with the same minted UUID (used for aggregation-ref ↔ aggregation pairing); distinct sentinels get distinct UUIDs.
 
 **Clause shape: opts always second, args after.** Every clause is `[op, {options}, ...args]`. Field refs are `["field", {options}, fieldId]` (id third), not the legacy MBQL 4 shape `["field", id, opts]`. The same rule holds for aggregations, filters, order-by — the options object never moves out of slot 1.
 
 ## MBQL 5 aggregations: name your output columns
 
-Default MBQL 5 aggregations materialize as `count`, `count_where`, `count_where_2`, `avg`, `avg_2`, `sum`, … — ugly when the result is a transform target. Pass `name` and `display-name` in the aggregation's options object to control them. Mint 4 UUIDs (`metabase uuid --count 4 --json`) for the slots below before assembling:
+Default MBQL 5 aggregations materialize as `count`, `count_where`, `count_where_2`, `avg`, `avg_2`, `sum`, … — ugly when the result is a transform target. Pass `name` and `display-name` in the aggregation's options object to control them. Mint 4 UUIDs (`mb uuid --count 4 --json`) for the slots below before assembling:
 
 ```json
 ["count",
@@ -79,12 +79,12 @@ cat > /tmp/transform.json <<'EOF'
 }
 EOF
 
-TRANSFORM_ID=$(metabase transform create --file /tmp/transform.json --profile <name> --json | jq -r '.id')
-metabase transform run "$TRANSFORM_ID" --wait --profile <name> --json
+TRANSFORM_ID=$(mb transform create --file /tmp/transform.json --profile <name> --json | jq -r '.id')
+mb transform run "$TRANSFORM_ID" --wait --profile <name> --json
 ```
 
 Notes:
-- `<db-id>` comes from `metabase database list --profile <name> --json`. Database ids are per-instance — a workspace child re-numbers them independently of the parent.
+- `<db-id>` comes from `mb database list --profile <name> --json`. Database ids are per-instance — a workspace child re-numbers them independently of the parent.
 - Target `schema` is the **canonical** name (e.g. `public`). In a workspace, the QP rewrites it to the per-workspace isolation schema (`mb__isolation_<hash>_<ws-id>`) at execution time — don't hard-code that prefix.
 - `--wait` on `transform run` polls until status is `succeeded` or `failed`. Without it you only get `{message: "Transform run started", run_id, final: null}` and have to poll yourself.
 - The `--json` envelope is shape-stable: `{message, run_id, final}`. `final` is always present — `null` when `--wait` is omitted or the run never started, otherwise a full `TransformRun` object with `status` and `message`. On a failed run (`final.status` ∈ {`failed`, `timeout`, `canceled`}) the CLI exits 1 and writes a one-line summary `transform run <id> failed` to stderr; the failure detail lives only in `final.message` on stdout, so `jq -r '.final.message'` is where to look.
@@ -95,24 +95,24 @@ Notes:
 ## Inspect
 
 ```bash
-metabase transform list --profile <name> --json
-metabase transform get <id> --profile <name> --full --json     # full transform incl. last run summary
+mb transform list --profile <name> --json
+mb transform get <id> --profile <name> --full --json     # full transform incl. last run summary
 ```
 
-After a run, the materialized table is queryable via `metabase` (`card create` against it, native query against `<schema>.<name>`, etc.). Columns and types are inferred from the result set; if you change the SELECT shape, drop the table first or the next run will fail on a column-mismatch error.
+After a run, the materialized table is queryable via `mb` (`card create` against it, native query against `<schema>.<name>`, etc.). Columns and types are inferred from the result set; if you change the SELECT shape, drop the table first or the next run will fail on a column-mismatch error.
 
 ## Inspect runs and cancel an in-flight run
 
 ```bash
 # Recent runs across all transforms (drains all pages by default; cap with --limit):
-metabase transform runs --profile <name> --json
-metabase transform runs --transform-id <id> --limit 10 --profile <name> --json
+mb transform runs --profile <name> --json
+mb transform runs --transform-id <id> --limit 10 --profile <name> --json
 
 # Fetch one run by RUN id (NOT transform id — the run id comes from `transform run` or `transform runs`):
-metabase transform get-run <run-id> --profile <name> --json
+mb transform get-run <run-id> --profile <name> --json
 
 # Cancel the currently-running run for a transform:
-metabase transform cancel <id> --profile <name> --json
+mb transform cancel <id> --profile <name> --json
 ```
 
 Notes:
@@ -146,7 +146,7 @@ Right shape — patch only what changes:
 
 ```bash
 # Rename only:
-metabase transform update <id> --body '{"name":"renamed"}' --profile <name> --json
+mb transform update <id> --body '{"name":"renamed"}' --profile <name> --json
 
 # Rewrite the SQL only:
 cat > /tmp/patch.json <<'EOF'
@@ -154,16 +154,16 @@ cat > /tmp/patch.json <<'EOF'
     "database": <db-id>,
     "native": { "query": "SELECT … FROM public.orders" } } } }
 EOF
-metabase transform update <id> --file /tmp/patch.json --profile <name> --json
+mb transform update <id> --file /tmp/patch.json --profile <name> --json
 
 # Change tag membership (note: tag_ids, not tags):
-metabase transform update <id> --body '{"tag_ids":[1,3]}' --profile <name> --json
+mb transform update <id> --body '{"tag_ids":[1,3]}' --profile <name> --json
 ```
 
 If you really must round-trip, project to the writable subset:
 
 ```bash
-metabase transform get <id> --full --profile <name> --json \
+mb transform get <id> --full --profile <name> --json \
   | jq '{name, description, source, target, run_trigger, tag_ids, collection_id, owner_user_id, owner_email}
         | with_entries(select(.value != null))' \
   > /tmp/patch.json
@@ -181,8 +181,8 @@ Recipe:
 
 ```bash
 # 1. Try once
-ID=$(metabase transform create --file /tmp/t.json --profile <n> --json | jq -r '.id')
-metabase transform run "$ID" --wait --profile <n> --json     # → failed
+ID=$(mb transform create --file /tmp/t.json --profile <n> --json | jq -r '.id')
+mb transform run "$ID" --wait --profile <n> --json     # → failed
 
 # 2. Fix the body in place; PATCH only what changed.
 #    Source-only patch — keeps name, target, tags untouched on the server.
@@ -191,10 +191,10 @@ cat > /tmp/source-patch.json <<'EOF'
     "database": <db-id>,
     "native": { "query": "<fixed SQL here>" } } } }
 EOF
-metabase transform update "$ID" --file /tmp/source-patch.json --profile <n> --json
+mb transform update "$ID" --file /tmp/source-patch.json --profile <n> --json
 
 # 3. Re-run
-metabase transform run "$ID" --wait --profile <n> --json     # → succeeded
+mb transform run "$ID" --wait --profile <n> --json     # → succeeded
 ```
 
 If you really must `create + delete` instead, do the `delete` **before** the first `remote-sync export` so the failed entity never lands in git history. Order matters: agents reflex to "export to checkpoint progress," but for transforms an export of a soft-failed state is mostly noise that needs a follow-up cleanup commit. See `references/remote-sync.md` "Read state before mutating" for the ordering rule.
@@ -202,7 +202,7 @@ If you really must `create + delete` instead, do the `delete` **before** the fir
 ## Drop the materialized table (keep the transform)
 
 ```bash
-metabase transform delete-table <id> --yes --profile <name>
+mb transform delete-table <id> --yes --profile <name>
 ```
 
 Useful when you've changed the SELECT and want a fresh `CREATE TABLE` on the next run. **`--yes` is required** in non-interactive contexts; without it the command exits with `--yes required to delete non-interactively`.
@@ -210,18 +210,18 @@ Useful when you've changed the SELECT and want a fresh `CREATE TABLE` on the nex
 ## Delete the transform
 
 ```bash
-metabase transform delete <id> --yes --profile <name>
+mb transform delete <id> --yes --profile <name>
 ```
 
-Removes the definition. Whether the materialized table is dropped depends on the server — check with `metabase table list --db-id <db-id> --profile <name> --json` if it matters. Same `--yes` rule as `delete-table`.
+Removes the definition. Whether the materialized table is dropped depends on the server — check with `mb table list --db-id <db-id> --profile <name> --json` if it matters. Same `--yes` rule as `delete-table`.
 
 ## Transform jobs (schedules)
 
-A schedule lives in a separate resource (`transform-job`) and references one or more transform ids. Create with the same body-input pattern (`--file body.json`); see `metabase transform-job --help` for the verb list. Most ad-hoc agent work is one-off `transform run`, not job authoring.
+A schedule lives in a separate resource (`transform-job`) and references one or more transform ids. Create with the same body-input pattern (`--file body.json`); see `mb transform-job --help` for the verb list. Most ad-hoc agent work is one-off `transform run`, not job authoring.
 
 ## Don't (transform-specific)
 
 - Don't put `transform run` calls in tight polling loops — pass `--wait` and let the CLI handle the polling. Manual loops without `--wait` will hammer the server.
-- Don't author MBQL 4 (the legacy nested `{ type: "query", query: {...} }` shape) by hand — pull a sample with `metabase transform get <id> --full --json`. MBQL 5 (`lib/type: "mbql/query"`) **is** authorable by hand thanks to the `metabase query --print-schema` + `--dry-run` feedback loop; for non-trivial pipelines you may still prefer building in the UI and exporting.
+- Don't author MBQL 4 (the legacy nested `{ type: "query", query: {...} }` shape) by hand — pull a sample with `mb transform get <id> --full --json`. MBQL 5 (`lib/type: "mbql/query"`) **is** authorable by hand thanks to the `mb query --print-schema` + `--dry-run` feedback loop; for non-trivial pipelines you may still prefer building in the UI and exporting.
 - Don't write the workspace isolation schema into `target.schema` or SQL. See `workspace.md` for the canonical-name rule.
 - Don't paste a `transform get` body into `transform update` — the PUT endpoint only accepts writable keys, and unknown keys (notably `tags`, `source_type`, `entity_id`, `created_at`, `last_run`) leak as raw SQL errors. See "Update body: send only writable keys" above. Use `tag_ids` (not `tags`) on the REST contract.
