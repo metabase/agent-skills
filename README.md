@@ -24,7 +24,9 @@ Always review and validate the changes made by a skill. Depending on your applic
 
 [metabase-cli](./skills/metabase-cli/SKILL.md)
 
-Drives a Metabase instance from the terminal via the official `metabase` CLI: authenticate with profiles, list/get/create/update/delete cards, dashboards, transforms, databases, settings, run queries, search content, sync content to and from a remote git repo, manage Enterprise workspaces, translate entity ids. Bundles workspace lifecycle and transform authoring as on-demand reference files.
+Drives a Metabase instance from the terminal via the official `mb` CLI — every Metabase resource through one command surface.
+
+This skill is a thin discovery stub; the workflow content lives in [`@metabase/cli`](https://www.npmjs.com/package/@metabase/cli) and is served at runtime by `mb skills get`. Install the CLI (`npm i -g @metabase/cli`) and the skill resolves the rest. The same skill is also available as a Claude Code plugin direct from the CLI repo (`/plugin marketplace add metabase/mb-cli` + `/plugin install metabase-cli@metabase`); one install path is enough.
 
 ### Database metadata
 

@@ -1,18 +1,23 @@
 # metabase-cli (skill)
 
-Drives a Metabase instance from the terminal via the official `mb` CLI: auth/profiles, list/get/create/update/run on every resource, content search, remote-sync, Enterprise workspaces, API keys, entity-id translation.
+Discovery stub for the [`@metabase/cli`](https://www.npmjs.com/package/@metabase/cli) skill bundle. The agent loads workflow content at runtime via `mb skills get`, so instructions always match the installed CLI version.
+
+## Install
+
+```bash
+npm i -g @metabase/cli                                                # CLI itself
+npx skills add metabase/agent-skills --skill metabase-cli             # this stub
+```
+
+Or, in Claude Code, install both the stub and the marketplace entry directly from the CLI repo:
+
+```
+/plugin marketplace add metabase/mb-cli
+/plugin install metabase-cli@metabase
+```
+
+One install path is enough — both resolve to the same `mb skills get` runtime fetch.
 
 ## Files
 
-- `SKILL.md` — always loaded. Covers auth (the human logs in, the agent uses the profile), the four flag conventions, output flags, body-input precedence, a per-group "Resources at a glance" reference, and a pointer at `mb __manifest` (the hidden machine-readable inventory of every command).
-- `references/workspace.md` — full workspace lifecycle (Enterprise): create, provision, start/stop/restart/remove, child credentials → child profile, diagnose tree. Read when the user touches `mb workspace …`.
-- `references/transform.md` — transform create-and-run flow with a working native-SQL JSON body template, run-with-wait pattern, inspection verbs. Read when authoring or running a transform.
-- `references/remote-sync.md` — remote-sync workflow (import/export/branches/stash/dirty checks), with safety rules around the lossy `--force` flags. Read when the user is moving content between Metabase and a git repo.
-
-The reference files are loaded on demand by the agent — `SKILL.md` tells it when. The split exists so a one-shot CLI task ("list cards in prod") doesn't pay the token cost for workspace or transform or sync detail it'll never use.
-
-## How the agent should think about this
-
-1. Default first move: `mb auth status --json`. If no profile, ask the human to log in — never run `auth login` for them.
-2. Default reference for "how does this command work?": `mb __manifest | jq '.commands[] | select(.command == "<name>")'`. Faster and more complete than scraping `--help`.
-3. When the task touches workspaces / transforms / sync, load the matching reference file before constructing commands. The references go beyond the at-a-glance examples.
+- `SKILL.md` — frontmatter (trigger phrases) + a redirect at `mb skills get core`.
