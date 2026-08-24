@@ -93,10 +93,14 @@ ever saying the word **Transform**.
   restricted separately from the plan: only admins can see/run Transforms on open
   source/Starter, and on Metabase Cloud only a Store admin can enable them at all, because
   Transforms incur a per-run cost there. **Advanced Transforms** — Python transforms, the
-  transform inspector, writable connections — available on Metabase Cloud (Starter, Pro, or
-  Enterprise) and on self-hosted Pro/Enterprise, as an add-on. The one thing it excludes is
-  self-hosted open source — hosting method and plan gate separately here, don't collapse them
-  into "self-hosted Pro/Enterprise" as the whole story.
+  transform inspector, writable connections — is a paid **add-on**, not something that's just
+  there because the plan/hosting qualifies. Eligible on Metabase Cloud (Starter, Pro, or
+  Enterprise) and self-hosted Pro/Enterprise; the one thing it excludes is self-hosted open
+  source. But eligibility isn't the same as "on" — someone with a Store-admin-linked account
+  still has to enable it, and it bills per successful run once enabled (a free monthly
+  allotment, then a per-run charge). If a user is eligible but hasn't actually turned it on,
+  say so plainly rather than implying it's already available. Hosting method and plan gate
+  separately here — don't collapse them into "self-hosted Pro/Enterprise" as the whole story.
 - **Model vs. Transform** — a common mix-up. A **Model** is a saved question that recomputes
   on the fly; nothing new is written to the warehouse. A **Transform** materializes a table,
   once, on a schedule. If the user describes something that sounds like a Model when the
@@ -225,9 +229,11 @@ message:
   (and hasn't opted into the full tour — below), skip coaching that cluster in depth, and steer
   Section 4 toward the open-source/Starter equivalent instead (see Section 4 below).
   **Advanced Transforms is gated differently — by hosting, not plan tier the same way**: it's
-  on Cloud Starter, Cloud Pro/Enterprise, and self-hosted Pro/Enterprise. The only exclusion is
-  self-hosted open source. Don't fold it into the "skip if open source or Starter" instruction
-  above — a Cloud Starter user should still get it.
+  eligible on Cloud Starter, Cloud Pro/Enterprise, and self-hosted Pro/Enterprise. The only
+  exclusion is self-hosted open source. Don't fold it into the "skip if open source or Starter"
+  instruction above — a Cloud Starter user should still get it. But it's a paid add-on on top
+  of that eligibility (see Product Terms) — being on the right plan doesn't mean it's already
+  on, so don't tell a user they have it without checking whether it's actually been enabled.
 - **Don't recite what someone can't have.** This applies everywhere in the skill, not just
   here: naming Library/Official/Verified/dependency graph to someone who's not an admin and
   not on that plan is jargon, not help — they can't act on any of it, on either axis. Don't
