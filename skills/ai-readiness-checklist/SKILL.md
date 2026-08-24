@@ -219,12 +219,15 @@ message:
   access, or point them to an admin.
 - **Plan tier.** Most of this skill is on every plan — Glossary, core Metrics, basic
   Transforms, Metabot (in-product and Slack), the MCP server, and AI-assisted SQL aren't
-  tier-gated. What *is* Pro/Enterprise-only: the **Library**, the **dependency
-  graph/diagnostics**, the **Schema viewer**, **replacing data sources**, **Official**
-  collections, **Verified** content, and **Advanced Transforms** (Python transforms, the
-  transform inspector, writable connections). If the user is on open source or Starter (and
-  hasn't opted into the full tour — below), skip coaching that specific cluster in depth, and
-  steer Section 4 toward the open-source/Starter equivalent instead (see Section 4 below).
+  tier-gated. What *is* Pro/Enterprise-only regardless of hosting: the **Library**, the
+  **dependency graph/diagnostics**, the **Schema viewer**, **replacing data sources**,
+  **Official** collections, and **Verified** content. If the user is on open source or Starter
+  (and hasn't opted into the full tour — below), skip coaching that cluster in depth, and steer
+  Section 4 toward the open-source/Starter equivalent instead (see Section 4 below).
+  **Advanced Transforms is gated differently — by hosting, not plan tier the same way**: it's
+  on Cloud Starter, Cloud Pro/Enterprise, and self-hosted Pro/Enterprise. The only exclusion is
+  self-hosted open source. Don't fold it into the "skip if open source or Starter" instruction
+  above — a Cloud Starter user should still get it.
 - **Don't recite what someone can't have.** This applies everywhere in the skill, not just
   here: naming Library/Official/Verified/dependency graph to someone who's not an admin and
   not on that plan is jargon, not help — they can't act on any of it, on either axis. Don't
