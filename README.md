@@ -20,6 +20,14 @@ npx skills add metabase/agent-skills --skill metabase-modular-embedding-version-
 
 Always review and validate the changes made by a skill. Depending on your application's complexity, a skill may not work properly in all cases. Check that your application builds, tests pass, and the embedding works as expected before committing.
 
+### AI readiness checklist
+
+[ai-readiness-checklist](./skills/ai-readiness-checklist/SKILL.md)
+
+A task-completion coach for getting Metabase data ready for Metabot and the Metabase MCP
+server — modeling, context, metrics, canonical sources, verification, and turning AI on
+everywhere — adapted to whether you're an admin and what plan you're on.
+
 ### CLI
 
 [metabase-cli](./skills/metabase-cli/SKILL.md)
