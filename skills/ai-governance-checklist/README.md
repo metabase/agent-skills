@@ -32,8 +32,11 @@ between sessions — fine for a single sitting. If you'd rather progress persist
 across sessions, Cowork can do that; Claude Code works too if you're already comfortable with a
 more developer-focused tool.
 
-If you have the Metabase MCP server set up, the skill can run one genuine check: testing
-whether Metabot actually can't reach data it shouldn't be able to see, rather than just taking
-your permissions setup on faith. Learn how [to connect the MCP
+If you have the Metabase MCP server set up **and connected as the user or group you're
+checking**, the skill can run one genuine check: testing whether Metabot actually can't reach
+data it shouldn't be able to see, rather than just taking your permissions setup on faith. That
+caveat matters — the MCP server authenticates as whoever's connected, so the test only proves
+something about that session's access, not a different user's or group's, unless the identity
+actually matches. Learn how [to connect the MCP
 server](https://www.metabase.com/docs/latest/ai/mcp). Everything else in this skill is admin
 configuration Claude can't inspect either way, so it's useful with or without MCP connected.

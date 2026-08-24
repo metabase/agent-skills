@@ -8,8 +8,8 @@ description: >
   turning on AI features. Trigger this skill even if the user just says "is my data AI
   ready?", "let's get set up for Metabot", or "run the AI readiness checklist" in a Metabase
   context.
-metabase_version: "0.61"
-last_updated: "2026-08-25"
+metabase_version: "0.63"
+last_updated: "2026-08-24"
 ---
 
 # Metabase AI Readiness Checklist
@@ -93,8 +93,10 @@ ever saying the word **Transform**.
   restricted separately from the plan: only admins can see/run Transforms on open
   source/Starter, and on Metabase Cloud only a Store admin can enable them at all, because
   Transforms incur a per-run cost there. **Advanced Transforms** — Python transforms, the
-  transform inspector, writable connections — need a self-hosted Pro/Enterprise plan plus the
-  Advanced Transforms add-on.
+  transform inspector, writable connections — available on Metabase Cloud (Starter, Pro, or
+  Enterprise) and on self-hosted Pro/Enterprise, as an add-on. The one thing it excludes is
+  self-hosted open source — hosting method and plan gate separately here, don't collapse them
+  into "self-hosted Pro/Enterprise" as the whole story.
 - **Model vs. Transform** — a common mix-up. A **Model** is a saved question that recomputes
   on the fly; nothing new is written to the warehouse. A **Transform** materializes a table,
   once, on a schedule. If the user describes something that sounds like a Model when the
@@ -153,7 +155,7 @@ time a new checklist run begins.
 3. **If not connected:** explain the tradeoff honestly, then let the user choose:
    > "Without the MCP server connected, I can still walk the checklist with you, but
    > everything will be self-reported — I won't be able to confirm a table actually works or
-   > that something's findable by name. Want to connect it now ([setup docs](/docs/latest/ai/mcp)),
+   > that something's findable by name. Want to connect it now ([setup docs](https://www.metabase.com/docs/latest/ai/mcp)),
    > or keep going without it?"
 4. If they proceed without it, set `mcpConnected: false` in the progress file (see Progress &
    Persistence) and skip every MCP-verifiable check for the rest of the run — ask about them
@@ -205,10 +207,16 @@ message:
 
 - **Admin / Data Analysts group vs. not.** Getting into Data Studio at all — Transforms, the
   Glossary, Data structure editing, and (on Pro/Enterprise) the Library and dependency graph —
-  needs the Admin or Data Analysts group, on every plan. So does the Slack OAuth setup for
-  Metabot. If the user isn't in that group, don't narrate the click path — tell them what to
-  hand to an admin instead, and keep coaching on what they *can* do themselves. Note this is
-  independent of plan: an open-source admin has more access than a Pro non-admin.
+  needs the Admin or Data Analysts group, on every plan. If the user isn't in that group, don't
+  narrate the click path — tell them what to hand to an admin instead, and keep coaching on
+  what they *can* do themselves. Note this is independent of plan: an open-source admin has
+  more access than a Pro non-admin.
+- **Slack setup is a different gate — don't conflate it with Data Analysts group access.**
+  Admins can always configure Metabot in Slack. A non-admin can too, but only with
+  **Application permissions → Settings access** granted specifically — being in the Data
+  Analysts group does *not* by itself grant that. If a non-admin says they can't get to Slack
+  settings, don't assume Data Analysts membership would fix it; ask whether they have Settings
+  access, or point them to an admin.
 - **Plan tier.** Most of this skill is on every plan — Glossary, core Metrics, basic
   Transforms, Metabot (in-product and Slack), the MCP server, and AI-assisted SQL aren't
   tier-gated. What *is* Pro/Enterprise-only: the **Library**, the **dependency
@@ -397,10 +405,12 @@ Phase 3 rather than asking for a second one.
 - **Metabot in-product.** Confirm it's enabled and the user has tried asking it a real
   question (can reuse the one from Phase 3, or ask it here first if this is where the session
   started).
-- **Metabot in Slack.** This is an admin OAuth flow. Check the `profile` first — if the user
-  isn't an admin, don't narrate the setup steps; tell them what to hand to an admin ("ask
-  someone with admin access to connect Metabot to Slack under [admin setting]") and ask them
-  to confirm once it's done. If the user is an admin, walk the steps normally.
+- **Metabot in Slack.** An OAuth flow gated by Settings access, not Data Analysts group
+  membership — see the Phase 1 note on this. Check the `profile` first — if the user is an
+  admin, walk the steps normally. If not, ask whether they have Application permissions →
+  Settings access before assuming they need an admin; if they don't have it either, tell them
+  what to hand to someone who does ("ask someone with Settings access to connect Metabot to
+  Slack under [admin setting]") and ask them to confirm once it's done.
 - **Metabase MCP server, connected to Claude or Cursor.** If this is already connected (it
   had to be, to run Phase 3), this one's done — just confirm the user also has it wired into
   whichever tool they use day to day, not just this session.
@@ -436,7 +446,7 @@ of the four live already.
 
 State lives in a single JSON file at:
 
-```
+```text
 ./.claude/ai-readiness-checklist/progress.json
 ```
 

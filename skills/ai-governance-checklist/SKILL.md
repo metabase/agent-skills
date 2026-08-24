@@ -55,8 +55,18 @@ scoped correctly is an *outcome* you can test, not just a config you take on fai
 has a specific boundary in mind ("Metabot shouldn't be able to see the finance schema for this
 group"), and MCP is connected, offer to actually try it — ask Metabot or query through MCP for
 something it should be blocked from, and see what happens. That's a real check of behavior, the
-same spirit as `ai-readiness-checklist`'s Phase 3. Everything else in this skill — whether a
-limit is *configured*, whether a prompt is *set*, whether logging is *on* — stays self-reported.
+same spirit as `ai-readiness-checklist`'s Phase 3.
+
+**But be precise about what the test actually proves.** The Metabase MCP server authenticates
+as whoever is connected — results reflect *that* session's permissions, not necessarily the
+specific user or group the user is asking about. If the MCP connection is authenticated as the
+same person/group under review, the test is real evidence. If it isn't (e.g. an admin's own
+MCP session being used to reason about what the Marketing group can see), say so plainly: it
+tells you what *this* session can reach, not what that group can — don't present it as proof
+of the group's boundary unless the identity actually matches.
+
+Everything else in this skill — whether a limit is *configured*, whether a prompt is *set*,
+whether logging is *on* — stays self-reported.
 
 Plan/tier gating below is checked against the docs and believed accurate as of `last_updated`,
 but AI features are moving fast right now — if a user reports something behaving differently
@@ -196,7 +206,7 @@ context for whenever Row 4 or a data-movement question comes up later — no nee
 immediately.
 
 **Routing on self-segmentation** — this matters more here than in `ai-readiness-checklist`,
-because four of the five checklist rows are Pro/Enterprise-only:
+because three of the five checklist rows are Pro/Enterprise-only:
 
 - **Admin vs. not.** Every lever in this checklist is an admin-only setting. If the user isn't
   an admin, don't narrate click paths — tell them what to hand to an admin, and keep the
@@ -254,13 +264,15 @@ For whichever row(s) actually get covered:
 which just have it by default. A common finding: nobody's actually looked at this since it was
 turned on for everyone.
 
-**What it can see.** This is the one with a real check available (see Honesty section above).
-Ask if there's a specific boundary they care about, and if MCP is connected, offer to actually
-test it — have Metabot (or a direct MCP query) attempt something it should be blocked from, and
-confirm it is. If there's no MCP connection or no specific boundary to test, this stays
-self-reported: the underlying principle is that Metabot inherits the asking user's existing
-data permissions (including row/column-level security where that's configured) — it doesn't
-get broader access than the person using it has.
+**What it can see.** This is the one with a real check available (see Honesty section above,
+including the identity-matching caveat — the test only proves something about whoever the MCP
+session is authenticated as). Ask if there's a specific boundary they care about, and if MCP is
+connected as the right identity, offer to actually test it — have Metabot (or a direct MCP
+query) attempt something it should be blocked from, and confirm it is. If there's no MCP
+connection, no specific boundary to test, or the connected identity doesn't match who's under
+review, this stays self-reported: the underlying principle is that Metabot inherits the asking
+user's existing data permissions (including row/column-level security where that's configured)
+— it doesn't get broader access than the person using it has.
 
 **How much it costs.** Token or message limits, instance-wide/per-group/per-tenant — settable
 on their own, no need to touch per-group feature access first (see the AI usage controls note
@@ -320,7 +332,7 @@ config state MCP can't see. Still worth doing:
 
 Same mechanism and schema shape as `ai-readiness-checklist`, at:
 
-```
+```text
 ./.claude/ai-governance-checklist/progress.json
 ```
 
@@ -337,10 +349,10 @@ Same mechanism and schema shape as `ai-readiness-checklist`, at:
   },
   "checklist": {
     "1_who_can_use_it": { "status": "done", "note": "restricted to Analytics + Admin groups" },
-    "2_what_it_can_see": { "status": "in_progress", "note": "boundary test pending MCP connection" },
+    "2_what_it_can_see": { "status": "done", "note": "confirmed via MCP boundary test — Metabot couldn't reach the finance schema for the Marketing group" },
     "3_how_much_it_costs": { "status": "not_started", "note": "" },
     "4_where_model_runs": { "status": "done", "note": "BYO key, Bedrock" },
-    "5_audit_trail": { "status": "not_applicable", "note": "Starter plan, didn't opt into full tour" }
+    "5_audit_trail": { "status": "in_progress", "note": "logging is on, nobody's actually reviewed it yet" }
   }
 }
 ```
