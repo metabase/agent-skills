@@ -135,17 +135,33 @@ there, so don't repeat it as a blanket claim regardless of setup. Two different 
   prompt, schema metadata, field-value samples — crosses out to an outside party, because
   there isn't one in the loop.
 - **BYO key to an external provider** (Bedrock, OpenAI, Azure, etc.) — including Metabase's
-  own managed AI service as the default case: query *results* still never leave Metabase or go
-  to that provider, but the request itself does — the user's prompt, database metadata (table
+  own managed AI service as the default case: query *results* aren't sent to that AI provider,
+  but the request itself is — the user's prompt, database metadata (table
   and field names), a sampling of field values, and derived metrics from chart analysis, which
   is context the model needs to reason about the schema. BYO changes *who* that provider is (an
   org chooses and controls it, rather than it being Metabase's default), but there's still an
   outside party receiving that context unless that party is also infrastructure the org runs.
+  Two things to add when this is being written into a compliance answer: with the managed
+  service, Metabase-the-company also collects some of that metadata to gauge usage and improve
+  the integration; and submitting feedback on a Metabot response can send that conversation's
+  context, which may include sensitive data, to Metabase.
+
+**The MCP server is a separate path, and the "results don't leave" line does not hold for it.**
+This is the single most important carve-out in this skill, because both this skill and
+`ai-readiness-checklist` actively encourage connecting MCP. Per the docs, when the MCP server
+is used, **query results are sent to the connected MCP client** — and that client may in turn
+forward them to whatever AI provider it's configured with, which is a provider Metabase has no
+visibility into or control over. So "results never leave Metabase" is accurate for
+Metabot-with-an-AI-provider and **false for MCP**. Never state it as a blanket property of the
+deployment. If the user has MCP on (or is about to turn it on), say plainly that it's a
+distinct data path with its own review: results go to the client, and the client's own AI
+configuration decides where they go next.
 
 Get which situation actually applies before saying "zero data movement" — it's a fair claim
-for the fully self-hosted setup, and an overstatement for BYO-to-a-cloud-provider. This
-matters most when the user is evaluating it for a compliance review; getting it wrong is
-exactly the kind of thing that comes back to bite a security review later.
+for the fully self-hosted setup with no MCP client in play, an overstatement for
+BYO-to-a-cloud-provider, and wrong for MCP. This matters most when the user is evaluating it
+for a compliance review; getting it wrong is exactly the kind of thing that comes back to bite
+a security review later.
 
 ---
 
@@ -220,9 +236,10 @@ because three of the five checklist rows are Pro/Enterprise-only:
   conversation useful by helping them articulate *what* to ask for (e.g. "ask your admin to
   cap the marketing group at 50k tokens/week" is more actionable than "ask your admin about
   token limits").
-- **Plan tier — don't lead with what's missing.** BYO model, self-hosting, and the "query
-  results never leave" baseline are true on every plan — lead with those, they're real and
-  they're free. AI usage controls, system prompts, usage auditing, and verified-only mode are
+- **Plan tier — don't lead with what's missing.** BYO model, self-hosting, and the baseline
+  that query results aren't sent to Metabot's AI provider are true on every plan — lead with
+  those, they're real and they're free (with the MCP carve-out from Product Terms if MCP is in
+  the picture). AI usage controls, system prompts, usage auditing, and verified-only mode are
   all Pro/Enterprise. If the user is on open source or Starter, don't recite that list by name
   or stack it with the admin-access point — say once, plainly, that fine-grained control (who,
   cost caps, audit trail) lives on Pro/Enterprise, that they may not need it yet depending on
@@ -289,9 +306,13 @@ in Product Terms). Ask if a runaway-usage scenario has actually been thought thr
 **Where the model runs.** BYO model/key vs. the managed AI service. If Phase 1 already
 established the user's deployment situation, reference what you already know rather than
 re-explaining BYO/self-host from scratch. Keep the data-movement point to one line by default —
-"results never leave; if you're also self-hosting the model, nothing leaves at all" — and only
-unpack the full "Data movement, precisely" comparison if they're specifically asking about
-compliance or where data goes. Don't bring this up unprompted while answering a different row.
+"results aren't sent to the AI provider; if you're also self-hosting the model, nothing leaves
+at all" — and only unpack the full "Data movement, precisely" comparison if they're
+specifically asking about compliance or where data goes. The one thing worth adding unprompted:
+if they have the MCP server on, say that it's a separate path where results *do* go to the
+connected client (see the carve-out in Product Terms) — that exception is load-bearing enough
+that letting the simpler line stand uncorrected would be misleading. Otherwise don't bring this
+up while answering a different row.
 
 **Audit trail.** AI usage auditing. Ask if anyone's actually looked at it, or if it's just
 theoretically on. If MCP usage comes up, one short line is enough — see the Product Terms note
@@ -328,7 +349,11 @@ config state MCP can't see. Still worth doing:
    document, not a sales pitch.
 3. If the user is on open source/Starter and a lot of this landed as `not_applicable`, don't
    end on a deficit note — reiterate what's true regardless of plan (BYO model, self-hosting,
-   query results never leaving) as the actual governance posture they already have.
+   and that query results aren't sent to the AI provider behind Metabot) as the actual
+   governance posture they already have. Keep that last one accurate: if they're running the
+   MCP server, it doesn't apply to that path — results go to the connected client — so either
+   note the exception or leave the claim out rather than overstating it in a summary someone
+   may forward to a security reviewer.
 4. Offer the handoff: if the underlying data itself hasn't been checked yet, mention
    `ai-readiness-checklist`; for broader Metabase education, `metabase-learning`.
 5. Save the progress file.

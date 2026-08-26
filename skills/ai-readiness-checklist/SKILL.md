@@ -43,29 +43,52 @@ skill only gets data and AI surfaces turned on.
 
 ## Being honest about what MCP can and can't verify
 
-This is the most important operating rule in this skill. The Metabase MCP server's tool
-surface is a **query-and-build surface**, not a configuration inspector. Read-only tools let
-Claude construct and run queries, search for tables and metrics by name, and read a resource.
-Write tools let Claude create collections/dashboards/questions, run SQL, and update a
-dashboard or question. There is no tool that reports back "does this table have a
-description," "is this in the Library," "what plan is this instance on," or "what does the
-lineage graph show for this table."
+This is the most important operating rule in this skill: **never imply you checked something
+you didn't.** Overclaiming verification is worse than not verifying at all; it's the one thing
+that would make this skill less trustworthy than the checklist it's replacing.
 
-So split every checklist item into one of two buckets, and never blur them:
+**Work out what you can actually check by looking at your own tool list, not by trusting a
+description in this file.** The Metabase MCP server's tool surface changes between releases,
+and a hard-coded list here goes stale silently — which is worse than no list, because it makes
+Claude confidently refuse checks it could have run. At the start of a run, look at which
+Metabase MCP tools are actually available in this session, and let that decide what's
+verifiable. As of `last_updated` the server exposes roughly: `construct_query` / `execute_query`
+/ `query` for running queries, `search` for finding tables and metrics by name, `read_resource`
+for reading entities by `metabase://` URI, and a set of write tools
+(`create_collection` / `create_dashboard` / `create_question` / `execute_sql` /
+`update_dashboard` / `update_question`). Treat that as a hint about where to look, not as the
+authority — your live tool list is the authority.
 
-- **MCP-verifiable (outcome-based):** does a query against this table actually work and
-  return a sane answer? Can this table or metric be found by name through search? These are
-  real checks Claude can run and report on factually.
-- **Self-reported / coached (configuration-based):** does this table have a plain-English
-  description, is a term in the Glossary, is a table in the Library, is a dashboard marked
-  Official, what plan the instance is on, whether the user is an admin. Claude cannot inspect
-  these through MCP. Ask about them, coach the user through the UI, and take their word for
-  the state — don't imply you checked something you didn't.
+`read_resource` is the one most easily underestimated. It reads Metabase entities directly —
+including `table`, `transform`, `metric`, `model`, `question`, `collection`, `database`, and
+`schema` — plus list URIs like a table's fields or a collection's items. That means several
+things this checklist asks about are genuinely inspectable rather than self-reported:
 
-If you're ever unsure which bucket an item falls into, default to self-reported and say so
-plainly: "I can't check that directly through MCP — tell me where you landed and I'll take
-your word for it." Overclaiming verification is worse than not verifying at all; it's the one
-thing that would make this skill less trustworthy than the checklist it's replacing.
+- **Does a Transform exist, and what does it do?** `transform` is a readable entity. Don't tell
+  the user you have no way to see their transforms.
+- **Do tables and fields have descriptions?** Read the table and its fields and look at what
+  comes back.
+- **Does this metric exist, and how is it defined?** Read the `metric` entity, don't just
+  search for the name.
+
+So split every checklist item into one of two buckets — but decide which bucket by *trying*,
+not by assuming:
+
+- **MCP-verifiable (outcome- or entity-based):** does a query against this table actually work
+  and return a sane answer? Can this table or metric be found by name through search? Does the
+  entity read back with the metadata the user says they set? These are real checks Claude can
+  run and report on factually.
+- **Self-reported / coached:** anything genuinely outside the tool surface — what plan the
+  instance is on, whether the user is an admin, what the dependency graph shows, and anything a
+  read simply doesn't return. Ask about these, coach the user through the UI, and take their
+  word for the state.
+
+When a read comes back without the field you were hoping for, say exactly that — "I can see the
+table, but that read doesn't tell me whether a description is set — can you check?" — rather
+than either guessing or silently dropping the check. And if you genuinely can't tell which
+bucket something falls into, try the read first; only fall back to "I can't check that directly
+through MCP — tell me where you landed and I'll take your word for it" once a read has actually
+failed to answer it.
 
 Plan/tier gating (below, and in Phase 1) is checked against the docs and believed accurate as
 of `last_updated`, but plans change — if a user reports a feature behaving differently than
@@ -112,17 +135,25 @@ ever saying the word **Transform**.
   Section 1, flag the distinction rather than letting it slide.
 - **Data Studio** — the workbench (grid icon → Data Studio) where Transforms, the Library,
   table metadata (Data Studio > Tables — editing table/field descriptions, types, and other
-  attributes), the Glossary, and the dependency graph/diagnostics live. Core Data Studio (basic
-  Transforms, table metadata editing, the Glossary) is on every plan;
-  getting in the door at all still needs the Admin or Data Analysts group, on any plan — see
-  the self-segmentation step in Phase 1. A cluster of sub-features inside it are Pro/Enterprise
-  only regardless of role: the Library, the Schema viewer, the dependency graph, dependency
-  diagnostics, and replacing data sources.
+  attributes), and the dependency graph/diagnostics live. Core Data Studio (basic Transforms,
+  table metadata editing) is on every plan. **Who can get in the door differs by plan, and this
+  trips people up:** Data Studio needs the **Admin group** or the **Data Analysts group** — but
+  the Data Analysts group *only exists on Pro/Enterprise*. So on open source or Starter, Data
+  Studio is **admin-only, full stop**; there is no non-admin path to it and no group an admin
+  could add someone to. Don't offer one. See the self-segmentation step in Phase 1. A cluster of
+  sub-features inside it are Pro/Enterprise only regardless of role: the Library, the Schema
+  viewer, the dependency graph, dependency diagnostics, and replacing data sources.
 - **Library** — the curated home for an org's most-trusted tables, metrics, and SQL snippets.
   **Pro/Enterprise only**, self-hosted or Cloud. This is what Section 4 means by "canonical."
-- **Glossary** — business-term definitions in Data Studio, read by both people and AI (Metabot,
-  MCP clients). **On every plan** — no tier gate, just the Admin/Data Analysts group access
-  that all of Data Studio needs.
+- **Glossary** — business-term definitions that Metabot reads when answering a prompt (define
+  "MRR" once and Metabot knows what you mean). **On every plan, and — unlike the rest of this
+  list — open to everyone, not just admins.** The Glossary lives in the data reference, at
+  `/reference` or via Data > Databases > "Learn about our data", where *anyone* can click the
+  `+ New term` button. Admins and Data Analysts get a nicer view of it inside Data Studio,
+  but that's a convenience, not the gate. This makes it the one Section 2 task a non-admin can
+  always do themselves — never route someone to an admin for it. Note the scope of the AI
+  benefit: docs tie the Glossary to **Metabot** specifically; there's no documented glossary
+  tool or entity on the MCP server, so don't promise it improves MCP-client results too.
 - **Metric** — a saved, reusable calculation definition, distinct from a one-off SQL snippet.
   Creating and using Metrics is **on every plan**. Marking one Verified (see below) and
   per-metric result caching are Pro/Enterprise extras on top of that.
@@ -150,7 +181,7 @@ ever saying the word **Transform**.
 | # | Section | What "done" looks like |
 |---|---------|-------------------------|
 | 1 | Model it | Raw tables are cleaned/joined/aggregated into a purpose-built table (a transform — or already handled upstream, e.g. dbt), refreshed on a schedule that matches how fresh the answer needs to be |
-| 2 | Add context | Tables and fields have plain-English descriptions, cryptic names have synonyms, field types are set correctly, business terms are in the Glossary |
+| 2 | Add context | Tables and fields have plain-English descriptions, cryptic columns have clearer display names, field types are set correctly, business terms are in the Glossary |
 | 3 | Define your metrics once | The most-asked-for calculations exist as saved Metrics, not five SQL snippets across five dashboards |
 | 4 | Mark what's canonical | Production-ready tables are in the Library, near-duplicates are flagged or retired, the right dashboards/questions are Official |
 | 5 | Verify, don't just trust | A real question against the modeled data checks out — the logic, the number, the lineage |
@@ -195,11 +226,17 @@ message:
 
 > "Before we dive in: have you already poked at Metabot, the MCP server, or AI SQL at all? If
 > so, where'd you get stuck — or did it look fine and you just want to double-check the setup
-> underneath? And quickly, so I don't walk you through stuff you can't get to — are you a
-> Metabase admin? If you're not sure whether you're also in the Data Analysts group, an easier
-> tell is: click the grid icon in the top right — if you see Data Studio in there, you have
-> that access, whatever your group membership is actually called. And what plan are you on:
-> open source, Starter, Pro, or Enterprise? Not sure on any of that is a totally fine answer."
+> underneath? And quickly, so I don't walk you through stuff you can't get to — click the grid
+> icon in the top right: do you see Data Studio in there? That one's a better tell than job
+> title, since it's what most of this checklist runs through. And what plan are you on: open
+> source, Starter, Pro, or Enterprise? Not sure on any of that is a totally fine answer."
+
+Ask about **Data Studio visibility**, not about group membership. Nobody can see their own
+groups in Metabase — there's no self-service "what groups am I in" view — so "are you in the
+Data Analysts group?" is a question the user usually can't answer, and on open source or
+Starter it's a question with no valid yes (that group is Pro/Enterprise-only). Whether Data
+Studio appears behind the grid icon is something they can check in two seconds, and it's the
+access that actually matters here.
 
 **Routing on starting point:**
 
@@ -222,20 +259,27 @@ message:
 
 **Routing on self-segmentation:**
 
-- **Admin / Data Analysts group vs. not.** Getting into Data Studio at all — Transforms, the
-  Glossary, table metadata editing, and (on Pro/Enterprise) the Library and dependency graph —
-  needs the Admin or Data Analysts group, on every plan. Most people don't know their own group
-  memberships by name (there's no self-service "your groups" view), so don't ask it that way —
-  use the observable proxy from the Phase 1 question instead: can they see Data Studio behind
-  the grid icon? If not, don't narrate the click path — tell them what to hand to an admin
-  instead, and keep coaching on what they *can* do themselves. Note this is independent of
-  plan: an open-source admin has more access than a Pro non-admin.
-- **Slack setup is a different gate — don't conflate it with Data Analysts group access, and
+- **Data Studio access — and note it's gated differently by plan.** Getting into Data Studio at
+  all — Transforms, table metadata editing, and (on Pro/Enterprise) the Library and dependency
+  graph — needs the **Admin group** or the **Data Analysts group**, and the Data Analysts group
+  only exists on Pro/Enterprise. Practically:
+  - **Open source / Starter:** admin-only. If they're not an admin, there's no group to be
+    added to — don't suggest asking for Data Analysts access, because it isn't available to
+    grant. The honest answer is "this part needs an admin."
+  - **Pro / Enterprise:** admin *or* Data Analysts. A non-admin who can't get in has a real
+    thing to ask for here, so it's worth naming.
+  Either way, go off the Phase 1 observable — can they see Data Studio behind the grid icon? —
+  rather than asking about group names. If they can't get in, don't narrate the click path;
+  tell them what to hand to an admin, and keep coaching on what they *can* do themselves
+  (the Glossary, notably — see Product Terms; that one's open to everyone on every plan).
+  Note role and plan are separate axes: an open-source admin has more access here than a Pro
+  non-admin.
+- **Slack setup is a different gate — don't conflate it with Data Studio access, and
   it's Pro/Enterprise-only in a different way than the Library etc. above.** Admins can always
   configure Metabot in Slack, on every plan — that setup lives under Admin > Settings, which
   only Admins can reach by default. On **Pro/Enterprise specifically**, a non-admin can also get
   there if an admin has granted them **Application permissions → Settings access** (a Pro/
-  Enterprise-only permission type in its own right) — being in the Data Analysts group does
+  Enterprise-only permission type in its own right) — Data Studio access does
   *not* by itself grant that. On open source or Starter, there's no such grant available at
   all, so "only admins can do this" is the accurate, complete answer there. A non-admin won't
   necessarily know the phrase "Application permissions" either — the practical check is whether
@@ -290,9 +334,12 @@ Don't force a rigid script — if the user already has metrics defined and just 
 sections 4 and 5, skip straight there (see Navigation below).
 
 ### Section 1 — Model it
-Mostly self-reported/coached — MCP has no tool to inspect whether a Transform exists or what
-it does, or to create one. **Name it explicitly as a Transform, in Data Studio** — don't
-describe this section in generic "clean your data" terms without saying so. Something like:
+Partly inspectable. `transform` is a readable entity type, so if MCP is connected, actually
+look before asking: read the user's transforms and see what's there, rather than opening with
+"do you have one?" when you can find out. What MCP *can't* do here is create a transform or set
+its schedule — that stays coached. **Name it explicitly as a Transform, in Data Studio** —
+don't describe this section in generic "clean your data" terms without saying so. Something
+like:
 
 > "This is what Metabase calls a Transform — it lives in Data Studio, and it's how you turn
 > raw tables into a purpose-built table your team (and AI) actually queries from. Do you have
@@ -309,7 +356,7 @@ stack, and nothing here requires ripping it out. Confirm the refresh cadence mat
 the answer needs to be, and mark it `done` on that basis.
 
 Worth mentioning once, not insisting on: modeling and curating the semantic layer directly in
-Metabase — Transforms, the Library, the Glossary, all in Data Studio — means lineage runs
+Metabase — Transforms and the Library in Data Studio, plus the Glossary — means lineage runs
 end-to-end in one place, from the raw table through the transform through the metric through
 the dashboard someone's actually looking at, instead of split across dbt and a separate BI
 layer. That's a genuine advantage if they're weighing where to consolidate, but it's a
@@ -354,17 +401,26 @@ modeling — *and* is refreshing on a schedule that matches how fresh the answer
 drafted-but-not-deployed query is `in_progress`, not `done`.
 
 ### Section 2 — Add context
-Fully self-reported/coached. Ask about table/field descriptions, field types, and **Glossary**
-entries specifically — name the Glossary by name, in Data Studio, rather than asking generally
-about "documentation." Coach specifically: plain-English descriptions say what a field *is*,
-not what it's called; a Glossary entry is worth adding for any term a new hire — or an AI
-agent — wouldn't already know ("MRR," "active user"). Don't claim to check any of this via MCP.
+Partly inspectable, and this is the section where checking first pays off most. If MCP is
+connected, read the relevant table and its fields and look at what actually comes back before
+asking — "your `orders` table has descriptions on 3 of 14 fields" is a far more useful opening
+than "have you added descriptions?" If the read doesn't surface descriptions, say so and ask;
+don't assume either way. The **Glossary** stays self-reported (no glossary tool on the MCP
+server) — name it by name and point to where it lives (`/reference`, open to everyone — see
+Product Terms), rather than asking generally about "documentation." Coach specifically:
+plain-English descriptions say what a field *is*, not what it's called; a Glossary entry is
+worth adding for any term a new hire — or Metabot — wouldn't already know ("MRR," "active
+user"). Note there's no "synonyms" feature to point at — the way to handle a cryptic column
+name is a clearer **display name** plus a description, with the Glossary carrying business
+terms.
 
 ### Section 3 — Define your metrics once
-Partially MCP-verifiable. Ask which calculations get reinvented across dashboards and whether
-they're saved as Metrics yet. If MCP is connected, use `Metabase MCP:search` for the metric
-name once the user says it exists — that confirms it's real and discoverable, which is a
-genuine outcome check. It does **not** confirm the definition is correct or that it's the
+Largely inspectable. Ask which calculations get reinvented across dashboards and whether
+they're saved as Metrics yet. If MCP is connected, `search` confirms a metric is real and
+discoverable by the name someone would actually type — and `read_resource` goes further, since
+`metric` is a readable entity: you can look at how it's actually defined rather than taking
+"yes, we have one" at face value. That's worth doing when the whole point of the section is
+that the definition should be singular and correct. What neither call proves is that it's the
 *only* version floating around; say so if asked.
 
 If search comes back empty even though the user is confident the metric exists, don't
@@ -376,11 +432,23 @@ the check:
 > under something else?"
 
 ### Section 4 — Mark what's canonical
-Fully self-reported/coached. MCP has no tool that reports **Library** membership, **Official**
-collection status, or **Verified** status — name all three by their actual feature names
-(Product Terms above), not generic language like "have you tagged your best content." Ask
-directly, and coach toward flagging or retiring near-duplicate tables an agent could grab by
-mistake — that part applies regardless of plan.
+Mostly coached; check what you can. `collection` and `table` are readable entities, so if MCP
+is connected it's worth reading and reporting what actually comes back rather than assuming —
+but don't assert that Library membership, **Official** status, or **Verified** status is
+absent just because a read didn't show it. If a read doesn't answer it, say so and ask. Name
+all three by their actual feature names (Product Terms above), not generic language like "have
+you tagged your best content," and coach toward flagging or retiring near-duplicate tables an
+agent could grab by mistake — that part applies regardless of plan.
+
+**Be honest about which of these actually changes AI behavior**, because they aren't equal:
+**Verified** is the one wired into a real control — an admin can restrict Metabot to verified
+content, and that restriction covers *models and metrics only*. **Official** is a
+collection-level badge aimed at humans, and Metabot can't discover collections on its own at
+all. The **Library** is curation for people too. All three are worth doing, but don't sell
+Official or the Library as things that directly constrain what Metabot reaches for — if the
+user's goal is specifically "make the AI pick the right thing," Verified on models and metrics
+is the lever, and it pairs with the verified-content setting covered in
+`ai-governance-checklist`.
 
 Check the `profile` from Phase 1 first: the Library, Official collections, and Verified
 content are all Pro/Enterprise. If the user is on open source or Starter and didn't opt into
