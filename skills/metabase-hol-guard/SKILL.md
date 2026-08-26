@@ -19,12 +19,28 @@ If HOL Guard is missing and runtime protection was requested, prefer an isolated
 pipx install hol-guard
 ```
 
-Then initialize, detect, and configure the supported harness:
+Then initialize and detect the supported harness:
 
 ```bash
 hol-guard bootstrap
 hol-guard detect --json
+```
+
+If the detected harness is `hermes`, use its dedicated bootstrap path:
+
+```bash
+hol-guard hermes bootstrap
+```
+
+For other supported harnesses, use the generic installer:
+
+```bash
 hol-guard install <harness>
+```
+
+Then keep the existing dry-run, launch, and status checks:
+
+```bash
 hol-guard run <harness> --dry-run
 hol-guard run <harness>
 hol-guard status
