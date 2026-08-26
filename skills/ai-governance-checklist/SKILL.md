@@ -10,7 +10,7 @@ description: >
   what Metabot sees", "we need an AI security review", or "run the AI governance checklist" in
   a Metabase context.
 metabase_version: "0.63"
-last_updated: "2026-08-24"
+last_updated: "2026-08-26"
 ---
 
 # Metabase AI Governance Checklist
@@ -48,7 +48,14 @@ server is a query-and-build surface — it can run queries, search by name, and 
 It has no tool that reports "what are this group's AI usage limits," "is Metabot restricted to
 verified content," "what does the system prompt say," or "does the audit log show this
 conversation." Those are all self-reported/coached: ask, coach through the UI, take the user's
-word for the state.
+word for the state. Worth being precise about scope here: the separate Metabase CLI (`mb`) can
+read and write actual *content* (tables, fields, cards, dashboards, transforms, collections)
+directly over the API — but as of this writing it has no commands for groups, permissions,
+Application settings, or Metabot configuration, which is what this skill is actually coaching
+on. So unlike `ai-readiness-checklist` (where `mb` genuinely can execute several sections
+instead of just coaching), this skill's self-reported framing holds even if the user has `mb`
+set up — check the CLI's current command list before assuming otherwise, since that could
+change.
 
 **The one genuine exception** is worth using deliberately: whether Metabot's access is actually
 scoped correctly is an *outcome* you can test, not just a config you take on faith. If the user

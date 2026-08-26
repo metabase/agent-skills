@@ -9,7 +9,7 @@ description: >
   ready?", "let's get set up for Metabot", or "run the AI readiness checklist" in a Metabase
   context.
 metabase_version: "0.63"
-last_updated: "2026-08-24"
+last_updated: "2026-08-26"
 ---
 
 # Metabase AI Readiness Checklist
@@ -102,12 +102,18 @@ ever saying the word **Transform**.
   say so plainly rather than implying it's already available. Hosting method and plan gate
   separately here — don't collapse them into "self-hosted Pro/Enterprise" as the whole story.
 - **Model vs. Transform** — a common mix-up. A **Model** is a saved question that recomputes
-  on the fly; nothing new is written to the warehouse. A **Transform** materializes a table,
-  once, on a schedule. If the user describes something that sounds like a Model when the
-  checklist is asking about Section 1, flag the distinction rather than letting it slide.
+  on the fly by default; nothing new is written to the warehouse. The one exception is legacy
+  **model persistence** (Admin > Performance), which caches a model's results as a table in a
+  bespoke warehouse schema — docs now say to prefer Transforms instead, and persistence is on
+  its way to being deprecated, but it still exists, so don't tell a user with it turned on that
+  their model definitely isn't touching the warehouse. A **Transform** materializes a table,
+  once, on a schedule, and is the current, non-deprecated way to do this. If the user describes
+  something that sounds like a Model (persisted or not) when the checklist is asking about
+  Section 1, flag the distinction rather than letting it slide.
 - **Data Studio** — the workbench (grid icon → Data Studio) where Transforms, the Library,
-  Data structure (metadata editing), the Glossary, and the dependency graph/diagnostics live.
-  Core Data Studio (basic Transforms, Data structure editing, the Glossary) is on every plan;
+  table metadata (Data Studio > Tables — editing table/field descriptions, types, and other
+  attributes), the Glossary, and the dependency graph/diagnostics live. Core Data Studio (basic
+  Transforms, table metadata editing, the Glossary) is on every plan;
   getting in the door at all still needs the Admin or Data Analysts group, on any plan — see
   the self-segmentation step in Phase 1. A cluster of sub-features inside it are Pro/Enterprise
   only regardless of role: the Library, the Schema viewer, the dependency graph, dependency
@@ -120,17 +126,22 @@ ever saying the word **Transform**.
 - **Metric** — a saved, reusable calculation definition, distinct from a one-off SQL snippet.
   Creating and using Metrics is **on every plan**. Marking one Verified (see below) and
   per-metric result caching are Pro/Enterprise extras on top of that.
-- **Official** — a designation on a **Collection**, not on an individual question or
-  dashboard. **Pro/Enterprise only.** Marking a collection Official gives it a badge, and
-  items inside it inherit that badge when they show up elsewhere (e.g. a question from an
-  Official collection added to a non-Official dashboard still shows the badge). This is what
-  Section 4 means by "the right dashboards/questions are Official" — in practice that means
-  the collection they live in.
-- **Verified** — a separate, item-level trust marker (not the same thing as Official) that
-  admins can apply to a question, model, metric, or dashboard individually. **Pro/Enterprise
-  only.** For questions/models/metrics, editing the underlying query drops the Verified
-  status; dashboard verification persists through edits since it doesn't have its own query.
-  Docs describe Official + Verified as complementary, not either/or.
+- **Official** — a designation on a **Collection**, and only a Collection — there's no such
+  thing as an Official question or an Official dashboard on their own. **Pro/Enterprise only.**
+  Marking a collection Official gives it a yellow badge. Per current docs, that badge follows a
+  *question* into other contexts in one specific case: a question that lives in an Official
+  collection still shows the Official badge next to its name if it's added to a dashboard that
+  isn't itself in an Official collection. That's the one documented exception — don't extend it
+  further (e.g. to metrics or to Verified status, which works differently — see below). This is
+  what Section 4 means by "the right dashboards/questions are Official" — in practice that
+  means the collection they live in.
+- **Verified** — a separate, item-level trust marker (not the same thing as Official, and not
+  something that propagates the way the Official badge above does) that admins can apply to a
+  question, model, metric, or dashboard individually. **Pro/Enterprise only.** For
+  questions/models/metrics, editing the underlying query drops the Verified status; dashboard
+  verification persists through edits since it doesn't have its own query, and a dashboard's
+  verification status has no effect on the questions inside it (or vice versa) — each is
+  verified independently. Docs describe Official + Verified as complementary, not either/or.
 
 ---
 
@@ -185,8 +196,10 @@ message:
 > "Before we dive in: have you already poked at Metabot, the MCP server, or AI SQL at all? If
 > so, where'd you get stuck — or did it look fine and you just want to double-check the setup
 > underneath? And quickly, so I don't walk you through stuff you can't get to — are you a
-> Metabase admin (or in the Data Analysts group), and what plan are you on: open source,
-> Starter, Pro, or Enterprise? Not sure on any of that is a totally fine answer."
+> Metabase admin? If you're not sure whether you're also in the Data Analysts group, an easier
+> tell is: click the grid icon in the top right — if you see Data Studio in there, you have
+> that access, whatever your group membership is actually called. And what plan are you on:
+> open source, Starter, Pro, or Enterprise? Not sure on any of that is a totally fine answer."
 
 **Routing on starting point:**
 
@@ -210,17 +223,24 @@ message:
 **Routing on self-segmentation:**
 
 - **Admin / Data Analysts group vs. not.** Getting into Data Studio at all — Transforms, the
-  Glossary, Data structure editing, and (on Pro/Enterprise) the Library and dependency graph —
-  needs the Admin or Data Analysts group, on every plan. If the user isn't in that group, don't
-  narrate the click path — tell them what to hand to an admin instead, and keep coaching on
-  what they *can* do themselves. Note this is independent of plan: an open-source admin has
-  more access than a Pro non-admin.
-- **Slack setup is a different gate — don't conflate it with Data Analysts group access.**
-  Admins can always configure Metabot in Slack. A non-admin can too, but only with
-  **Application permissions → Settings access** granted specifically — being in the Data
-  Analysts group does *not* by itself grant that. If a non-admin says they can't get to Slack
-  settings, don't assume Data Analysts membership would fix it; ask whether they have Settings
-  access, or point them to an admin.
+  Glossary, table metadata editing, and (on Pro/Enterprise) the Library and dependency graph —
+  needs the Admin or Data Analysts group, on every plan. Most people don't know their own group
+  memberships by name (there's no self-service "your groups" view), so don't ask it that way —
+  use the observable proxy from the Phase 1 question instead: can they see Data Studio behind
+  the grid icon? If not, don't narrate the click path — tell them what to hand to an admin
+  instead, and keep coaching on what they *can* do themselves. Note this is independent of
+  plan: an open-source admin has more access than a Pro non-admin.
+- **Slack setup is a different gate — don't conflate it with Data Analysts group access, and
+  it's Pro/Enterprise-only in a different way than the Library etc. above.** Admins can always
+  configure Metabot in Slack, on every plan — that setup lives under Admin > Settings, which
+  only Admins can reach by default. On **Pro/Enterprise specifically**, a non-admin can also get
+  there if an admin has granted them **Application permissions → Settings access** (a Pro/
+  Enterprise-only permission type in its own right) — being in the Data Analysts group does
+  *not* by itself grant that. On open source or Starter, there's no such grant available at
+  all, so "only admins can do this" is the accurate, complete answer there. A non-admin won't
+  necessarily know the phrase "Application permissions" either — the practical check is whether
+  they can actually open Admin > Settings > Slack themselves; if they can't and don't know why,
+  point them to an admin rather than asking them to self-diagnose the permission name.
 - **Plan tier.** Most of this skill is on every plan — Glossary, core Metrics, basic
   Transforms, Metabot (in-product and Slack), the MCP server, and AI-assisted SQL aren't
   tier-gated. What *is* Pro/Enterprise-only regardless of hosting: the **Library**, the
@@ -299,10 +319,16 @@ section on its own.
 Also ask about write access — two separate kinds, both worth checking:
 
 - **Warehouse write/DDL access.** A Transform materializes a physical table, which needs
-  write/DDL access to the underlying database. If the user doesn't have that (common for
-  non-admins, or anyone without a data-engineering role), building a Transform themselves
-  isn't on the table — say so plainly, and point them to whoever owns the warehouse rather
-  than narrating a UI action they can't complete.
+  create/drop/write privileges on the underlying database — but that's a property of **the
+  database connection Metabase uses**, not of the Metabase user asking. Whatever credentials
+  the connection was set up with determine what any Transform can do, for every Metabase user
+  alike; docs specifically recommend pointing transforms at a separate writable connection.
+  Don't frame this as a personal permissions gap ("common for non-admins") — a Metabase admin
+  can just as easily be blocked here if the connection itself is read-only (this is common:
+  plenty of orgs deliberately connect Metabase with a read-only warehouse user). Ask whether
+  the connection can write, not whether the person asking is an admin — if it can't, point them
+  to whoever manages that database connection rather than narrating a UI action they can't
+  complete.
 - **Metabase-side access to run one at all.** Basic (query-based) Transforms are on every
   plan, but who can enable/run them is still gated: on open source/Starter, only admins can
   see or run Transforms; on Metabase Cloud, only a Store admin can enable them, since
@@ -406,20 +432,30 @@ difference, in case they want to go set it up before finishing.
 
 ## Phase 4 — Turn AI On, Everywhere (Section 6)
 
-Four surfaces, each coached rather than executed by Claude — none of these are things Claude
-can click through on the user's behalf. If Phase 1 routed the user here first (the "haven't
-tried anything yet" default), this is where that first real question happens — reuse it in
-Phase 3 rather than asking for a second one.
+Four surfaces, each coached rather than executed by Claude through the Metabase MCP server —
+none of these four are things Claude can click through on the user's behalf using MCP; Slack
+and Metabot-in-product both end in a real OAuth/toggle click only a human can do. (This
+MCP-only framing applies to Section 6 specifically. Sections 1, 2, and part of 4 are a
+different story if the user separately has the Metabase CLI, `mb`, set up — a distinct,
+execution-capable tool, authenticated as the user, that can directly create/edit transforms,
+tables, and fields, and manage collections and the Library over the API, rather than just being
+coached through them. That's outside this skill's MCP-only scope — point the user at the
+`metabase-cli` skill if they have `mb` and would rather have Claude do those parts than be
+coached through them.) If Phase 1 routed the user here first (the "haven't tried anything yet"
+default), this is where that first real question happens — reuse it in Phase 3 rather than
+asking for a second one.
 
 - **Metabot in-product.** Confirm it's enabled and the user has tried asking it a real
   question (can reuse the one from Phase 3, or ask it here first if this is where the session
   started).
-- **Metabot in Slack.** An OAuth flow gated by Settings access, not Data Analysts group
-  membership — see the Phase 1 note on this. Check the `profile` first — if the user is an
-  admin, walk the steps normally. If not, ask whether they have Application permissions →
-  Settings access before assuming they need an admin; if they don't have it either, tell them
-  what to hand to someone who does ("ask someone with Settings access to connect Metabot to
-  Slack under [admin setting]") and ask them to confirm once it's done.
+- **Metabot in Slack.** Set up under Admin > Settings, so only Admins can do this by default,
+  on every plan — see the Phase 1 note on this. Check the `profile` first — if the user is an
+  admin, walk the steps normally. If not: on Pro/Enterprise, ask whether they can actually open
+  Admin > Settings > Slack themselves (that means an admin granted them Application permissions
+  → Settings access); on open source or Starter, that grant doesn't exist, so just tell them
+  what to hand to an admin. Either way, if they can't get there themselves, tell them what to
+  hand off ("ask someone with Settings access to connect Metabot to Slack under Admin >
+  Settings > Slack") and ask them to confirm once it's done.
 - **Metabase MCP server, connected to Claude or Cursor.** If this is already connected (it
   had to be, to run Phase 3), this one's done — just confirm the user also has it wired into
   whichever tool they use day to day, not just this session.
