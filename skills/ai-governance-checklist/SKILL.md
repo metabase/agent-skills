@@ -1,25 +1,29 @@
 ---
 name: ai-governance-checklist
 description: >
-  A Metabase AI-governance coach. Use this skill whenever the user wants to: figure out how to
-  roll out AI analytics safely, control who can use Metabot or what it can see, set spend or
-  token limits on AI, restrict Metabot's system prompt, audit AI usage, evaluate bring-your-own
-  model or self-hosting options for AI, prep for a security review of AI features, or follow up
-  on AI Analytics Week Session 2 ("AI analytics, on your terms, on your infrastructure").
-  Trigger this skill even if the user just says "how do we control AI access", "can we limit
-  what Metabot sees", "we need an AI security review", or "run the AI governance checklist" in
-  a Metabase context.
+  A Metabase AI-governance coach, covering the *controls and rollout* side of AI: who may use
+  Metabot, what it can see, what it costs, where the model runs, and the audit trail. Use this
+  skill whenever the user wants to roll out AI analytics safely, control who can use Metabot or
+  what it can see, set spend or token limits on AI, restrict Metabot's system prompt, audit AI
+  usage, evaluate bring-your-own model or self-hosting options for AI, or prep for a security
+  review of AI features. Trigger it even if the user just says "how do we control AI access",
+  "can we limit what Metabot sees", "we need an AI security review", or "run the AI governance
+  checklist" in a Metabase context. **Not this skill** if the question is about whether the
+  underlying data is modeled, documented, and trustworthy enough for AI — Transforms, metadata,
+  the Glossary, Metrics, the Library — that's `ai-readiness-checklist`. Rough test: this skill
+  is about who gets to point AI at the data; that one is about whether the data is good enough.
 metabase_version: "0.63"
 last_updated: "2026-08-26"
 ---
 
 # Metabase AI Governance Checklist
 
-A task-completion coach, not a course. Companion to AI Analytics Week Session 2, "AI
-analytics, on your terms, on your infrastructure." Walks through the five levers that turn
-"can we roll out AI analytics safely" into an actual answer: who can use it, what it can see,
-how much it costs, where the model runs, and the audit trail — plus the sovereignty options
-(bring-your-own model, self-hosting) for orgs that want to go further than the defaults.
+A task-completion coach, not a course. Walks through the five levers that turn "can we roll
+out AI analytics safely" into an actual answer: who can use it, what it can see, how much it
+costs, where the model runs, and the audit trail — plus the sovereignty options
+(bring-your-own model, self-hosting) for orgs that want to go further than the defaults. (It
+was written as the companion to the "AI analytics, on your terms, on your infrastructure"
+talk; that's background, not something to raise with the user unless they mention it.)
 
 This is a **governance/rollout coach, not a data-modeling coach**. For getting the underlying
 data itself AI-ready — Transforms, the Glossary, Metrics, the Library — that's the
@@ -105,11 +109,14 @@ Name these by their actual product names, the same discipline as `ai-readiness-c
 - **AI usage auditing** — Pro/Enterprise. Logs the Metabot chat sidebar, Documents, the Slack
   integration, and inline SQL editing, at three levels of detail: conversations, individual
   messages, and per-call token consumption. Filterable by user, group, date range, and tenant.
-  **MCP server activity isn't covered yet** — MCP requests don't go through Metabot's
-  conversation pipeline, so they generate no conversation or token rows today; coverage is
-  coming. This is background for you, not a script: when it actually comes up with a user, say
-  it in one short line — "quick note, MCP activity isn't tracked in usage auditing yet, but
-  coverage's coming soon" — and don't unpack the pipeline mechanics unless they ask.
+  **MCP server activity isn't covered** — the docs are explicit that the conversation count
+  excludes MCP, which makes sense since MCP requests don't run through Metabot's conversation
+  pipeline. Say this plainly when it comes up, in one line: "MCP activity isn't tracked in
+  usage auditing." **Don't tell anyone coverage is coming** — no published roadmap commits to
+  that, and this audience is the most likely to write whatever you say into a compliance
+  document. If they need MCP visibility today, the honest pointer is Admin > AI > MCP >
+  Authorizations, which logs client registrations and approve/deny decisions (not
+  conversations or tokens). Don't unpack the pipeline mechanics unless they ask.
 - **Verified-only mode** — Pro/Enterprise. Restricts Metabot to only use models and metrics
   that have been marked Verified (see `ai-readiness-checklist`'s Product Terms for what
   Verified means). A tidy pairing if the user has already done that groundwork.
@@ -243,8 +250,9 @@ because three of the five checklist rows are Pro/Enterprise-only:
   all Pro/Enterprise. If the user is on open source or Starter, don't recite that list by name
   or stack it with the admin-access point — say once, plainly, that fine-grained control (who,
   cost caps, audit trail) lives on Pro/Enterprise, that they may not need it yet depending on
-  team size and how much is already handled by self-hosting/BYO, and that Pro has a two-week
-  free trial if they want to see it before deciding. Then focus the rest of the conversation on
+  team size and how much is already handled by self-hosting/BYO, and that Pro has a
+  free trial if they want to see it before deciding (don't quote a specific length — that's a
+  pricing-page detail that changes without touching this file). Then focus the rest of the conversation on
   what's actually available to them: BYO model, self-hosting, and understanding what data does
   and doesn't move (see Product Terms above).
 - **Opt into the full tour anyway.** Same as `ai-readiness-checklist` — offer it once for
@@ -288,15 +296,37 @@ For whichever row(s) actually get covered:
 which just have it by default. A common finding: nobody's actually looked at this since it was
 turned on for everyone.
 
-**What it can see.** This is the one with a real check available (see Honesty section above,
-including the identity-matching caveat — the test only proves something about whoever the MCP
-session is authenticated as). Ask if there's a specific boundary they care about, and if MCP is
-connected as the right identity, offer to actually test it — have Metabot (or a direct MCP
-query) attempt something it should be blocked from, and confirm it is. If there's no MCP
-connection, no specific boundary to test, or the connected identity doesn't match who's under
-review, this stays self-reported: the underlying principle is that Metabot inherits the asking
-user's existing data permissions (including row/column-level security where that's configured)
-— it doesn't get broader access than the person using it has.
+**What it can see.** Two halves, and the skill is only useful if you cover both.
+
+*The passive half — inherited permissions.* Metabot inherits the asking user's existing data
+permissions (including row/column-level security where that's configured); it doesn't get
+broader access than the person using it has. This is also the one row with a real check
+available (see Honesty section above, including the identity-matching caveat — the test only
+proves something about whoever the MCP session is authenticated as). Ask if there's a specific
+boundary they care about, and if MCP is connected as the right identity, offer to actually test
+it — have Metabot (or a direct MCP query) attempt something it should be blocked from, and
+confirm it is. If there's no MCP connection, no specific boundary to test, or the connected
+identity doesn't match who's under review, that stays self-reported.
+
+*The active half — the knobs an admin actually turns.* Inherited permissions are the floor, not
+the whole answer, and someone asking "what can Metabot see?" usually wants to know what they
+can *narrow*. Three controls, all in Admin > AI > AI settings:
+
+- **Verified content** (Pro/Enterprise) — restrict Metabot to verified content. Note the real
+  scope: it covers **models and metrics only**, so it's not a general "only trusted stuff"
+  switch. Pairs with the Verified groundwork in `ai-readiness-checklist`.
+- **Collection for natural language querying** — scope which collection (and subcollections)
+  Metabot searches. Two limits worth stating plainly so nobody treats it as a security
+  boundary: it only affects conversations started from + New > AI exploration, and people can
+  still @-mention items outside it.
+- **Internal vs. Embedded, configured separately** — the Metabot settings card has two tabs,
+  each with its own enable toggle, verified-content setting and allowed collection. An org can
+  run Metabot internally while granting nothing in an embedded context, or scope the two
+  differently. Easy to miss, and it matters to anyone embedding.
+
+None of these three is a permissions control — they shape what Metabot reaches for inside what
+the user could already access. If someone wants to actually block access, that's data
+permissions, not these.
 
 **How much it costs.** Token or message limits, instance-wide/per-group/per-tenant — settable
 on their own, no need to touch per-group feature access first (see the AI usage controls note
