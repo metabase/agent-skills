@@ -9,11 +9,13 @@ Use HOL Guard as the local agent-runtime safety boundary before high-impact Meta
 
 ## Protect the local harness
 
+Probe the actual HOL Guard CLI rather than relying on a platform-specific executable lookup:
+
 ```bash
-command -v hol-guard
+hol-guard --version
 ```
 
-If HOL Guard is missing and runtime protection was requested, prefer an isolated install:
+If that command is unavailable and runtime protection was requested, prefer an isolated install:
 
 ```bash
 pipx install hol-guard
@@ -26,7 +28,7 @@ hol-guard bootstrap
 hol-guard detect --json
 ```
 
-If the detected harness is `hermes`, use its dedicated bootstrap path:
+If the detected harness is `hermes`, use its dedicated bootstrap path instead:
 
 ```bash
 hol-guard hermes bootstrap
@@ -38,15 +40,16 @@ For other supported harnesses, use the generic installer:
 hol-guard install <harness>
 ```
 
-Then keep the existing dry-run, launch, and status checks:
+Then keep the existing dry-run, launch, status, and harness-specific verification checks:
 
 ```bash
 hol-guard run <harness> --dry-run
 hol-guard run <harness>
 hol-guard status
+hol-guard doctor <harness> --json
 ```
 
-Use the harness identifier reported by `detect` when supported. Run the Metabase workflow from the protected harness launched by `hol-guard run`. Do not claim protection unless Guard status or doctor output proves it.
+Use the exact harness identifier reported by `detect --json`. Run the Metabase workflow from the protected harness launched by `hol-guard run`. If the dry run, status, or harness doctor reports an error or cannot prove the protection state, stop mutation-bearing Metabase work rather than falling back to an unprotected agent.
 
 ## Require Guard before mutations
 
