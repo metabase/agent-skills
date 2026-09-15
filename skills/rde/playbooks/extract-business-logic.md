@@ -1,53 +1,66 @@
 # Extract business logic from existing artifacts
 
-Applies when the rules exist in code, documents, a transformation project, or a spreadsheet; produces a builder's reference independent of the originals, every claim tagged by confidence, a gap report per requested number, and ratified assumptions. No SQL is written.
+Applies: the rules exist in code, documents, another tool's project, a spreadsheet, or in definitions already in the instance. Produces either a mirror of the existing definitions (the light path) or a tagged reference plus a gap report per requested number (the migration path). No SQL is written.
 
-Read first: the specification-extraction, gap-report, and specification-versus-build-instructions sections of [`ledgers-and-artifacts.md`](../references/ledgers-and-artifacts.md), [`profiling-catalog.md`](../references/profiling-catalog.md), and [`collaboration-contract.md`](../references/collaboration-contract.md).
+Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 path` `2 inventory` `3.<artifact> read` `4 tag` `5 live check` `6 gap report` `7 ratify` `reply`.
 
-## 1. Inventory the artifacts
+Read first: [`extraction-and-gap-report.md`](../references/extraction-and-gap-report.md), [`profiling-catalog.md`](../references/profiling-catalog.md), and the domain file STATE.md names.
 
-Scope is what you can read locally or fetch; an unreachable document space is one the user exports on request. List every repository, document space, and export; record an unreachable one per the unreachable-sources rule in `ledgers-and-artifacts.md`.
+## Commands you will run
 
-Check: each artifact is marked reachable or not; the crawl scope is written down.
+Every line also takes `--profile $PROFILE --json`; `q()` is sourced from `./.scratch/probe.sh`.
 
-## 2. Read exhaustively
+```bash
+mb search "<number or term>" --models metric,measure,segment,card,dataset,transform --db-id $DB
+mb card get <id> --fields name,description,dataset_query          # a definition people already use
+mb transform list --fields id,name,description,target             # the five facts, if anyone wrote them
+mb table list --db-id $DB --fields id,name,schema                 # every cited table exists here, or it does not
+mb table get <table-id> --include fields
+q "SELECT <cited column>, count(*) AS n FROM <schema.table> GROUP BY 1 ORDER BY 2 DESC LIMIT 50"   # does the cited value still occur
+```
 
-Apply the code reading list and the document dating and tagging rules from `ledgers-and-artifacts.md` to every artifact in scope.
+## 1. Pick the path
 
-Check: every child page and linked file in scope was read, not only the pages handed to you.
+"Reuse what we have": read the definitions in use (`card get`, transform descriptions, the company's own project files), write each into STATE.md Questions with its home table and filter, tag each per `extraction-and-gap-report.md`, and continue in [`build-semantic-layer.md`](build-semantic-layer.md); nothing below runs. A migration, a disputed number, or rules nobody can point at: steps 2 to 7.
 
-## 3. Tag every claim
+## 2. Inventory the artifacts
 
-Apply the claim tags, the citation rule, the contradiction rule, and the two mandatory sections (hardcoded-value inventory, join map) from `ledgers-and-artifacts.md`; the document's opening lines state the tagging scheme.
+Scope is what you can read locally or fetch; an unreachable document space is exported by the user on request and recorded per the unreachable-sources rule. Crawl stop rule: read a page only when it names a table, a column, or a number the build needs; stop when a level of links adds none. `[DECIDED, reversible]`: the scope, written down.
 
-Check: no untagged claim; no `PROVEN` claim without a citation.
+## 3. Read
 
-## 4. Check against live data
+Apply the code reading list and the dating rules in `extraction-and-gap-report.md` to every artifact in scope.
 
-Confirm every cited table and column exists (`mb table list --db-id <db-id> --fields id,name,schema --max-bytes 0 --json`, then `mb table get <id> --include fields --json`) and profile the values behind each rule with `profiling-catalog.md`. Verdict-changing findings: a filter on a value that no longer occurs; a mapping covering only inactive keys; a documented uniqueness rule the data violates. On a fact about the data, the data wins; the divergence is a finding.
+## 4. Tag every claim
 
-Check: every cited identifier was verified against the live catalog.
+Confidence tags, citation rule, contradiction rule, the hardcoded-value inventory, and the join map per `extraction-and-gap-report.md`; the document opens by stating the scheme. No untagged claim; no proven claim without a citation.
 
-## 5. Build the gap report
+## 5. Check against live data
 
-One record per requested number and dimension in the gap-report format from `ledgers-and-artifacts.md`, opening with the verdict matrix.
+Every cited table and column exists in the catalog; the values behind each rule are profiled with `profiling-catalog.md`. Verdict-changing findings: a filter on a value that no longer occurs; a mapping covering only inactive keys; a documented uniqueness rule the data violates. On a fact about the data, the data wins; the divergence is a finding.
 
-Check: the summary counts match a recount of the matrix; no cited column skipped step 4.
+## 6. Build the gap report
 
-## 6. Stop and ratify
+One record per requested number and dimension in the format in `extraction-and-gap-report.md`, opening with the verdict matrix; the report is the deliverable. Specification and environment values are one document; the ids live in STATE.md.
 
-Present the gap report and wait. Group open questions by owner, one sentence each; a decision uses the checkpoint block in [`collaboration-contract.md`](../references/collaboration-contract.md). Record every resolution in the assumption ledger; an unratified assumption enters the build as a pre-registered checkpoint, never as a fact.
+## 7. Ratify
 
-Check: no unresolved question is about to become a modeling choice made alone.
+Present the report; open questions as one decision memo per the contract, grouped by owner. Reversible items proceed on the default; an irreversible one is a `[CHECKPOINT]`. Every item is a STATE.md Decisions row; an unratified assumption enters the build as an open row, never as a fact. The ratified reference plus the report is the plan [`build-clean-tables.md`](build-clean-tables.md) expects; validation against the original artifact's own output measures parity only (`reconciliation.md`).
 
-## 7. Hand off
+Finished example, the verdict matrix:
 
-Split the deliverable per Specification versus build instructions in `ledgers-and-artifacts.md`: the ratified reference is the specification, the gap report and environment values are the build instructions; together they are the approved plan [`build-clean-tables.md`](build-clean-tables.md) expects. Validation against the original artifact's own output measures parity only (validation-mode table in `reconciliation.md`); say so.
+```
+| number                | verdict | source (dated, tag)                        | live data                                   | gap                       |
+| MRR                   | EXACT   | billing_sql/mrr.sql, 2026-03, PROVEN       | invoice_line amounts present, 0.0% null     | none                      |
+| Net revenue retention | APPROX  | wiki "Metrics", 2025-11, DOCUMENTED        | no plan history before 2026-01              | history horizon 2026-01   |
+| Activation rate       | NONE    | analyst chat, undated, INFERRED            | events carry no signup event                | needs a definition (D12)  |
+Summary: 1 exact, 1 approximate, 1 none; 4 contradictions recorded; 2 cited columns absent from the catalog.
+```
 
 ## Done when
 
-Every check in steps 1 to 6 passes and the user has approved.
+Every artifact in scope is read or marked unreachable; every claim is tagged; every cited identifier was checked live; the gap report's counts match a recount of the matrix; the open questions are in STATE.md with owners.
 
 ## Reply
 
-What can and cannot be built, as three counts and one sentence on why. The contradictions found, both positions with dates. Where the data disagreed with the documents. The open questions grouped by who can answer them. Nothing is built; approval starts the build.
+The five-part hand-back in `collaboration-contract.md`; under part three: the verdict counts and one sentence on why, the contradictions with both positions and dates, where the data disagreed with the documents.

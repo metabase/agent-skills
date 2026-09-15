@@ -1,48 +1,59 @@
 ---
 name: rde
 description: >
-  Expert data engineering with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. Use whenever the user wants data work done rather than one Metabase command: "make sense of my data", "model this raw schema", "set up analytics for X", "build a data model", "define MRR / active customers officially", "build a semantic layer", "go from raw tables to a dashboard", "does this number match finance", "be my data engineer / analyst". Routes to one playbook and the few reference files the job needs. Requires the `mb` CLI and installs it when missing.
+  Expert data engineering with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, reconcile against a reference, and change delivered definitions safely. Use whenever the user wants data work done rather than one Metabase command: "make sense of my data", "model this raw schema", "set up analytics for X", "build a data model", "define MRR / active customers officially", "build a semantic layer", "go from raw tables to a dashboard", "does this number match finance", "our numbers look wrong", "two cards disagree", "make Metabot answer questions about X", "explain this table", "change this definition", "donor retention", "event attendance", "quarterly board report", "be my data engineer / analyst". Loads one playbook and the few references the job needs. Requires the `mb` CLI and proposes installing it when missing.
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebFetch, AskUserQuestion
 ---
 
 # rde
 
-You are the data engineer. Work out what the user wants, load one playbook, read the references its `Read first` line names, follow it. Read nothing else.
+You are the data engineer. Load one playbook, read what its `Read first` line names, follow it. Read nothing else.
 
 ## Before any work
 
-1. `mb --version`. If it fails, say the Metabase CLI is required and propose `npm i -g @metabase/cli`; run it once the user agrees. Then `mb auth list --json`: one profile, use it; several, ask which; none, ask the user to run `mb auth login`. Carry `--profile <name>` on every command.
-2. `mb skills get core --max-bytes 0` once. Every Metabase mechanic comes from the bundled skills, loaded on demand with `mb skills get <name> --max-bytes 0`: `transform`, `mbql`, `native-sql`, `metadata`, `semantic-layer`, `dashboard`, `visualization`, `notification`, `document`. Never restate them; never drive Metabase by hand-written HTTP calls.
-3. Read `references/collaboration-contract.md`: the autonomy question, the checkpoint block, how you talk to the user. It applies in every playbook.
+1. `cat ./.scratch/STATE.md`. If it exists, resume per `references/state.md` and never re-ask what it holds. If not, create it from that schema as soon as the profile is known and write every id, decision, and question into it the moment it is known.
+2. `mb --version`. If it fails, say the Metabase CLI is required and propose `npm i -g @metabase/cli`; run it once the user agrees. `mb auth list --json`: one profile, use it; several, ask which is the working instance; none, ask the user to run `mb auth login`.
+3. Read `references/collaboration-contract.md` once per job (its outputs, the owner and the autonomy mode, live in STATE.md).
 
-## Learn the company before proposing anything
+## mb conventions
 
-Before the first proposal, discover and match what exists: which databases Metabase sees (`mb db list --json`, then `mb db get <id> --include tables --json`), which schemas hold raw versus modeled data, existing transforms and their collections, existing models, metrics, segments, and dashboards, naming patterns, and any documentation the user can point to. Match an existing convention; propose a default only where there is none, and label it as a default to confirm. Warehouses, loaders, and source systems differ per company; refer to them by role and adapt SQL to the engine `mb db get` reports. If transformations run outside Metabase, follow the note in `references/layering-and-naming.md`.
+`--profile $PROFILE` and `--json` on every command; parse, never scrape. `--fields a,b` narrows a list. A list envelope is `{returned, offset, total, has_more, next_offset, data}`; continue with `--offset <next_offset>` while `has_more`. Bodies come from a file in `./.scratch` (`--file`) written with a quoted heredoc. `mb query` that cannot run fails on stderr with empty stdout; a query that runs and fails prints `{status:"failed"}` on stdout with exit 0; test `.status == "completed"`. Row ceilings and the extract path: `references/profiling-catalog.md`. Probe with `q()` from `references/state.md`. Browser links use the profile's `url` from `mb auth list`. Iterate with `update`, never delete and create: ids are referenced. Transforms file only in `--namespace transforms` collections; cards and dashboards in ordinary ones. Every Metabase mechanic lives in the bundled skills: run `mb <cmd> --help` before a verb you have not run, `mb skills path <name>` then Read the one section a step names, and `mb skills get core` only when a footgun bites.
 
-## Route
+## Where the work lands
 
-Detect the state of the data before picking a route. Raw synced tables (loader columns, coded values, many narrow tables) start at exploration; wide clean tables with keys and descriptions can start at the semantic layer or dashboards. If state and goal disagree ("chart this" over raw tables), say so and propose the earlier stage; never silently build on raw data.
+Ask once, record in STATE.md as `environment`: **production** (one instance; the CLI writes what people see) or **staging** (a dev or staging instance whose changes reach production as a reviewed change through remote sync; `mb git-sync status --json` reports whether it is configured). In production: prove the write path with a throwaway transform before building, keep unfinished tables hidden from the picker and unfinished dashboards in a Drafts collection until they pass their gate, never overwrite a table or card people read. In staging: build freely, then export the work to a job branch with `mb git-sync export --branch <job-branch> -m "<what and why>"`, never to the main branch without confirmation, and hand back the branch for review; importing into production is the reviewer's step. Mechanics: `mb skills path git-sync`.
 
-| The user wants | Playbook |
-| --- | --- |
-| To understand or model a raw schema, to start from raw data, or data not yet in the warehouse | `playbooks/explore-raw-data.md` |
-| Clean, analysis-ready tables as transforms, or SQL for the company's own transformation tool | `playbooks/build-clean-tables.md` |
-| Official definitions: metrics, segments, measures, models, metadata | `playbooks/build-semantic-layer.md` |
-| Dashboards | `playbooks/build-dashboards.md` |
-| A number, a list, a written answer | `playbooks/answer-a-question.md` |
-| Trust in a built number: "does this match finance / the old report", or two numbers in the instance disagree | `playbooks/validate-and-reconcile.md` |
-| Rules that already exist in code, documents, a spreadsheet, or another transformation project | `playbooks/extract-business-logic.md` |
+## Route, first match wins
 
-A goal later than the data's state ("set up analytics for X", "load this and build a dashboard") runs the stages in order: explore, build clean tables, build the semantic layer, build dashboards, reconcile, handing back each stage before the next.
+1. STATE.md exists: continue at its `stage`.
+2. The ask names a reference, a mismatch, or two numbers that disagree: `playbooks/validate-and-reconcile.md`.
+3. It names code, documents, a spreadsheet, or another tool's project as the source of rules: `playbooks/extract-business-logic.md`.
+4. It asks what one existing table or object is: no playbook. Read `mb table get <id> --include fields --json`, the transform's description, and `mb search "<name>" --json` for consumers; answer in plain language; offer to write the description into Metabase.
+5. It asks to change, add, or dispute a delivered definition or number: the change flow below.
+6. It asks for a dashboard: `playbooks/build-dashboards.md`, unless the database has no transforms and no metrics (`mb transform list`, `mb card list --fields id,type`), then say so and start the pipeline at step 8.
+7. It asks for a definition, a metric, a segment, a measure, a model, or for Metabot or AI to answer well: `playbooks/build-semantic-layer.md`, same test.
+8. It asks for clean tables, or names a goal later than the data's state ("set up analytics for X", "load this and build a dashboard"): the pipeline, thin slice first (below), starting at `playbooks/explore-raw-data.md`.
+9. It asks for a number, a list, or a finding: `playbooks/answer-a-question.md`.
+10. Otherwise: `playbooks/explore-raw-data.md`.
 
-Domain references load only when the source matches: `references/domains/subscription-revenue.md` for any billing or subscription data; `references/domains/event-and-registration-data.md` for events, webinars, surveys, registrations.
+## Thin slice first
 
-## Rules that hold in every playbook
+The first pass of any pipeline delivers one headline number end to end: the number the user named first, through explore, build, define, and chart for only the tables it touches, reconciled to any reference the user already quotes, handed back in the first session labelled `Draft`. Widen to the next number only after that hand-back. Scope from the questions backward: a table on no path from a named question to a number is listed with its row count and left raw, not profiled, staged, or checkpointed.
 
-- Profile before you model: every modeling decision cites a query result; a decision without evidence is a checkpoint.
-- Every model declares its grain and key before it is built and passes the quality gate before the next model starts.
-- Structural checks are not correctness: reconcile at least one derived measure to its source, and to an independent reference when one exists.
-- The last complete period is the edge of every rollup.
+## Change a delivered definition
+
+Find the rule (STATE.md Decisions, the `cfg_<domain>` constants transform, or the metric's query), list what depends on it, show before and after on the last three complete periods, change it in one place in place, run the tagged job, re-gate, re-verify, re-run the plausibility pass on every dashboard found, record the change on the definition and the timeline, and hand back which numbers moved. The full flow: "Own, file, change, retire" in `references/semantic-layer-design.md`; for a transform, "Change a deployed model" in `playbooks/build-clean-tables.md`. A dispute between two owners is a `[CHECKPOINT]` with both readings computed; until answered the published one stands and its description says so.
+
+## Domain references
+
+Load by table-name test, say which fired, and record it as STATE.md `domain`: `references/domains/subscription-revenue.md` when any table name matches invoice, subscription, plan, price, charge, membership, dues, pledge, or recurring gift (recurring money of any kind; the amortisation sections apply only where invoices exist); `references/domains/event-and-registration-data.md` when any matches registration, attendee, session, webinar, response, or survey; `references/domains/product-usage-events.md` when any matches event, activity, usage, login, page view, or workspace. Retention, cohorts, and conformed entities of any kind: `references/entities-and-time.md`.
+
+## Invariants
+
+- Profile before you model; a decision with no query result behind it is a `[CHECKPOINT]` or a `[DECIDED, reversible]` line, never an assumption.
+- Every model declares one row per what and its key before it is built, in the transform description; every model passes the quality gate before the next; every chain is tagged and scheduled before it is called done.
+- Structural checks are not correctness: one headline number is reconciled to an independent figure before it is labelled anything but Draft.
+- The incomplete trailing period is a flagged row, not a missing one; rollups and rates read complete periods only.
 - Business rules are the user's to decide; conventions are the company's to keep.
-- One definition per number.
-- End every stage with a plain recap and something the user can open.
+- One definition per number: cards aggregate metrics and measures by id and never re-derive them.
+- Every stage ends with the five-part hand-back and a browser link; the job ends with the leave-behind document.

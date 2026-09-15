@@ -1,84 +1,65 @@
 # Semantic layer design
 
-What deserves a definition, which kind it is, how to keep one definition per number, and how to document it so caveats travel with the number; the router sends you here before any model, metric, measure, segment, or field-metadata edit. Mechanics are `mb skills get semantic-layer` and `mb skills get metadata`; decide here, execute there.
-
-## Discover what exists
-
-`mb segment list --json`, `mb measure list --json`, `mb library get --json`, `mb collection tree --json`, `mb card list --fields id,name,type,collection_id --json` (rows carry `type`, so metrics and models are in it), `mb search "<term>" --models metric,segment,measure,dataset --json`; then `mb card get <id> --fields dataset_query --json` on the saved questions that repeat, for the filters and calculations people re-type. Extend an existing definition instead of creating a parallel one; match its casing and noun order. Disagreements among saved questions are definitions to settle at a checkpoint (block in [collaboration-contract.md](collaboration-contract.md)) before building.
-
-## Field metadata
-
-On every table you will define against, in this order: entity key, foreign-key targets, semantic types, display names, plumbing hidden, descriptions. Complete means a description on every column people read and a semantic type on every column with business meaning. Ambiguous words are banned as column names: a term that names several populations in the business gets a disambiguated name at every use site, `billing_accounts`, `login_accounts`, or `contacts`, never `accounts`. Ids beside labels: [layering-and-naming.md](layering-and-naming.md). The rest: `mb skills get metadata`. No metric is defined before this pass is complete.
+Which kind of definition a number needs, the metadata chain, and how definitions are owned, verified, and changed; the router sends you here before any definition or metadata edit. Extend an existing definition (discovery: [layering-and-naming.md](layering-and-naming.md)), never a parallel one; two saved questions disagreeing about one number reconcile under [reconciliation.md](reconciliation.md).
 
 ## Which kind of definition
 
-| Entity | Stands for | Example |
-| --- | --- | --- |
-| Model | the curated column set or join people start from | `Orders` over the clean order table |
-| Metric | the published number, an aggregate | `Total Revenue` = `Sum([revenue_usd])` |
-| Measure | a table-bound aggregation reused inside questions | `Order count` on the order table |
-| Segment | the row filter | `Paid accounts` = `plan <> 'plan_free'` |
-| Dimension (a typed column) | the group-by | `Plan`, `Month`, `Region` |
-| Transform | everything else | joins, row-level maths, business logic |
-
-- A metric formula is an aggregation; a calculated column belongs in a transform and exists before the metric is written.
-- A metric contains no join; a number needing two tables is a transform that widens the table first.
-- A metric contains no row filter; reusable row selection is a segment the user combines at question time.
-- A metric, measure, or segment reaches only the table it is defined on (`mb skills get semantic-layer`, single-table reach), so check reach before promising one.
-- A metric is *the* company number; a convenient aggregation is a measure, not a published metric.
-
-| Anti-pattern | Fix |
+| Kind | Stands for |
 | --- | --- |
-| Metric bundling several aggregations, a join, and a filter | transform plus a plain aggregate |
-| Segment that changes what one row means | it is a transform |
-| Native SQL question answering what the layer should answer | log the gap in the coverage file, build the definition |
-| Everything published to the Library | publish only the canonical set; Library placement is a trust signal |
+| Model | the starting object only where people start from a join; metrics only on it (`source-card`); the Library is not required for a curated table |
+| Metric | the published number: one aggregation, its definitional filter, its time dimension |
+| Measure | the formula, once, on one table (v59+) |
+| Segment | a slicing filter, on one table |
+| Transform | a calculated column, a join, anything changing what a row means; built before the metric reads it |
 
-## One definition per number
+- Filters. Definitional (non-test, recognised, complete periods) is part of the number: a transform-computed flag inside the metric's own query. Slicing (region, plan) is a segment or a dashboard filter. `Paid revenue` is its own metric over the base metric, so the formula is written once.
+- Ladder, in build order: measure `definition` with exactly one aggregation, `["sum", {}, ["field", {}, <mrr_usd-id>]]`; headline metric `"aggregation": [["measure", {}, <measure-id>]]` plus definitional `filters`; derived metric `["metric", {}, <metric-id>]` in the aggregation slot, arithmetic over two for a ratio; a card slices with `"filters": [["segment", {}, <segment-id>]]`. Below v59 the headline metric carries the formula itself.
+- One starting object per table, the curated table by default (Library or not): plumbing `visibility_type: hidden`, display names, descriptions, and no model over it, because measures and segments never show on a model. A model only where people start from a join, and then metrics only.
+- A segment or measure never follows its table into a join, nested question, or model. A breakout crosses a metadata foreign key with no join: `["field", {"source-field": <fk-field-id>}, <target-field-id>]`. Widen with a transform only for columns a measure or segment reads; one fact per grain plus conformed entity tables ([entities-and-time.md](entities-and-time.md)) beats a wide table per question; never copy tables the company maintains elsewhere.
 
-Exactly one definition of each headline number exists in the instance. `Paid Revenue` is `Total Revenue` with `Paid accounts` applied, not a second metric. Failure condition: the moment two cards can disagree about a number, the layer has failed.
+## Time dimension and display on every metric
 
-Compose derived numbers from canonical metrics: `Revenue per Customer` = `[Total Revenue] / [Paying Customers]`; `Net New Revenue` = the sum of the signed movement metrics. When a number needs metrics from two tables: widen the table, align through a shared foreign-key dimension, or accept two charts.
+A metric with a time column carries it as a monthly `temporal-unit` breakout in its `dataset_query` with `"display": "line"`; that breakout is its default time dimension and a trend card inherits it. One with none is `"display": "scalar"`.
 
-## Decompose the questions
+## The metadata chain
 
-1. Record the questions verbatim in `./.scratch/questions.md`; paraphrasing into metric names loses scope.
-2. Name each question's tuple: metric, segment, breakout dimensions, grain.
-3. Collapse: tuples differing only in segment or breakout are one metric. "Revenue for plan_basic", "Revenue by plan", and "Quarterly revenue by plan" are one metric, one segment, two breakouts.
-4. Write the question-to-build map in `./.scratch`, one row per cluster: `Question cluster | Metric | Segment | Break out by | Dashboard`.
-5. Build the metrics, segments, and dimensions, not the questions.
-6. Walk every question back into a coverage file in `./.scratch` mapping question to metric, segment, breakout, dashboard. A gap is stated, never filled with a one-off SQL card.
+In this order on every table you define against, each for what it unlocks; no metric before the pass.
 
-## Pin every word to real data
+1. `visibility_type: technical` on every raw, staging, and intermediate table the build touched (`mb table update <id> --body '{"visibility_type":"technical"}'`): the picker offers only the final layer.
+2. `entity_type` per final-layer table (`entity/UserTable`, `entity/EventTable`, ...): x-rays and Metabot know what a row is.
+3. `type/PK` on the key; `type/FK` plus `fk_target_field_id` on every column naming another final-layer row: `source-field` joins, linked filters, Library cascade.
+4. A semantic type on every column with business meaning (`type/Category` on breakouts, `type/Currency` on money, temporal types on dates): widget and formatting.
+5. `has_field_values: list` on every column a dashboard filters by, `search` on high-cardinality ids and emails: dropdown versus search box.
+6. `visibility_type: hidden` on plumbing columns, `details-only` on long text; `field_order` on the table.
+7. `display_name` and `description` on every column people read: what search and Metabot rank by.
+8. On the table: `description`, `caveats` (the standing caveats metric descriptions point to), `owner_email`, `data_layer`.
+9. After every job run that can add a category value, `mb db rescan-values <db-id>`, scheduled beside the job.
 
-Before defining `Active customer`, confirm the candidate rule against actual values: the distinct values of the status column, the spread of the last-order date, the row count each candidate catches. Use the entities and vocabulary the organisation already uses; when a word is contested, ask.
+## The Questions table
 
-## Naming
+In STATE.md ([state.md](state.md)), one row per cluster with the columns there. Rows differing only in filter or breakout are one metric. The time column is the date basis, a reversible decision shown per the contract. A breakout shared by clusters on different home tables is a conformed dimension: once, on an entity table every home table reaches by foreign key, never copied onto each fact ([entities-and-time.md](entities-and-time.md)). A question the layer cannot answer is a gap row, never a one-off SQL card.
 
-Name for the person reading a menu six weeks from now, in plain English, the population and window in the name; join keys named identically wherever the same thing appears. Examples: `mb skills get semantic-layer`.
+## Library
 
-## Thresholds
+Canonical set: the home tables the Questions table names plus the entity tables they reach by foreign key; nothing atomic or intermediate. Ask for a yes on that list. Cascade guard: publishing cascades to upstream FK targets, so before `mb library publish --table-ids <ids>` every FK on a published table targets a final-layer table; a FK into staging publishes staging. Without the Library, `Definitions` is the canonical set.
 
-Segment strictness, plan boundaries, recency windows: each is a default to confirm. Present the candidate values with the row count each catches, recommend one, and record the confirmed value as a named constant so a change is a re-run.
+## Own, file, change, retire
 
-## Document so caveats travel with the number
-
-A headline metric's description carries: grain and time convention (point in time at period end, trailing window); the formula inline where the name is looser than the definition; inclusions and exclusions with the size of the largest exclusion; which events do not move it (refund, credit, status change); whether prior periods can restate and why; which other number it must not be reconciled against one to one; a pointer to the timeline marking known incidents.
-
-A segment's description states what it includes, what it excludes, why, and the business warning attached (a move from `plan_plus` to `plan_basic` is a downgrade, not churn).
-
-Keep a glossary in `./.scratch`, one entry per loosely used term, recording where the available documentation disagrees rather than picking a winner nobody agreed to.
-
-`mb timeline create` and `mb timeline-event create`: one timeline for definition changes (one event per date a definition moved, with direction and size), one for known data incidents (affected entity, signed error). Events render only on time-series questions in the timeline's collection, so file the timeline in the collection holding the affected metric's questions.
-
-Never clean caveats away for a tidy dashboard; known errors, excluded populations, and an unexplained residual stay visible. Data-quality content lives in its own collection, separate from the business collection.
+- Default filing, to confirm: one collection per business domain holding its dashboards, `Definitions` under it for metrics and models; the Library's Data and Metrics collections hold the canonical set (`mb card update <id> --body '{"collection_id":<id>}'` files a metric).
+- Every final-layer table carries `owner_email`; every metric description ends with its owner. The CLI cannot set the verified badge: ask the user to mark the canonical metrics verified in the UI, and say so in the hand-back.
+- Change a delivered definition: dependents via `mb search "<name>" --models card,dashboard,metric,document --json`; before and after on the last three complete periods; update in place, never a new id since dashcards hold it; prepend `Changed <date>: <what and direction>` to the description; one timeline event (`mb timeline-event create`) in the collection of the metric's time-series questions (events render only there); re-verify; plausibility pass on every dependent card ([dashboard-content-design.md](dashboard-content-design.md)); tell subscribers which dashboards moved and by how much. A wrong shipped number: the restatement protocol in [collaboration-contract.md](collaboration-contract.md).
+- A dispute between owners is a `[CHECKPOINT]` with both readings computed; the published one stands, described as disputed, until answered.
+- Retire: a `Deprecated:` name prefix, description naming the successor, one cadence for cards to move, then archive. Never delete.
 
 ## Verify before handing back
 
-- The definition returns a plausible number: not null, not an error, not an order of magnitude from a count you trust.
-- A segment narrows the row count to roughly what profiling predicted when proposing it.
-- A breakout by each declared dimension yields more than one group.
-- The definition appears on a question built on the intended table; one built on the wrong table or needing a join silently never appears.
-- The question-to-build map and coverage file are current, gaps listed.
-- Implausible is a bug to fix; plausible but externally unverified is reported as exactly that ([reconciliation.md](reconciliation.md)).
-- Only the canonical tables and metrics go to the Library, with the user's confirmation; without the Library, the canonical set is the described objects in the agreed collection.
+- Three surfaces agree: the measure summarised on the table (`mb query`), the metric (`mb card query <id> --json`), and a question aggregating `["metric", {}, <id>]` return one number for one period.
+- One held-out question from the user, not in the Questions table, answered in MBQL on a published table with measures, segments, and breakouts only, foreign-key breakouts included; needing native SQL is a gap to log.
+- `mb search "<the user's own wording>" --models metric,measure,segment --json` returns the intended object first; else add the user's words to the description.
+- One headline reconciled to an independent figure for one period ([reconciliation.md](reconciliation.md)); the rest carry `Self-consistent only`. `mb library get --json`: no staging table in Data.
+
+## Finished examples
+
+Metric description: `Self-consistent only, no external reference. Monthly recurring revenue at month end, in USD, from invoiced subscription lines spread over their service period. Excludes one-off charges, tax, and applied credits (one-offs: 4.1% of invoiced amount). Refunds do not reduce it. Prior months restate when a late invoice lands, usually under 0.5%. Not comparable to accounting revenue. Complete through August; September is on the table flagged incomplete. Owner: jo@acme.example.`
+
+Segment description: `Paying accounts: plan is not plan_free and at least one paid invoice exists. Excludes trials and internal accounts (staff domain list, 23 accounts). A move from plan_plus to plan_basic is a downgrade, not churn. Owner: sam@acme.example.`

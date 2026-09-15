@@ -1,45 +1,80 @@
 # Build dashboards
 
-Applies when the final-layer tables and the semantic layer exist and the user wants something to look at; produces a content plan (which question becomes which card on which dashboard), the cards and dashboards, and a plausibility pass over every number. This playbook owns what goes on the page; the bundled skills own how a chart, the grid, filters, and interactivity are authored.
+Applies: the semantic layer exists and the user wants something to look at. Produces a content plan, a draft reviewed on screen, cards composing definitions by id, a plausibility pass, delivery per audience. No definitions yet: say so and offer [`build-semantic-layer.md`](build-semantic-layer.md).
 
-Read first: [`dashboard-content-design.md`](../references/dashboard-content-design.md), [`collaboration-contract.md`](../references/collaboration-contract.md), `mb skills get dashboard`, and `mb skills get visualization`.
+Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 STATE.md` `2 content plan` `3 draft` `4.<card> build` `5 page: text, filters, layout` `6 plausibility` `7 delivery` `8 final collection` `reply`.
 
-## 1. Discover what exists and confirm the inputs
+Read first: [`dashboard-content-design.md`](../references/dashboard-content-design.md), [`state.md`](../references/state.md), and the domain file STATE.md names.
 
-Run `mb dashboard list --json`, `mb collection tree --json`, and `mb search --models dashboard,card --limit 50 --json`. Record existing dashboards, naming, and collection layout; a dashboard that already answers the question is extended, not duplicated, and new ones follow the same placement.
+## Commands you will run
 
-Confirm the final-layer tables are deployed (`mb table list --db-id <db-id> --json`) and the definitions from [`build-semantic-layer.md`](build-semantic-layer.md) exist. State and goal disagreeing ("chart this" over raw tables): say so and offer the earlier stage. No semantic layer yet: a dashboard is possible, but every card then carries its own version of each number; name that trade-off and let the user choose.
+Every line also takes `--profile $PROFILE --json`; ids from STATE.md Questions.
 
-Check: every number you intend to chart has one definition behind it, or the user has accepted that it will not.
+```bash
+jq .dataset_query ./.scratch/card.json | mb query --file - --dry-run; mb card create --file ./.scratch/card.json
+mb card query <card-id> --fields status,data.rows                  # equals STATE.md's verified number
+mb dashboard create --file ./.scratch/dash.json
+mb dashboard cards <dash-id>                                       # a row's id is the dashboard_card_id; card_id is the card
+mb setting get 'email-configured?' | jq .value                     # false: stop
+mb subscription create --file ./.scratch/sub.json
+mb dashboard update <dash-id> --body '{"collection_id":<final collection id>}'
+```
 
-## 2. Name the audience, then plan the content
+Bodies (metric 301, segment 12, `period_month` 1717):
 
-One dashboard per audience and cadence, per `dashboard-content-design.md`. Per dashboard write, before building: who reads it, the question it answers on opening, and the ordered card list in the order `dashboard-content-design.md` sets. Per card: the question it answers, the metric or measure, the segment, the dimension, the intended display. Leave off what `dashboard-content-design.md` says not to chart, and write down what you left off and why.
+```json
+{"name":"MRR by month, paying accounts","display":"line","collection_id":<drafts>,"visualization_settings":{},
+ "dataset_query":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,
+   "aggregation":[["metric",{},301]],"filters":[["segment",{},12]],"breakout":[["field",{"temporal-unit":"month"},1717]]}]}}
+{"name":"MRR","display":"smartscalar","collection_id":<drafts>,"dataset_query":{"... the same query ..."},
+ "visualization_settings":{"scalar.comparisons":[{"id":"c1","type":"previousPeriod"},{"id":"c2","type":"staticNumber","value":100000,"label":"Target"}]}}
+{"name":"CEO weekly","collection_id":<drafts>,
+ "parameters":[{"id":"period","name":"Period","slug":"period","type":"date/month-year"}],
+ "dashcards":[
+  {"id":-1,"card_id":null,"col":0,"row":0,"size_x":24,"size_y":2,"visualization_settings":{"virtual_card":{"display":"text"},"text":"Data through August 2026; September flagged incomplete. Refreshed daily 03:00 UTC, a day behind billing. MRR: Reconciled to finance on 2026-09-12, within 1%. Churn: Draft, provisional decisions: D7."}},
+  {"id":-2,"card_id":302,"col":0,"row":2,"size_x":6,"size_y":3,"parameter_mappings":[{"parameter_id":"period","card_id":302,"target":["dimension",["field",1717,null]]}]}]}
+{"name":"CEO weekly","dashboard_id":<dash-id>,"cards":[{"id":302,"dashboard_card_id":87,"include_csv":false,"include_xls":false}],
+ "channels":[{"channel_type":"email","schedule_type":"weekly","schedule_hour":8,"schedule_day":"mon","recipients":[{"email":"ceo@acme.example"}]}]}
+```
 
-Check: every card traces to a question somebody asked; the plan ends with fewer cards than it started with.
+A measure sits in the same slot as `["measure",{},<id>]`; on a model the stage reads `"source-card": <model-id>` instead of `source-table`; a number this shape cannot express is a gap: log it in STATE.md Questions and define it first.
 
-## 3. Checkpoint the plan
+## 1. STATE.md
 
-Present the card list per dashboard, in order, in plain language, with the omissions, using the checkpoint block in [`collaboration-contract.md`](../references/collaboration-contract.md). Wait.
+Read it; every Questions row this page uses carries a metric or measure id and a verification result.
 
-## 4. Build the cards
+## 2. Content plan
 
-One card per approved entry, composed from the semantic layer (metric or measure, plus segment, plus breakout), never re-deriving a number. Display and settings per `mb skills get visualization`. File the cards in an ordinary collection matching the layout found in step 1.
+Per audience and cadence, shaped like the finished plan in `dashboard-content-design.md`: the decision the page serves; per card the question, definition, segment, breakout, display; per KPI the comparison, target (ask, never invent), drill, alert; the subscription; what is left off and why. Card choices are `[DECIDED, reversible]`; more than one audience or cadence where the split is the user's call is a `[CHECKPOINT]`.
 
-Check: each card returns rows on its own, and its headline value equals what the same definition returned in semantic-layer verification. A mismatch means the card added a filter; find it before laying anything out.
+## 3. Draft, then review on screen
 
-## 5. Layout and wiring
+Per `dashboard-content-design.md`, Draft, then review on screen: build in `Drafts`, hand back the link, the card list, and the omissions.
 
-Load `mb skills get dashboard --max-bytes 0` and follow it. Place the cards in the plan's order; choose filters by the filter rule in `dashboard-content-design.md`.
+## 4. Cards
+
+One card per plan entry, naming the metric, measure, or segment by id, adding only a breakout and a display; dry-run before create. The card's headline equals the number verified in STATE.md; a mismatch means the card added a filter. Read the card back; set `graph.dimensions` and `graph.metrics` (output column names) only when the auto-pick is wrong: `mb skills path visualization`, "Minimum-viable settings per chart family".
+
+## 5. The page
+
+A text card at the top: data through, refresh (the job's schedule, never a hope), lag, the trust label per headline; a `Definitions` text card at the foot with the first sentence of each headline's description. Filters per `dashboard-content-design.md`: one date filter per date basis, mapped to the metric's time column on every card sharing it. Layout: `mb skills path dashboard`, Read "Layout: the grid is 24 columns"; drills and cross-filters from "Choose the interaction" when the plan calls for them.
 
 ## 6. Plausibility pass
 
-Run the plausibility pass in `dashboard-content-design.md` and chase every implausible number rather than shipping it with a caveat. A plausible number never checked against an outside reference is said to be exactly that; proving it is [`validate-and-reconcile.md`](validate-and-reconcile.md).
+Per `dashboard-content-design.md`; chase every implausible number; never ship it with a caveat; dropdowns populated (`mb db rescan-values $DB` if stale).
+
+## 7. Delivery per audience
+
+Readers who do not open Metabase: a subscription on the cadence (channel configured; mail to real people is irreversible, `[CHECKPOINT]` on recipients). Prose readers: a document embedding the cards (`mb skills path document`, Read "Embedding an existing card"). Numbers not to miss: an alert (body in [`validate-and-reconcile.md`](validate-and-reconcile.md)).
+
+## 8. Final collection
+
+Move the dashboard after the pass; record it in the STATE.md Questions rows.
 
 ## Done when
 
-Every dashboard has a named audience and an approved card list; every card traces to a question and composes an existing definition; the filter rule in `dashboard-content-design.md` holds; the plausibility pass is clean; what was left off the page is written down.
+Every card traces to a Questions row and composes a definition by id; text card, date filters, and definitions card are on the page; the plausibility pass is clean; every audience in the plan has its delivery; omissions written down.
 
 ## Reply
 
-One sentence per dashboard on what it answers, with the link. The cards in reading order, each by the question it answers, not its chart type. What you left off and why. Any number that is plausible but unreconciled. The open decisions, and an offer to reconcile the headline numbers next.
+The five-part hand-back in `collaboration-contract.md`; under part three: the cards in reading order by the question each answers, what was left off and why, each KPI's comparison and target.

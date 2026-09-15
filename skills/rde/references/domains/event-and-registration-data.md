@@ -1,6 +1,6 @@
 # Event and registration data
 
-Any event, webinar, survey, or registration source: grains, the completion rule, threshold derivation, matching registrants to customer records, and the three report families; the router sends you here when the source is registration, attendance, or survey data. Every threshold and match rule is a default to profile, propose with evidence, and confirm at a checkpoint ([../collaboration-contract.md](../collaboration-contract.md)).
+Any event, webinar, survey, or registration source: grains, the completion rule, threshold derivation, matching registrants to customer records, and the three report families; the router sends you here when the source is registration, attendance, or survey data. Every threshold and match rule is a default to profile, propose with evidence, and confirm at a `[CHECKPOINT]` ([../collaboration-contract.md](../collaboration-contract.md)).
 
 ## Grains
 
@@ -11,7 +11,7 @@ Build in this order, each model declaring its grain ([../layering-and-naming.md]
 | Registrant per event | person per event | registration, attendance, watch behaviour, customer match; the only grain that can be re-cut later |
 | Event | event | registrations, attendees, completions, conversion rates, average watch duration, rolled up on the row |
 | Series | recurring programme or campaign, where the source has one | the event metric set |
-| Cohort and segment rollups | event type, customer status, plan, or acquisition cohort | the same metric set sliced one way; siblings over the atomic model, never independent queries |
+| Cohort and segment rollups | event type, customer status, plan, or acquisition cohort ([../entities-and-time.md](../entities-and-time.md) for the base set, follow set, and rate) | the same metric set sliced one way; siblings over the atomic model, never independent queries |
 
 Two shapes for question data: a wide per-registrant table (one column per single-answer question) and a long answers table (one row per registrant, question, answer) for multi-select. Read the question catalog first: which questions exist and whether each is single-select, multi-select, or free text.
 
@@ -45,11 +45,11 @@ A presence event is not an engagement event. Profile the low end before treating
 
 ## Matching registrants to customer records
 
-Registration forms are self-typed, so the match is a hypothesis.
+Registration forms are self-typed, so the match is a hypothesis; the general conformed-entity procedure is in [../entities-and-time.md](../entities-and-time.md), and these are its email rules.
 
 1. Exact match first on normalised email (trimmed, lower-cased); report the exact-match rate before proposing anything else.
 2. Domain match only as a fallback where exact fails and the business accepts company-level attribution; exclude consumer and free-mail domains with a maintained list, and carry the match method on every row.
-3. Duplicates on the customer side (several rows per email or domain) fan out the join: checkpoint with the volume, a sample, and the candidate tiebreakers (most recently created, earliest created, most recently active) for the owner to pick.
+3. Duplicates on the customer side (several rows per email or domain) fan out the join: `[CHECKPOINT]` with the volume, a sample, and the candidate tiebreakers (most recently created, earliest created, most recently active) for the owner to pick.
 4. Unmatched rows stay, flagged as not an existing customer with customer columns null; never inner-join an enrichment, never drop or carry forward.
 5. Re-check the match rate after every enrichment join against a threshold agreed up front (default: pause when the unmatched share exceeds 20 percent) and show the unmatched volume with sample rows.
 

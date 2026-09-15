@@ -1,34 +1,20 @@
 # Collaboration contract
 
-Read at the start of every job; every playbook assumes these rules.
+Read once per job; its outputs (owner, mode, decisions, the personal-data answer) live in STATE.md ([state.md](state.md)).
 
-## Autonomy modes
+## Owner, then mode
 
-Ask once, near the start, then hold the answer for the whole job without re-asking between stages:
+Ask once, near the start: "Who signs off on what a number means (what counts as a customer, a donor, revenue)? I will batch definition questions to them and decide the rest, showing you what I decided." Default to Balanced. Move to Check with me when the user corrects two decisions in a row or asks to see everything; move to Just go when they say so. Record both in STATE.md; never re-ask.
 
-> Quick thing before I start: how hands-on do you want to be?
-> - **Check with me on everything**: I run each step past you first.
-> - **Balanced** (default): I decide the obvious things and ask when it matters.
-> - **Just go**: I do what makes sense and show you the result.
+## Decide and show, or stop
 
-The mode moves the line for mechanical choices only. It never removes a row from the always-stop table. "Just go" means decide the obvious, never guess on the unclear.
+A decision is reversible (a named constant, a labelled default, a re-run) or irreversible. Irreversible always stops with a `[CHECKPOINT]`, in every mode: publishing a number as canonical or to an audience, showing personal data, overwriting or dropping a table people read, changing a definition already handed back. A reversible decision whose two readings differ by more than the materiality threshold (default 5 percent of the headline number, to confirm) also stops. In Balanced and Just go, every other reversible decision is taken on the recommended option, recorded, and batched into the next hand-back; the user corrects by exception. In Check with me, every decision stops.
 
-## Mechanical versus judgment
+```
+[DECIDED, reversible] <rule as implemented>. Evidence: <numbers>. Affects: <models, metrics>. To change: reply with the alternative; it is a re-run.
+```
 
-| Proceed without asking | Stop and wait for a reply |
-|---|---|
-| Renaming to the company's convention, casting a type, converting a unit already verified as single | Selecting which source tables serve a concern |
-| Choosing a key where exactly one candidate exists | Defining a business measure (active, completed, recognized, churned), after searching existing models and metrics for a definition to reuse |
-| Running quality checks and reporting results inline | Deciding what happens to unmatched rows on a join |
-| Adding the model header and description | Any assumption where two readings would produce materially different output |
-
-Business rules are the user's to decide. Conventions are the company's to keep: match what exists in the warehouse, the transforms, or the Library; propose a default only where nothing exists, and label it as a default in the checkpoint.
-
-## Zero-row tables
-
-Check every source table for emptiness before the first model reads it. An empty source table is a checkpoint that names the metric it blocks: unused, broken load, or wrong upstream filter, and only the user can say which.
-
-Exemption: the loader's own bookkeeping tables (load state, schema history) and child tables the loader created for a nested field that no parent row populated. List them as skipped in the build ledger, do not stage them, no checkpoint.
+Routine reversible decisions: date basis, inclusion filter, derived classification column, grain, key among several candidates, unit and currency, line detail source, convention default. Decide each from the profile with the smallest defensible reading, the alternative reading's effect on the headline number measured and shown beside it. Business rules are the user's to decide; conventions are the company's to keep ([layering-and-naming.md](layering-and-naming.md)).
 
 ## The checkpoint block
 
@@ -45,65 +31,42 @@ Recommendation: <preferred option and a one-sentence rationale>
 Action required: reply with a letter or give alternate instructions before this work continues.
 ```
 
-- `Context` carries measured numbers. Profile first, then ask.
-- Two or more options, and a recommendation the user can accept with one letter.
-- Wait. Do not continue past the block until an explicit reply arrives, however long that takes.
+`Context` carries measured numbers: profile first, then ask. Two or more options, one recommendation. Wait for the reply.
 
-## Decisions that always stop
+## The decision memo
 
-These stop every time, in every mode, at any confidence:
+Before building, list the open decisions once, grouped by who can answer, each as: the question in one sentence, the default you will use and where it came from, what changes if it is wrong. Ask for changes only. Record each as a Decisions row; build the first slice on the defaults while waiting. An answered decision is never re-asked. An unanswered one proceeds as `PROVISIONAL`: named in the metric description and on the dashboard, and it blocks Library publishing and the `Reconciled` label. Never resolve a decision by inference from the data; never write a default as confirmed.
 
-| Category | The question it stops on |
-|---|---|
-| Derived classification | Which column each derived classification (cadence, status, type, segment) is read from |
-| Date basis | Which date a fact belongs to when the row carries several |
-| Inclusion filter | Which statuses, populations, or rows are in scope |
-| Test-data exclusion | Which rows are excluded as test, staff-owned, or demo; every supplied identifier is verified against the data first |
-| Grain | What one row of each output model is |
-| Unit and currency | Which unit amounts are stored in, and whether more than one currency is present |
-| Key choice | Which column identifies an entity when several candidates exist |
-| Line detail source | Which child table supplies line detail |
-| Validation baseline | Which reference a built number is validated against; present the candidates, let the user disqualify |
-| Convention default | Any layer, prefix, collection, or schema convention proposed because none exists |
+## Zero-row tables and personal data
 
-Before building, name each load-bearing column: for every classification, the column you will read it from and why, and get a yes.
+An empty table on the path of a named question is a `[CHECKPOINT]` naming the number it blocks; an empty table off that path is listed and ignored. Exempt: the loader's bookkeeping tables and child tables for a nested field no parent row populated; list as skipped.
 
-## Pre-registered checkpoints
+Personal data (names, emails, phones, addresses, payment details): ask once per job whether this audience may see it, or it is masked or reduced to counts (the default to confirm); record the answer; apply it everywhere.
 
-List every decision known to be open before building anything, numbered, each with:
+## Plain language
 
-- The decision, in one sentence.
-- Who can answer it (data owner, finance owner, domain owner).
-- Which models depend on it.
-- The value used absent an answer, and where that value came from.
-- What breaks if that value is wrong.
+Lead with the point; SQL and JSON stay on request, never in chat to ask or answer. Mirror the user's vocabulary and terseness. For a non-database reader: "one row per customer", not "the grain is customer"; avoid grain, fact table, dimension table, denormalize, surrogate key, materialize; Metabase terms (Question, Model, Segment, Metric, Transform, Library) are fine. Every question carries its context immediately before it: what you found, why it matters, then the question. Never name a probe or helper table the user never saw.
 
-Raise each as a `[CHECKPOINT]` when you reach the first model that depends on it. Group the list by owner so it can be forwarded as a batch.
+## The hand-back
 
-Two hard rules: never resolve a pre-registered decision by inference from the data; never treat a written default as confirmed.
+Five parts, in this order, in every Reply:
 
-## Record every resolution
+1. What you can now do, with a browser link.
+2. The headline numbers, each with its trust label.
+3. What I decided for you: reversible, one line each; tables, keys, and checks only here, only when they changed a number.
+4. What I need from you, batched by owner.
+5. What comes next and roughly how long.
 
-Write each answer into the decision ledger ([ledgers-and-artifacts.md](ledgers-and-artifacts.md)): decision, answer, who gave it, date. Never re-ask a question already answered.
+## Trust labels and restatement
 
-## Talking to the user
+The first line of every headline metric's description and every KPI card's description is its trust label: `Reconciled to <reference> on <date>, within <tolerance>` / `Self-consistent only, no external reference` / `Draft, provisional decisions: D3, D7`. The same label sits beside the number in every hand-back. A stakeholder's done is `Reconciled` or an explicit acceptance of `Self-consistent only`.
 
-- Answer first, detail on demand: lead with the plain-language point; keep SQL, JSON, and transform bodies available on request, never dumped into chat, never used to ask or answer a question, and never hidden; a permission request is one sentence summarizing the action.
-- Mirror their vocabulary and terseness. With no signal, start plain; relax once they show fluency.
-- Plain language over warehouse jargon for a non-database reader: "one row per customer", not "the grain is customer". Avoid grain, fact table, dimension table, denormalize, surrogate key, materialize. Table, column, schema, key, foreign key are fine. Metabase terms (Question, Model, Segment, Measure, Metric, Transform, Library) are encouraged.
-- Never reference a helper table or probe they never saw; reintroduce it in their terms or leave it out.
-- Every question carries its own context immediately before it, never as a back-reference: what you found, why it matters, then the question. Assume the reader has seen only the last few lines.
+When a shipped number was wrong: fix the definition in place (`update` on the same id; a segment or measure carries a `revision_message` naming the cause, a metric's description gains a dated change line), add a timeline event with direction and size, a dated text card on the dashboard for one period (old figure, new figure, cause, which past periods moved), and say the same in the hand-back. Never restate silently.
 
-## Personal data
+## Final deliverables
 
-Flag names, emails, phone numbers, addresses, and payment details on sight. Ask keep, mask, or drop before they land in a table others will browse. Before showing rows that contain them, ask display, aggregate, or mask; the default, to confirm, is counts and breakdowns.
+Done needs three things: a recap in the hand-back shape with a browser link, never only an `mb` command; a document in the business collection titled `How to use <area> numbers` (`mb skills path document`) listing each metric and segment with its meaning and trust label, who owns definitions, how to ask a new question, and what to do when a number looks wrong; and a five-line walkthrough for the maintainer.
 
 ## Working files and credentials
 
-Working files go in `./.scratch` (`mkdir -p ./.scratch` first), never a system temp directory.
-
-Never paste credentials, tokens, or warehouse passwords into chat. When one must be stored, the user runs the storing command.
-
-## The final hard stop
-
-Nothing is done until you hand back a plain-language recap: each table and what one row of it is, how the tables connect, and a link or command that opens the result.
+Working files go in `./.scratch` (`mkdir -p ./.scratch` first), never a system temp directory; they are not a deliverable. Never paste credentials, tokens, or warehouse passwords into chat; when one must be stored, the user runs the storing command.

@@ -1,55 +1,68 @@
 # Build clean tables
 
-Applies once a model inventory is approved; produces the models as Metabase transforms, gated on data quality, plus a build ledger. An open model, grain, or key returns to [`explore-raw-data.md`](explore-raw-data.md).
+Applies: an approved inventory, or one model added later (skip to step 3, add its Models row, tag it into the job). Produces transforms, gated, hidden until final, scheduled, with a standing check alert.
 
-Read first: [`layering-and-naming.md`](../references/layering-and-naming.md), [`staging-rules.md`](../references/staging-rules.md) (loader shape too), [`modeling-decisions.md`](../references/modeling-decisions.md), [`data-quality-checks.md`](../references/data-quality-checks.md), [`ledgers-and-artifacts.md`](../references/ledgers-and-artifacts.md), [`collaboration-contract.md`](../references/collaboration-contract.md), dialect and row ceiling in the Tools and limits section of [`profiling-catalog.md`](../references/profiling-catalog.md), the domain file the router named, `mb skills get transform`, `mb skills get native-sql` or `mbql`, `mb skills get metadata` (step 7).
+Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 pre-flight` `2 collections, tag, job` `3.<model> build` `4.<model> gate` `5.<table> metadata` `6 job, alert` `7 change` `reply`.
+
+Read first: [`layering-and-naming.md`](../references/layering-and-naming.md), [`data-quality-checks.md`](../references/data-quality-checks.md), and the domain file STATE.md names.
+
+## Commands you will run
+
+Every line also takes `--profile $PROFILE --json`.
+
+```bash
+source ./.scratch/probe.sh                                  # q(): references/state.md
+mb collection create --body '{"name":"stg_billing"}' --namespace transforms
+mb transform-tag create --body '{"name":"rde_billing"}'
+mb transform-job create --body '{"name":"rde_billing daily","schedule":"0 0 3 * * ?","tag_ids":['$TAG']}'
+q "SELECT * FROM (<model sql, slice predicate on>) t LIMIT 5" # pass: status completed
+src() { jq -n --rawfile s "$1" --argjson db $DB '{type:"query",query:{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$s}]}}'; }
+jq -n --argjson src "$(src ./.scratch/<m>.sql)" --rawfile d ./.scratch/<m>.desc --argjson db $DB '{name:"<m>",description:$d,collection_id:<layer-collection-id>,tag_ids:['$TAG'],source:$src,target:{type:"table",database:$db,schema:"<out_schema>",name:"<m>"}}' > ./.scratch/t.json
+mb transform create --file ./.scratch/t.json | jq '{id,target}'
+jq -n --argjson src "$(src ./.scratch/<m>.sql)" '{source:$src}' > ./.scratch/patch.json
+mb transform update <id> --file ./.scratch/patch.json       # source-only patch
+mb transform run <id> --sync | jq '{status:.final.status, table:.target_table_id, msg:.final.message}'
+mb transform list --full | jq '[.data[] | select(.source.query.stages[0].native | test("<schema>.<name>")) | .id]'   # dependents
+```
 
 ## 1. Pre-flight
 
-Fix profile, database id, output schema. Match the schema and names existing transforms use (`mb transform list --fields id,name,collection_id,target --max-bytes 0 --json`); with none, propose the `layering-and-naming.md` default to confirm. Outside-Metabase transformations: the note in `layering-and-naming.md` says which steps below apply.
+Read STATE.md; confirm its tables exist (`mb table list --db-id $DB --fields id,name,schema`). Smoke-test the write path: transform `_rde_smoke` (one literal row into `out_schema`), `run --sync`, `delete-table --yes`, `transform delete --yes`; a permission or missing-schema error is a `[CHECKPOINT]` for the admin.
 
-Count every source table in the inventory (enrichment included): name, rows, status. Confirm every target name is free in that list and in `mb table list --db-id <db-id> --fields id,name,schema --max-bytes 0 --json`.
+## 2. Collections, tag, job, rows
 
-Check: no zero-row source, no name collision. Either is a checkpoint, never a silent skip or overwrite.
+Reuse what exists; else one collection per layer, one tag per chain, one job over the tag at the loader's cadence (ask when data lands; default daily after, `[DECIDED, reversible]`). Ids into STATE.md; one Models row per model in dependency order, `cfg_<domain>` first when a constant exists. Materialization: `layering-and-naming.md`.
 
-## 2. Collections
+## 3. Build loop, one model at a time
 
-Reuse existing transform collections; otherwise one per layer, named per `layering-and-naming.md`, via `mb collection create --namespace transforms` (body from the bundled skill). Check: `mb transform list --fields id,name,collection_id --json` shows every transform filed.
+SQL in `./.scratch/<m>.sql`; `<m>.desc` carries the five facts plus every constant per `layering-and-naming.md`, mirrored in the SQL header. Raw-table blocks: `staging-rules.md`; staging is a CTE unless shared or expensive. Validate on a slice (a bounded predicate on the driving table) through `q` until the shape and the step 4 checks pass; drop the predicate, create or patch, `run --sync`, then hide the new table (`visibility_type: technical`) until its gate passes. `table: null`: `mb transform get <id> --fields target_table_id`. A failed run: fix the file, patch, run again; unreadable: `mb skills path transform`, Read "Iterating on a failing transform". MBQL source: `jq .source.query ./.scratch/t.json | mb query --file - --dry-run` replaces `q`.
 
-## 3. Ledger and order
+## 4. Gate
 
-Start `./.scratch/BUILD_LEDGER.md` per `ledgers-and-artifacts.md`, SQL beside it, one file per model. One layer at a time, in dependency order within it.
+The eight checks as one query per `data-quality-checks.md`, at its cadence. A FAIL stops the chain. Judgment calls (`modeling-decisions.md`) are `[DECIDED, reversible]` from the profile, `[CHECKPOINT]` when irreversible. Write the Checks and Models rows. Then `mb table update <table-id> --body '{"visibility_type":"technical"}'` on every raw, staging, and intermediate table the model read or wrote.
 
-## 4. Build loop, one model at a time
+## 5. Metadata on final-layer tables
 
-1. SQL, formatted, in `./.scratch/<model>.sql`, headed per `layering-and-naming.md`; the block that reads a raw table obeys `staging-rules.md`.
-2. Run it through `mb query` as a native stage with a small `--max-bytes`. A pass is `status: completed` on stdout, or an over-cap exit 2; `{status: failed}` on stdout with exit 0 is a failure. An MBQL transform is validated with `mb query --dry-run` on its body instead of a `.sql` file.
-3. `mb transform update <id>` when the name exists in `mb transform list --max-bytes 0 --json`, else `mb transform create` (body from the bundled skill).
-4. `mb transform run <id> --sync --json`. `--sync` waits for this transform's target table to register; it is not a database-wide sync.
-5. On a failed run, fix the SQL file and return to 3, never to a second transform.
+Per table, unhide it (`"visibility_type":null`), then in the order `semantic-layer-design.md` gives, bodies in [`build-semantic-layer.md`](build-semantic-layer.md). Under time pressure stop after keys, foreign keys, currency, and hidden plumbing, and say what remains.
 
-## 5. Quality gate after every model
+## 6. Schedule, run once, leave a check
 
-Run the `data-quality-checks.md` suite on the fresh table; report in its format. A `FAIL` stops the build: no next model, no weakened check; a join match rate under threshold, an unconfirmed empty output, and a non-unique grain all fail.
+`mb transform-job transforms $JOB` lists every model; `mb transform-job run $JOB`, then `mb transform runs` until none is `started`: every member `succeeded`. Per layer, the standing check card and its `has_result` alert (bodies in `data-quality-checks.md`, Checks that outlive the build).
 
-When the fix is a judgment, stop with counts in hand, using the checkpoint block in [`collaboration-contract.md`](../references/collaboration-contract.md): the collision winner, the authoritative column, the partial-period cut (`modeling-decisions.md`), the fate of rows an enrichment join missed (default: null columns plus a flag column, confirmed). Record every answer in both ledgers.
+## 7. Change a deployed model
 
-## 6. Declare each model deployed
+Copy the SQL to `<m>.prev.sql` (rollback is a patch with it). Classify: logic only, patch and run; shape change, `mb transform delete-table <id> --yes` first; rename, re-point every definition and card on the old column. Find dependents in stored SQL, run the job, re-gate each rebuilt table, re-verify their definitions per `semantic-layer-design.md`, add the timeline event (body in `validate-and-reconcile.md`), restate per the contract.
 
-Write `status: DEPLOYED` only when the four criteria in `ledgers-and-artifacts.md` hold.
+Finished example, a transform description (the SQL header mirrors it):
 
-## 7. Metadata on the final-layer tables
-
-On deployed final-layer tables only, perform the field-metadata pass in the order `semantic-layer-design.md` gives (`mb skills get metadata`). Check: every inventory foreign key resolves to a real table; no decoded column is untyped.
-
-## 8. Re-running a chain
-
-`mb transform dependencies <id>` lists upstream transforms, not dependents; re-run a chain per the "Building a DAG" section of `mb skills get transform` (tags plus a transform-job).
+```
+One row per customer per month (key: customer_id, period_month). Sources: int_billing_invoice_line_spread, cfg_billing. Definition: recognized recurring revenue per customer per month from spread invoice lines; state new/retained/lapsed/reactivated by the gap rule. Caveats: USD only; one-off charges flagged, not removed; newest month flagged incomplete. Constants: cfg_billing.gap_months = 1 (D7, open); cfg_billing.last_complete_period = 2026-08.
+```
 
 ## Done when
 
-Every model carries `status: DEPLOYED`; no check fails; final-layer tables have step 7 metadata; every checkpoint is answered; every model's SQL sits in `./.scratch`.
+Every Models row has `transform_id`, `table_id`, rows, no FAIL; the job ran once, every member `succeeded`; plumbing hidden; metadata done or its stop stated; check card and alert exist; STATE.md `next` is empty.
 
 ## Reply
 
-The tables, what one row of each is, how they connect; the checks that ran; limitations named as such; one final-layer table to open, by name and link; decisions still held; offer the semantic layer next.
+The five-part hand-back in `collaboration-contract.md`; part one links `<base-url>/data-studio/transforms/<id>/inspect`; under part three: what one row of each table is, the constants decided, the checks and counts.

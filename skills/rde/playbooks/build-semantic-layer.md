@@ -1,51 +1,81 @@
 # Build the semantic layer
 
-Applies once the final-layer tables are deployed with rows; produces field metadata, models, measures, segments, and metrics with a description each, a question-to-build map, and the verified canonical set. Missing tables: [`build-clean-tables.md`](build-clean-tables.md) first.
+Applies: final-layer tables exist with rows. Produces one starting object per table, the definitions with descriptions, verified, and the canonical set published or filed.
 
-Read first: [`semantic-layer-design.md`](../references/semantic-layer-design.md), [`collaboration-contract.md`](../references/collaboration-contract.md), `mb skills get semantic-layer`, `mb skills get metadata`, and `mb skills get mbql`.
+Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 STATE.md` `2 starting objects` `3.<table> metadata` `4 Questions` `5 conformed dims` `6.<definition> define` `7 describe` `8 verify` `9 publish, owners` `reply`.
 
-## 1. Discover what exists
+Read first: [`semantic-layer-design.md`](../references/semantic-layer-design.md), [`entities-and-time.md`](../references/entities-and-time.md), and the domain file STATE.md names.
 
-Run the discovery commands in `semantic-layer-design.md`. Record existing definitions, naming, and filing; match them; reuse, never duplicate. Confirm each planned object type is supported (`mb <command> --help --json` reports the minimum server version); without the Library (no `library` feature, or a server below v59) the canonical set is the described objects in the agreed collection.
+## Commands you will run
 
-Confirm the defining tables have rows: `SELECT count(*)` per table through `mb query`, or the `rows:` line in the build ledger. Check: every planned object type is supported or its substitute named; every defining table is present. Never compensate for a missing table with row-level logic in a metric.
+Every line also takes `--profile $PROFILE --json`; field ids: `mb table get <id> --include fields`.
 
-## 2. Field metadata on the defining tables
+```bash
+mb table update <table-id> --body '{"entity_type":"entity/TransactionTable","description":"One row per customer per month.","caveats":"USD only; newest month flagged incomplete.","owner_email":"finance@acme.example"}'
+mb field update <field-id> --body '{"semantic_type":"type/FK","fk_target_field_id":<customers.customer_id field id>}'
+mb field update <field-id> --body '{"semantic_type":"type/Category","has_field_values":"list"}'
+mb search "<the user's wording>" --models metric,measure,segment,dataset
+mb measure create --file ./.scratch/measure.json; mb segment create --file ./.scratch/segment.json
+jq .dataset_query ./.scratch/metric.json | mb query --file - --dry-run; mb card create --file ./.scratch/metric.json
+mb card query <metric-id>
+mb library publish --table-ids <ids>
+mb card update <metric-id> --body '{"collection_id":<library metrics collection id>}'
+```
 
-Verify the pass from `build-clean-tables.md` step 7 happened on every defining table and complete the gaps to the completeness bar in `semantic-layer-design.md`, mechanics per `mb skills get metadata`. Check: the bar is met; every declared foreign key resolves.
+Bodies (database 3, table 909; `mrr_usd` 1715, `period_month` 1717, `is_complete_period` 1721, `state` 1722, `activated_at` 1730):
 
-## 3. Collect the questions
+```json
+{"name":"Recurring revenue","description":"Recurring revenue, USD.","table_id":909,
+ "definition":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,"aggregation":[["sum",{"name":"mrr_usd"},["field",{},1715]]]}]}}
+{"name":"Complete periods","description":"Months fully loaded.","table_id":909,
+ "definition":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,"filters":[["=",{},["field",{},1721],true]]}]}}
+{"name":"Monthly recurring revenue","type":"metric","collection_id":17,"display":"line",
+ "dataset_query":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,
+   "aggregation":[["measure",{},<measure-id>]],"breakout":[["field",{"temporal-unit":"month"},1717]]}]},"visualization_settings":{}}
+```
 
-Ask for the questions people ask: recurring reports, weekly numbers, what nobody can answer. Without one, infer it from the saved questions that repeat, mined per `semantic-layer-design.md`. Check: a written question list precedes any definition.
+The aggregation slot per definition: a sum `["sum",{"name":"mrr_usd"},["field",{},1715]]`; `count-where` `["count-where",{"name":"churned"},["=",{},["field",{},1722],"churned"]]`; `share` `["share",{"name":"activation_rate"},["not-null",{},["field",{},1730]]]`; a derived metric `["metric",{},<metric-id>]`. A definitional filter goes in `filters` of the same stage. On a model the stage reads `"source-card": <model-id>` instead of `source-table`.
 
-## 4. Decompose each question
+## 1. STATE.md and tables
 
-Split each per `semantic-layer-design.md` into the number measured, the rows it is measured over, and the breakout columns; map in `./.scratch`, one row per question: metric, segments, dimensions, defining table, exists or to build. Row-level logic belongs in a transform: a question spanning two tables widens the table (single-table reach, `semantic-layer-design.md`). Two stakeholders defining one number differently is a checkpoint (block in `collaboration-contract.md`), not two objects.
+Read STATE.md; every Models row a definition needs has `table_id` and rows; a missing one goes back to [`build-clean-tables.md`](build-clean-tables.md).
 
-Check: every question maps to objects on a single table each; no dimension is assumed to exist.
+## 2. One starting object per table
 
-## 5. Define the objects
+Per `semantic-layer-design.md`: the curated table (Library or not), no model over it; a model only where people start from a join, metrics only. `[DECIDED, reversible]`.
 
-Order: models over the final-layer tables where a curated column set is wanted, then measures and segments, then metrics. Verbs and bodies: the bundled skills. File objects beside the company's existing ones.
+## 3. Metadata chain
 
-Check: after each object, it appears on a question built directly on its table.
+Per defining table in `semantic-layer-design.md`'s order, bodies above; gaps left by `build-clean-tables.md` step 5 close here.
 
-## 6. Describe every object
+## 4. Questions table
 
-Name and one-line description in the user's words, per the naming rules in `semantic-layer-design.md`; where a definition encodes a judgment (excluded rows, measuring date, what it is net of), the description says so. Check: no object without a description, no description that restates the formula.
+Each STATE.md Questions row gets a home table, a time column (the date basis), the definitional filter, breakouts (own or FK), exists or build. Two owners defining one number differently: `[CHECKPOINT]` with both numbers.
 
-## 7. Verify every definition
+## 5. Conformed dimensions
 
-Run each against the verification list in `semantic-layer-design.md`; proving a plausible number externally is [`validate-and-reconcile.md`](validate-and-reconcile.md). Check: every map row carries a run result.
+A breakout shared by two home tables lives once on an entity table reached by a metadata foreign key (`entities-and-time.md`), never copied; a metric reads it through `source-field` (`mb skills path mbql`, "Joins and FK traversal").
 
-## 8. Publish the canonical set
+## 6. Define in ladder order
 
-Present the tables and metrics you would publish; it is the user's call. With the Library: tables via `mb library publish --table-ids <ids> --json`; metrics reach it by being filed in its Metrics collection (`mb library get --json` reports the id; `mb card update <id> --body '{"collection_id":<id>}'`). Without it: file the canonical objects in the agreed collection and say the Library is unavailable. Check: nothing unratified or unverified is published or filed as canonical.
+Measures; metrics over measures by id; derived metrics over metrics; segments; on a model, metrics only. Definitional filters live inside the definition; slicing filters are segments. A metric with a time column carries a monthly breakout and `display: line`, otherwise `scalar`.
+
+## 7. Describe
+
+Trust label first, per the contract; then what it counts and excludes with the largest exclusion's size, restatement, what it must not be compared to, the owner. A segment: what it includes, excludes, why, its warning.
+
+## 8. Verify
+
+The four checks under Verify before handing back in `semantic-layer-design.md`, each result written to the Questions row's `status`; a headline over tolerance goes to [`validate-and-reconcile.md`](validate-and-reconcile.md).
+
+## 9. Publish or file, then owners
+
+Canonical set and cascade guard per `semantic-layer-design.md`, Library. Publishing is irreversible, `[CHECKPOINT]`, never while a decision it reads is open. Metrics enter the Library by filing in its Metrics collection; no Library: a `Definitions` collection, stated. Changing a delivered definition: the flow in `semantic-layer-design.md`; timeline event body in [`validate-and-reconcile.md`](validate-and-reconcile.md). `owner_email` on every final-layer table and transform; every description ends with the owner; ask the user to mark canonical metrics verified in the UI (the CLI cannot).
 
 ## Done when
 
-Every check in steps 1 to 8 passes; every question in the map resolves to named objects or is recorded as unanswerable with the reason; the canonical set is published to the Library, or filed in the agreed collection where there is none, with the user's confirmation.
+Every Questions row resolves to named objects with a verification result or is marked unanswerable with the reason; the canonical set is published or filed; owners set.
 
 ## Reply
 
-What people can ask with one click that they could not before; the objects grouped by kind, each with its meaning, not its formula; the questions you could not answer and what is missing; one metric to open; the definitions that are still your proposal.
+The five-part hand-back in `collaboration-contract.md`; under part three: the objects by kind with their meaning, the held-out question and its answer, definitions still proposals.

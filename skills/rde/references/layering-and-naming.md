@@ -1,82 +1,48 @@
 # Layering and naming
 
-Read before creating the first transform or writing SQL for the company's own transformation tool.
+Read before the first transform, or before writing SQL for the company's own tool.
 
 ## Discover the company's conventions first
 
-Inventory what exists and record it in `./.scratch` before proposing any layer, name, or location:
-
-| Look at | Where | Take from it |
-|---|---|---|
-| Schemas and table names | Catalog commands in [profiling-catalog.md](profiling-catalog.md) | Layer vocabulary, prefixes, landing and output schemas |
-| Transforms and their collections | `mb transform list --fields id,name,collection_id --json`, then `mb collection get <id> --json` per collection | Layer count, collection layout, grammar, header style |
-| Models, metrics, measures, segments | The discovery commands in [semantic-layer-design.md](semantic-layer-design.md) | Definitions to reuse, description style |
-| Documentation | Files the user shares, or an export of an unreachable document space | Conventions, glossary |
-
-Match an existing convention even where it differs from the defaults below; propose a default only where nothing exists, labeled as such, and confirm it with the checkpoint block in [collaboration-contract.md](collaboration-contract.md).
+Before proposing a layer, name, or location, inventory what exists and record it in STATE.md ([state.md](state.md)): schemas and table names ([profiling-catalog.md](profiling-catalog.md)); transforms and their collections (`mb transform list --fields id,name,collection_id,description --json`); existing models, metrics, measures, and segments ([semantic-layer-design.md](semantic-layer-design.md)); files the user shares. Match what exists; propose a default only where nothing exists, labelled as such, as a reversible decision ([collaboration-contract.md](collaboration-contract.md)). Where a convention breaks an invariant, say so once, propose the fix, and record the answer as a Decisions row.
 
 ## Invariants and conventions
 
-The final layer is the tables people read, whatever the company calls it. The loader-shape rules in [staging-rules.md](staging-rules.md) apply to whichever model first reads a raw table, even when that model is a wide table with no staging layer.
+"Final layer" is the role term for the tables people read, whatever the company calls them. The loader-shape rules in [staging-rules.md](staging-rules.md) apply to whichever block first reads a raw table, even inside a wide table with no staging layer.
 
-| Invariant, holds everywhere | Convention, flexes to the company |
-|---|---|
-| Every model, in every layer, declares the five header facts below; the layout follows an existing header style when one exists | Layer prefixes and name grammar |
-| The block that reads a raw table never joins; it may be a CTE inside a wider model | Number of layers, and whether a cleaning layer exists at all |
-| Nothing reads a model that a later model in the same chain refines | Collection layout and output schema (defaults under Physical layout) |
-| Checks pass before the next model ([data-quality-checks.md](data-quality-checks.md)) | Where SQL files live |
-| One definition per number: shared logic computed once, read by every consumer | Whether transforms run in Metabase or in the company's tool |
-| Ids kept beside labels, never replaced by them | |
-| Detail rows kept; a total sits beside them, never instead of them | |
-| Re-runnable without duplicating rows, incremental where volume demands it, a uniqueness check on the key | |
-| Business rules are the user's to decide | |
+Invariants: every model in every layer declares the five header facts below; the block that reads a raw table never joins; nothing reads a model that a later model in the same chain refines; checks pass before the next model ([data-quality-checks.md](data-quality-checks.md)); one definition per number, computed once and read everywhere; ids kept beside labels; detail rows kept, a total beside them, never instead; re-runnable without duplicating rows; a uniqueness check on the key; business rules are the user's to decide.
 
-Where an existing convention breaks an invariant, say so once, propose the fix, and let the user decide.
+Conventions, the company's: layer prefixes and name grammar; number of layers, and whether a cleaning layer exists; collection layout and output schema; where SQL files live; transforms in Metabase or in the company's tool; a staging block materialized or a CTE.
 
-## Default layers
+## Layers, and the flat default
 
-Default, to confirm, when no convention exists:
+Default, to confirm, when no convention exists: staging, one block per source table (rename, cast, convert units, choose a key; no joins), owing a safe-to-read source table ([staging-rules.md](staging-rules.md)); intermediate (joins, enrichment, classification, attribution, recognition), owing each piece of shared business logic computed once; final layer (mart), the output grains people read, owing the measures for its grain on the row.
 
-| Layer | Does | Owes |
-|---|---|---|
-| Staging | One model per source table: rename, cast, convert units, choose a key. No joins. | A safe-to-read source table ([staging-rules.md](staging-rules.md)) |
-| Intermediate | Joins, enrichment, classification, attribution, recognition | Each piece of shared business logic computed once |
-| Mart | The final layer: the output grains people read | The measures for its grain on the row |
+A staging block is a CTE inside its only consumer; it becomes its own materialized transform when two or more models read it or when it deduplicates a large appended sync. A final-layer table exists only if it rolls up, conforms an entity across sources, or adds measures that only make sense at the output grain; a `SELECT * FROM <model below>` is not built.
 
-A final-layer table exists only if it rolls up (changes what a row is), conforms an entity across sources, or adds measures that only make sense at the output grain; one whose body would be `SELECT * FROM <model below>` is not built, and consumers read the model below.
+Flat under deadline: a small source, one decision maker, and a deadline get one wide table per real-world thing (`customers`, `orders`) or two layers (cleaned tables, then the tables people read), linking ids kept on every table; say so plainly. Return to layers when the same logic is about to be written into two outputs, or an output feeds another: promote the shared piece into an intermediate model.
 
 ## Naming
 
-| Object | Default pattern | Example |
-|---|---|---|
-| Staging model | `stg_<source>_<table>` | `stg_acme_order` |
-| Intermediate model | `int_<source>_<concept>` | `int_acme_order_classified` |
-| Entity mart | `mart_<source>_dim_<entity>` | `mart_acme_dim_customer` |
-| Event mart | `mart_<source>_fct_<event>` | `mart_acme_fct_order` |
-| Composite grain key | `<entity>_<period>_key` | `customer_month_key` |
+Default grammar `<layer>_<source>_<thing>` (`stg_acme_order`, `mart_acme_fct_order`); `<source>` is the system the data came from, not the warehouse or the team; a composite grain key is `<entity>_<period>_key`. Ambiguous words (`date`, `amount`, `status`, `type`, `value`, `count`) are banned as column names; qualify them (`order_date`, `amount_usd`). Key choice and minting: [staging-rules.md](staging-rules.md).
 
-`<source>` is the system the data came from, not the warehouse and not the team. Under any grammar:
+## Model header and constants
 
-- Ambiguous words are banned as column names: the rule in [semantic-layer-design.md](semantic-layer-design.md).
-- Which id is the key, and when to mint one: Key selection in [staging-rules.md](staging-rules.md).
-
-## Model header
-
-Five facts at the top of every model's body, mirrored into its description; the layout below is the default where the company has no header style:
+The transform description is the canonical header; the SQL comment at the top of the body mirrors it, and when they differ the description wins. Five facts, in the company's header style where one exists:
 
 ```sql
 -- One row per: <X>
 -- Key:         <column that identifies the row>
 -- Sources:     <upstream models or tables>
 -- Definition:  <one-line business definition>
--- Caveats:     <exclusions, hardcoded values, deviations, unconfirmed assumptions with their open question>
+-- Caveats:     <exclusions, constants and values, deviations, provisional decisions by id>
 ```
 
-Constants (window length, rank order, exclusion list, rate) live in one named place.
+Constants live in one transform, `cfg_<domain>` (`SELECT 1 AS gap_months, 'D7' AS gap_months_note, 0.05 AS materiality, 'D2' AS materiality_note`): one row, one column per constant plus a `<constant>_note` column naming the STATE.md decision id. Every model that reads a constant cross-joins it (`CROSS JOIN analytics.cfg_billing c`, then `c.gap_months`); changing one is a `mb transform update` on `cfg_<domain>` and one run of the domain's job.
 
 ## Declare grain and key before building
 
-Agree the inventory with the user as a table before the first model is created: staging models one per source table, the named intermediates, and final-layer tables as three lists (entities, events, rollups).
+Agree the inventory as a table before the first model is created: staging blocks one per source table, the named intermediates, and final-layer tables as three lists (entities, events, rollups). A grain column name means the same thing everywhere; pick the date basis once, as a decision.
 
 | Model | One row per | Key |
 |---|---|---|
@@ -84,39 +50,26 @@ Agree the inventory with the user as a table before the first model is created: 
 | `mart_acme_fct_order` | order | `order_id` |
 | `mart_acme_fct_customer_month` | customer and month | `customer_month_key` |
 
-- Materialize a composite grain as one column, `concat(customer_id, '|', cast(date_trunc('month', event_at) as varchar)) AS customer_month_key`, so the grain check is a duplicate count on it.
-- A grain column name means the same thing everywhere; pick the date basis once, record it, and checkpoint it.
-- Unrelated domains get their own final-layer tables; a domain with no stated business logic gets the simplest defensible model, every definitional choice logged as an open question.
+A composite grain is one concatenated column, so the grain check is a duplicate count on it.
 
-## Grain ladder for rollups
+Grain ladder for rollups: one atomic grain, the finest row the source supports; one primary rollup, the grain most questions are asked at; segment rollups, the same measure set sliced one way each. Define the measure set once; pre-aggregate each child to the target grain in its own block before joining.
 
-1. One atomic grain: the finest row the source supports (one row per order line).
-2. One primary rollup: the grain most questions are asked at (one row per order).
-3. Segment rollups: the same measure set sliced one way each (per customer and month).
+## Materialization
 
-Define the measure set once and reuse it across the segment rollups; a list of questions is usually a few measures across a few grains, answered by rolling one event model up by a date column.
+Default: full rebuild (`target.type: "table"`), so a logic change backfills every period on the next run. After the first run measure rows and duration (`mb transform runs --transform-id <id> --json`); propose incremental only where the rebuild exceeds the job window or the engine bills by scan, as a reversible decision carrying both numbers.
 
-## Anti-patterns
-
-| Never | Instead |
+| Rows | Strategy |
 |---|---|
-| Precomputed totals instead of detail rows | Detail rows, with a convenience count beside them |
-| Joining several child tables directly onto one row | Pre-aggregate each child to the target grain in its own block, then join the blocks |
-| A placeholder for an absent attribute | `coalesce(x, 0)` only for a measure from a left-joined child; a genuinely absent attribute stays null |
+| Immutable events with a monotone timestamp | `table-incremental`, `append`; source checkpoint on that column |
+| Entities that mutate in place | `table-incremental`, `merge` on the declared key (deletes matching keys, then inserts); checkpoint on the update timestamp |
+| Anything a whole-partition window function reads (latest-load dedup, dense spine, motion tables) | full rebuild |
+
+Body shape: `mb transform create --help --json | jq .inputSchema`; mechanics: `mb skills path transform`, section "Incremental targets". A run reads rows with checkpoint above the stored watermark up to the field's maximum at run start, then stores that maximum; the field must be monotone (a load timestamp, never an event time) or a late row is skipped forever. A run with no watermark is a full refresh: the first run, and the run after `checkpoint-filter-field-id` changes. `delete-table` keeps the watermark and does not force one. A changed definition, merge key, or checkpoint column needs a full refresh, forced by changing the checkpoint field on update or by deleting and recreating the transform. The quality gate reads the whole table after an incremental run, never the increment. History snapshots (`append` transforms): [entities-and-time.md](entities-and-time.md).
 
 ## Physical layout
 
-Every clause here is a default to confirm: one collection per layer named for it (`stg_acme`, `int_acme`, `mart_acme`), each model filed before the next is started; every layer in one output schema separate from the landing schema; layer carried by prefix and collection, not by schema.
+Defaults to confirm: one collection per layer named for it (`mb collection create --body '{"name":"stg_acme"}' --namespace transforms`); every layer in one output schema separate from the landing schema; layer carried by prefix and collection, not by schema.
 
 ## Transformations that run outside Metabase
 
-When the company transforms data in its own tool, [build-clean-tables.md](../playbooks/build-clean-tables.md) still runs:
-
-- Applies: pre-flight, the build ledger, SQL carrying the model header in the company's file layout and naming, `mb query` validation against physical table names, and the quality gate on each landed table.
-- Skipped: collections, `mb transform create`, `update`, and `run`, and the DAG re-run.
-- SQL references physical tables so it runs through `mb query`; the user swaps in their tool's reference syntax. Hand the files over from `./.scratch`.
-- Once the tables land: `mb db sync-schema <id> --wait`; a batch gets the gate per model in dependency order. `DEPLOYED` for a landed table means it passed the gate. Then continue at the semantic layer ([semantic-layer-design.md](semantic-layer-design.md)).
-
-## When a single flat table is enough
-
-Skip the layers when a handful of source tables describe one real-world thing, no measure is shared by two outputs, and there is no rollup: one wide table per thing (`customers`, `orders`, `products`), linking ids kept on it. Return to layers when the same business logic is about to be written into two outputs, or an output table feeds another: promote the shared piece into an intermediate model.
+When the company transforms data in its own tool, [build-clean-tables.md](../playbooks/build-clean-tables.md) still runs: the Models table in STATE.md; SQL with the header in the company's layout and naming; slice-first validation through `q()` on physical table names; the gate on each landed table. Skipped: smoke test, collections, tag and job, `mb transform create`, `update`, `run`, and picker hiding of the tool's tables. The user swaps in their tool's reference syntax; hand over the files. Once the tables land: `mb db sync-schema <id> --wait`, the gate per model in dependency order (a passed table is deployed, [state.md](state.md)), then the semantic layer ([semantic-layer-design.md](semantic-layer-design.md)).

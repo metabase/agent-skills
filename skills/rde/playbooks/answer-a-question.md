@@ -1,51 +1,76 @@
 # Answer a question
 
-Applies when the user wants a number or a finding rather than a build ("how many", "which", "did it go up"); produces a written answer in plain language with its scope stated, at least three cross-checks behind it, and the durable form the user asked for, if any. The deliverable is the answer, not a chart.
+Applies: the user wants a number or a finding, not a build ("how many", "which", "did it go up"). Produces the answer with its scope stated beside it, tagged `Official` or `Ad hoc`, three checks behind it, the next breakdown pre-empted, and an offer to save it.
 
-Read first: [`collaboration-contract.md`](../references/collaboration-contract.md), the semantic-checks section of [`data-quality-checks.md`](../references/data-quality-checks.md), the row-ceiling note in [`profiling-catalog.md`](../references/profiling-catalog.md), and `mb skills get core`.
+Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 scope` `2 find the definition` `3 probe` `4 compute` `5 three checks` `6 write` `7 deliver` `reply`.
 
-## 1. Scope the question
+Read first: [`state.md`](../references/state.md) and the domain file STATE.md names.
 
-Settle four things in one short message, your lean stated so the user can just confirm: the population (everyone, or only active, confirmed, paying, non-test); the period and the date column it is measured on; the status filters and exclusions (cancelled, refunded, staff, test rows); the form the answer takes (a number in chat, a written finding, a saved question, a dashboard card, or an official definition).
+## Commands you will run
 
-Check: you can restate the question with population, period, and filters in one sentence, and the user agreed to it and to the form. Two readings that give materially different numbers is a checkpoint (block in [`collaboration-contract.md`](../references/collaboration-contract.md)), not a pick.
+Every line also takes `--profile $PROFILE --json`; `q()` is sourced from `./.scratch/probe.sh`.
 
-## 2. Find what exists, then pick the grain
+```bash
+mb search "<the user's words>" --models metric,measure,segment,dataset --db-id $DB
+mb card get <id> --fields name,description,dataset_query          # what the definition already excludes
+q "SELECT count(*) AS n FROM <schema.table>"
+q "SELECT <column>, count(*) AS n FROM <schema.table> GROUP BY 1 ORDER BY 2 DESC LIMIT 50"
+cat > ./.scratch/a.json <<'JSON'
+{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,
+  "aggregation":[["metric",{},305]],
+  "filters":[["time-interval",{},["field",{},1717],"last","month"]],
+  "breakout":[["field",{},1719]]}]}
+JSON
+mb query --file ./.scratch/a.json --dry-run; mb query --file ./.scratch/a.json --fields status,data.rows
+q "SELECT sum(n) FROM (<the breakdown query>) b"                  # reconstruction: breakdown sums to the total
+mb card create --file ./.scratch/saved.json                       # the offer to save, when accepted
+```
 
-Search for an existing definition first: `mb search "<term>" --models metric,dataset,segment,measure --json`; an official number is used, never re-derived. Then pick the table whose grain matches the question: one row per order answers "how many orders", and "how many customers" only as a distinct count. Prefer a final-layer table over a raw table; if only raw tables exist and the question needs a join, say so and offer [`build-clean-tables.md`](build-clean-tables.md) first.
+A measure is `["measure",{},<id>]` in the same slot; a segment is `["segment",{},<id>]` in `filters`.
 
-Check: you can say "one row per ___" for the table, and what you count is that thing or a distinct count of a column on it.
+## 1. Scope silently, state the scope in the answer
+
+Pick the reading a reasonable colleague would mean: the population, the period and its date column, the exclusions. Write it as one sentence; it appears verbatim beside the number. The pick is `[DECIDED, reversible]`. Ask before computing only when two readings differ materially, and then with both numbers in hand.
+
+## 2. Find what exists
+
+STATE.md Questions first, then `mb search`. A metric or measure found makes the answer `Official`; none makes it `Ad hoc`. Then the table whose grain matches: one row per order answers "how many orders", and "how many customers" only as a distinct count. Prefer a final-layer table; raw tables needing a join: say so and offer [`build-clean-tables.md`](build-clean-tables.md).
 
 ## 3. Probe small
 
-`count(*)` and a handful of rows first, then the distinct values of every column you will filter or group by. Aggregate in SQL; the row ceiling and the full-extract path are in `profiling-catalog.md`. Check: no column enters a filter or a `GROUP BY` before you have seen its values.
+`count(*)` and the distinct values of every column you will filter or group by, before either enters the query. The row ceiling and the extract path: `profiling-catalog.md`.
 
-## 4. Compute
+## 4. Compute through the definition
 
-Write the query the scoped sentence calls for, run it, keep the exact query beside the number. Group where a breakdown is one clause away. Check: the query implements the sentence from step 1 filter for filter; if not, the sentence changed and the user has not been told.
+Where step 2 found a metric or measure, aggregate it by id with the question's filters and breakout, so the chat answer equals the dashboard's. Native SQL is for questions no definition covers, and using it there is a gap logged in STATE.md Questions. Group where the next breakdown is one clause away.
 
-## 5. Cross-check
+## 5. Three checks, inline
 
-Run at least three, plus whatever the semantic checks in `data-quality-checks.md` add for this shape of question:
-
-- A denominator: the total the number is a share of.
-- A null check: rows where the filtered or grouped column is null or blank; a large null bucket is often the finding.
-- A reconstruction: the same number a second way, summing the breakdown to the total or counting the population off a related table through its key.
-
-Disagreement between paths is reported, not resolved by picking the friendlier one; a cause that is an undecided business rule is a checkpoint. Check: denominator, null count, and second path are written beside the answer.
+A denominator: the total the number is a share of. A null bucket: rows where the filtered or grouped column is null or blank; a large one is often the finding. A reconstruction: the breakdown summed equals the total, or the population counted off a related table through its key. Disagreement is reported, never resolved by picking the friendlier number; a cause that is an undecided business rule is a `[CHECKPOINT]`.
 
 ## 6. Write the answer first
 
-One sentence with the number, its denominator, and its period, in the user's words; then only the caveats that change how it reads: what was excluded, what was null, where the period was cut, what the number is not. Offer the query rather than pasting it. For free-text data, quote several real responses beside the count. Check: the first sentence alone gives a correct impression; the caveats contradict nothing in it.
+One sentence with the number, its denominator, and its period, in the user's words, tagged; then the scope sentence; then the breakdown they will ask for next; then only the caveats that change the reading. Personal data per the contract. Offer the query rather than pasting it.
 
 ## 7. Deliver in the form asked for
 
-Build exactly the form step 1 settled and nothing unasked. A question asked more than once gets the recommendation to define it ([`build-semantic-layer.md`](build-semantic-layer.md)).
+A number in chat needs nothing else. Offer to save it as a question or, if it will be asked again, to define it in [`build-semantic-layer.md`](build-semantic-layer.md). A written finding is a document: `mb skills path document`, Read "Body shape (create / update)".
+
+Finished example, an answer:
+
+```
+Ad hoc. 41 customers churned in August 2026 out of 1,212 paying at the start of the month (3.4%).
+Scope: paying accounts, churn dated by service end, trials and internal accounts excluded.
+By plan: plan_basic 29, plan_plus 9, plan_pro 3.
+Checked: 41 + 1,171 retained = 1,212; 0 rows with a null plan; 41 again by counting subscriptions whose end fell in August.
+Caveat: 6 of the 41 reactivated in September and move to "paused" once D7 is answered.
+Save this as a question, or define churn officially?
+```
 
 ## Done when
 
-The scoped sentence and the form are confirmed; the answer comes from a table whose grain you can state; the three cross-checks are recorded; the written answer leads with the number in context; the form asked for is built and nothing else.
+The scope sentence sits beside the number; the answer comes from a definition or from a table whose grain you can state; the three checks are recorded; the form asked for is built and nothing else.
 
 ## Reply
 
-The answer in one sentence with denominator and period; the breakdown as a short table if there is one; the few caveats that change its reading; one line on what it was checked against; the link to the saved form when one was asked for; any scoping decision you made for them.
+The five-part hand-back in `collaboration-contract.md`, collapsed to the answer above when nothing else changed; under part three: the scoping choices made for them and what each check returned.

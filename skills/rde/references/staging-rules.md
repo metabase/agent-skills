@@ -5,19 +5,19 @@ Read when starting the cleaning layer, whatever the company calls it, and for wh
 ## Invariants
 
 - The block that reads a raw table never joins; enrichment, decoding against a lookup, and classification belong to an intermediate model or a later CTE in a wide model.
-- No business logic: no recognition rule, no status collapse, no derived category. Casts, renames, unit conversion, decoding of encodings, key selection, and loader bookkeeping removal only.
+- No business logic: no recognition rule, status collapse, or derived category. Casts, renames, unit conversion, decoding, key selection, and loader bookkeeping removal only.
 - No filter that changes the population the table describes. A hygiene filter removing structurally broken rows is allowed and declared in the header.
 - No aggregation: staged rows equal source rows minus the tombstones and duplicates removed deliberately and reported.
 
 ## Defaults to match or confirm
 
-- One staging model per source table, named by the company's convention (default in [layering-and-naming.md](layering-and-naming.md)); never merge two source tables into one staging model, never split one into two, never rename two source tables into one shape to look consistent (conform in the intermediate layer).
+- One staging block per source table, named by the company's convention; a CTE inside its only consumer, materialized as its own transform only when shared or deduplicating a large appended sync ([layering-and-naming.md](layering-and-naming.md)). Never merge two source tables into one block, never split one into two, never conform two sources into one shape here (intermediate work). An inlined block is still headed and still gated, with row parity per source block.
 - Money in one unit and timestamps in one timezone, each converted exactly once, at this step, with the unit in the column name and the timezone in the header.
 - Deduplication sits here only when measured as needed (below).
 
 ## How a loader shapes a table
 
-Discover the loader's shape from the landed tables, never from assumption. Read the column list per table (`mb table get <id> --include fields --json`): a flattened column exists only where at least one parent row populated it, so two tables of the same source type can carry different columns.
+Discover the loader's shape from the landed tables: read the column list per table (`mb table get <id> --include fields --json`); a flattened column exists only where a parent row populated it, so two tables of one source type can carry different columns.
 
 | Columns present on most tables | Implies |
 |---|---|
@@ -29,10 +29,10 @@ Record the freshness column and its maximum value; a stale loader caps every tra
 
 | Loader artifact | Rule |
 |---|---|
-| Row id column (one per landed row) | Drop, except kept deliberately as the key of a child table that has no natural key |
-| Load id column (one per run) | Drop, except kept deliberately as the deduplication tiebreaker |
-| Sync or extracted-at timestamp | Drop, except kept as the tiebreaker or as the freshness input |
-| Soft-delete flag or deleted-at column | Resolve here: filter deleted rows out, or keep an explicit boolean when downstream counts them. Pick one, say which in the header, apply consistently. Never leave tombstones unfiltered and unflagged |
+| Row id column (one per landed row) | Drop; keep only as the key of a child table with no natural key |
+| Load id column (one per run) | Drop; keep only as the dedup tiebreaker |
+| Sync or extracted-at timestamp | Drop; keep only as tiebreaker or freshness input |
+| Soft-delete flag or deleted-at column | Filter deleted rows out, or keep an explicit boolean when downstream counts them; say which in the header; never leave tombstones unfiltered and unflagged |
 | Type-discriminator column whose every value names the table it sits in | Drop |
 | Nested field flattened into a prefixed column (`address__city`, `address_city`) | Rename to `<parent>_<field>` in `snake_case`; drop the prefix only when the field name is unambiguous without it |
 | Array split into a child table (`order__items`) | Stage the child table as its own model with one row per element |
@@ -55,26 +55,26 @@ Record the freshness column and its maximum value; a stale loader caps every tra
 | Coded column (`c_4471`, `status_3`) | Cleanly typed code | Deliver the code; the label join happens in an intermediate model |
 | Anything | `snake_case` | `*_id` keys, `*_at` timestamps, `*_date` dates |
 
-Count the distinct currencies or units present before suffixing a column with a unit.
+Count the distinct currencies or units before suffixing a column with one.
 
 ## Preserve the source column beside a lossy cast
 
 When a cast can lose information (text to number, text to date, wide numeric to narrow), cast into a new column and keep the original beside it, so cast parity compares non-null originals against non-null casts.
 
-Never gain nulls silently. More nulls in a staged column than in the source is a failure to investigate.
+Never gain nulls silently: more nulls in a staged column than in the source is a failure to investigate.
 
 ## Key selection
 
 - Globally unique, stable source ids are the primary and foreign keys. Do not mint replacements.
-- Mint a key only for a child or array table with no natural key (rule in the loader table above).
-- One candidate: proceed. Several candidates: checkpoint (block in [collaboration-contract.md](collaboration-contract.md)).
-- Assert uniqueness on the chosen key with the key-uniqueness probe in [profiling-catalog.md](profiling-catalog.md). Duplicates on it mean the wrong key or a table that needs deduplication.
+- Mint a key only for a child or array table with no natural key (loader table above).
+- One candidate: proceed. Several candidates: a reversible decision, shown with the evidence ([collaboration-contract.md](collaboration-contract.md)).
+- Assert uniqueness on the chosen key with the key-uniqueness probe in [profiling-catalog.md](profiling-catalog.md). Duplicates mean the wrong key or a table needing deduplication.
 
 ## Decode and normalize encodings
 
-Normalized sources hide meaning in lookup tables (`*_field`, `*_choice`, `*_question`, `*_type`). Build the code-to-label map from the lookup and pull the label from the lookup in the query, never as a typed-in literal. The join makes that model intermediate; staging delivers the code column typed and named.
+Normalized sources hide meaning in lookup tables (`*_field`, `*_choice`, `*_question`, `*_type`). Build the code-to-label map from the lookup and read the label from it in the query, never as a typed literal. The join makes that model intermediate; staging delivers the code column typed and named.
 
-Never flatten a multi-valued field into an opaque blob (`"email | phone | text"`). Separate columns or a child table with one row per value; the choice is the user's, filterability is not.
+Never flatten a multi-valued field into an opaque blob (`"email | phone | text"`): separate columns or a child table with one row per value, the user's choice.
 
 ## Measure whether deduplication is needed
 
@@ -90,8 +90,4 @@ WITH ranked AS (
 SELECT * FROM ranked WHERE load_rank = 1;
 ```
 
-Which collisions are mechanical and which are checkpoints: [modeling-decisions.md](modeling-decisions.md).
-
-## Check before moving on
-
-Run the suite in [data-quality-checks.md](data-quality-checks.md) per model or batched per layer; a failure blocks the next model. For a joined wide model, row parity is per source block, or on the driving table.
+Which collisions are mechanical and which stop: [modeling-decisions.md](modeling-decisions.md).

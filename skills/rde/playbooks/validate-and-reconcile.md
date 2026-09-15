@@ -1,53 +1,81 @@
 # Validate and reconcile
 
-Applies when a built number must be proven against something outside itself, or disagrees with an existing one; produces a declared validation mode, a row-level comparison at the narrowest shared grain, a gap decomposed with a cause per bucket, a fix or a stated ceiling per cause, and standing controls. Data-quality checks prove self-consistency only.
+Applies: a built number must be proven against something outside itself, or two numbers disagree. Produces a declared validation mode, a row-level comparison at the narrowest shared grain, a gap with a cause per bucket, a fix or a ceiling per cause, and standing controls.
 
-Read first: [`reconciliation.md`](../references/reconciliation.md), [`ledgers-and-artifacts.md`](../references/ledgers-and-artifacts.md), [`collaboration-contract.md`](../references/collaboration-contract.md), the Tools and limits section of [`profiling-catalog.md`](../references/profiling-catalog.md) (full-extract path, dialect, row ceiling), `mb skills get notification` (alerts on saved questions), and `mb skills get transform` (scheduled transform-jobs).
+Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 reference, mode` `2 scope` `3 comparison` `4 buckets` `5.<rule> fix` `6 ceiling` `7 controls` `reply`.
+
+Read first: [`reconciliation.md`](../references/reconciliation.md), [`state.md`](../references/state.md), and the domain file STATE.md names.
+
+## Commands you will run
+
+Every line also takes `--profile $PROFILE --json`; `q()` is sourced from `./.scratch/probe.sh`.
+
+```bash
+mb search "<term>" --models table,card,metric --db-id $DB
+mb card get <id> --fields name,dataset_query                # each side of a disagreement
+mb setting get uploads-settings | jq .value.db_id           # must equal $DB
+mb upload csv --file ./data/finance_mrr.csv --collection <id>
+# the comparison transform: the create body in build-clean-tables.md, SQL from the full-outer-join shape in reconciliation.md
+q "SELECT state, bucket, count(*) AS n, sum(gap) AS net, sum(abs(gap)) AS gross FROM <out_schema>.cmp_<number> GROUP BY 1, 2"   # state and bucket columns per reconciliation.md
+mb card query <cmp-card-id> --export-format csv > ./.scratch/cmp.csv   # rows past the ceiling
+mb card create --file ./.scratch/check.json; mb alert create --file ./.scratch/alert.json
+mb timeline create --body '{"name":"Definition changes","collection_id":<analytics collection id>}'
+mb timeline-event create --body '{"name":"Churn gap 1 to 2 months","description":"D7 answered; June to August restated down 3.1%.","timestamp":"2026-09-15T00:00:00Z","timezone":"UTC","time_matters":false,"timeline_id":<id>}'
+```
+
+Bodies:
+
+```json
+{"name":"DQ: customer_month failures","display":"table","collection_id":<dq collection id>,"visualization_settings":{},
+ "dataset_query":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/native","native":"<the structural checks as one query, one row per failing check>"}]}}
+{"payload":{"card_id":410,"send_condition":"has_result","send_once":false},
+ "subscriptions":[{"cron_schedule":"0 0 7 * * ? *"}],
+ "handlers":[{"channel_type":"channel/email","recipients":[{"type":"notification-recipient/raw-value","details":{"value":"data@acme.example"}}]}]}
+```
 
 ## 1. Land the reference, declare the mode
 
-Search before asking: `mb search "<term>" --models table,card --json`, reference-shaped warehouse tables, existing comparison transforms or cards. Ask for it at the finest grain, keyed by something both sides carry, before building. Land it with `mb upload csv --file <path>` only when `mb setting get uploads-settings --json` reports the build's database as `db_id`; otherwise the user lands the reference with their loader. Never fabricate a figure. Declare the validation mode from the table in `reconciliation.md`; with no reference, a pass rate proves nothing.
+Search before asking; ask for the reference at the finest grain, keyed by something both sides carry. Land it with `upload csv` only when the uploads database is the build's; otherwise the user's loader. Two numbers disagreeing inside the instance: read both queries, the metric is the reference (`source_parity`, `reconciliation.md`). Never fabricate a figure. The mode comes from the table in `reconciliation.md`; with no reference a pass rate proves nothing. Mode, reference rows, grain, pull date into STATE.md Decisions.
 
-Check: mode, reference row count, grain, pull date in the ledger.
+## 2. Scope the reference to the build
 
-## 2. Filter the reference to the build's scope
-
-Apply the scope filters first, each with its reason: the categories the build recognizes, no forecast or forward-filled rows, complete periods, the exclusions both sides claim. A reference covering part of the population is a coverage difference to report, not a defect.
-
-Check: the comparison universe is one sentence, and every figure is quoted against it.
+Each filter with its reason: the categories the build recognizes, no forecast rows, complete periods, the exclusions both sides claim. Coverage differences are reported, not fixed. The comparison universe is one sentence every figure is quoted against.
 
 ## 3. Reconcile at the narrowest shared grain
 
-Build the comparison as its own transform (body from the bundled skill), or as a model in the company's tool, with the full-outer-join shape in `reconciliation.md`, on a declared key, at the grain the model produces; roll up to the reporting grain only after the row-level comparison passes.
-
-Check: key declared, full outer join, model's own grain.
+The comparison is its own transform (or a model in the company's tool) with the full-outer-join shape in `reconciliation.md`, on a declared key, at the grain the model produces; roll up only after the row level passes.
 
 ## 4. Decompose the gap
 
-Bucket every compared row per `reconciliation.md`: per bucket, row count, signed and absolute contribution, share of total absolute gap. Net and gross together; agreement at several tolerance bands; top rows by absolute gap read one by one. Attribute each bucket to a cause, marked fixable or not; the rest stays explicitly unattributed. Compare dimensions too, not only the measure. Deliver the rows through the full-extract path in `profiling-catalog.md`, stating what the file omits.
-
-Check: bucket counts sum to the compared row count; every headline count is computed from the comparison, never remembered.
+Bucket every non-match row with the ordered `CASE` in `reconciliation.md`, a column of the comparison transform: rows, net, gross, share per bucket; agreement at several tolerance bands; the top rows by absolute gap read one by one; dimensions compared, not only the measure. Each bucket gets a cause, fixable or not, or stays unattributed. Tolerances and boundaries are `[DECIDED, reversible]`. Bucket counts sum to the compared rows; every headline count is computed, never remembered.
 
 ## 5. Fix one rule at a time
 
-Each fix changes one rule and is re-measured against the same reference under the same universe, reporting before and after per misclassification direction. Closing a gap with logic not in the plan is a checkpoint (block in [`collaboration-contract.md`](../references/collaboration-contract.md)), never a quiet addition; logic deliberately deferred goes on the deferred list in `reconciliation.md`.
-
-Check: every iteration is in the ledger with its rule and its effect in each direction.
+Each fix changes one rule and is re-measured against the same reference under the same universe, before and after per direction. Closing a gap with logic not in the plan is a `[CHECKPOINT]`; a headline that moved gets a timeline event and the contract's restatement protocol.
 
 ## 6. Declare the ceiling
 
-Apply the ceiling rule in `reconciliation.md`: list each item the sources cannot carry with its reason and effect, apart from the deferred list; state the residual and stop.
+Per `reconciliation.md`: each item the sources cannot carry with its reason and effect; the residual; stop.
 
 ## 7. Standing controls
 
-Leave controls that run without you, from the standing-controls table in `reconciliation.md`, each an alert on a saved question (`mb skills get notification`), a scheduled transform-job (`mb skills get transform`), or a model in the company's tool. A movement classifier ships with the state and motion tables (Reconcile by construction, `reconciliation.md`).
+Freshness and structural checks by default, the rest on request (`reconciliation.md`). Each is a check card returning rows only on failure plus a `has_result` alert (channel first: `mb setting get 'email-configured?'`; test with `mb alert send <id>` to yourself; more in `mb skills path notification`, Read "Alerts"), or a scheduled transform-job (`mb skills path transform`, Read "Transform jobs (schedules)"); a snapshot is an append transform on the job (`entities-and-time.md`). Each control names a threshold and an owner.
 
-Check: each control has a threshold, an owner, a place it runs.
+Finished example, the verdict and gap table:
+
+```
+Reconciled to finance's MRR sheet, August 2026: build 412,300 vs reference 398,100, net +3.6%, gross 16,900, over 1,212 customers.
+| bucket | rows | net | gross | share | cause | fixable |
+| match | 1,148 | +310 | 1,020 | 6% | rounding | no |
+| scope | 19 | +9,400 | 9,400 | 56% | reseller accounts only in build; finance nets them out | yes (D9) |
+| classification | 41 | +4,600 | 6,100 | 36% | refunds as negative lines | yes (D3) |
+| unexplained | 4 | -110 | 380 | 2% | manual adjustments only in reference | no |
+```
 
 ## Done when
 
-Every check in steps 1 to 5 and 7 passes, every bucket has a cause or an explicit non-attribution, and the residual is named with its causes.
+Every bucket has a cause or an explicit non-attribution; every fix is re-measured; the residual is named with its causes; the controls run unattended.
 
 ## Reply
 
-The verdict in one sentence: how close, at which grain, over which universe. Net and gross together. The gap buckets as a short table with causes; what you fixed and what moved; the ceiling in plain language; the controls running; the decisions waiting on the user.
+The five-part hand-back in `collaboration-contract.md`; under part three: the verdict in one sentence (how close, which grain, which universe), the gap table, what moved per fix, the ceiling in plain language.
