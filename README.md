@@ -44,6 +44,12 @@ Drives a Metabase instance from the terminal via the official `mb` CLI — every
 
 This skill is a thin discovery stub; the workflow content lives in [`@metabase/cli`](https://www.npmjs.com/package/@metabase/cli) and is served at runtime by `mb skills get`. Install the CLI (`npm i -g @metabase/cli`) and the skill resolves the rest. The same skill is also available as a Claude Code plugin direct from the CLI repo (`/plugin marketplace add metabase/mb-cli` + `/plugin install metabase-cli@metabase`); one install path is enough.
 
+### Data engineering router
+
+[rde](./skills/rde/SKILL.md)
+
+An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic.
+
 ### Database metadata
 
 [metabase-database-metadata](./skills/metabase-database-metadata/SKILL.md)
