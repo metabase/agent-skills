@@ -53,7 +53,7 @@ Five parts, in this order, in every Reply:
 
 1. What you can now do, with a browser link.
 2. The headline numbers, each with its trust label.
-3. What I decided for you: reversible, one line each; tables, keys, and checks only here, only when they changed a number.
+3. What I decided for you: reversible, one line each; tables, keys, tests, and checks only here, only when they changed a number.
 4. What I need from you, batched by owner.
 5. What comes next and roughly how long.
 

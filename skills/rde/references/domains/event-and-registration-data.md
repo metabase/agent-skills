@@ -65,6 +65,16 @@ The atomic model carries the match method and a matched boolean.
 
 Every report states its scope (all-time or a window, everyone or only confirmed) and its denominator.
 
+## Cases a transform test pins
+
+Per model, the fixture rows and expectations [../transform-tests.md](../transform-tests.md) asks for; the thresholds come from the `cfg_<domain>` input, so a re-derived cutoff is a change to the fixture's constant, not to the SQL.
+
+- Registrant grain: one repeat registration that is a duplicate and one that is a real second sign-up, by the source's own identifiers; `equals` on registrant, event, `is_selected`.
+- Completion: one registrant per path (live above the minimum, replay above the threshold), one satisfying both, one satisfying neither; `equals` on registrant, `is_completed`, the satisfying-path column.
+- Thresholds: one row exactly at each cutoff and one just under it; `equals` on the boolean, the continuous measure carried beside it.
+- Short attendance: a zero-duration row, a row with a join timestamp and no duration (null, never zero), a row at the theoretical maximum; `equals` on the treatment column.
+- Event rollup: `empty` where attendees exceed registrants, where completions exceed attendees plus replay viewers, or where a registration falls after the event.
+
 ## Checks
 
 - One row per registrant per event, asserted; a repeat registration is a duplicate to resolve or a real second sign-up, decided from the source's own identifiers.

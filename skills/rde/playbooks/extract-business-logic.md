@@ -45,7 +45,7 @@ One record per requested number and dimension in the format in `extraction-and-g
 
 ## 7. Ratify
 
-Present the report; open questions as one decision memo per the contract, grouped by owner. Reversible items proceed on the default; an irreversible one is a `[CHECKPOINT]`. Every item is a STATE.md Decisions row; an unratified assumption enters the build as an open row, never as a fact. The ratified reference plus the report is the plan [`build-clean-tables.md`](build-clean-tables.md) expects; validation against the original artifact's own output measures parity only (`reconciliation.md`).
+Present the report; open questions as one decision memo per the contract, grouped by owner. Reversible items proceed on the default; an irreversible one is a `[CHECKPOINT]`. Every item is a STATE.md Decisions row; an unratified assumption enters the build as an open row, never as a fact. The ratified reference plus the report is the plan [`build-clean-tables.md`](build-clean-tables.md) expects; a worked example found in an artifact (a spreadsheet row, a test in the code, a figure in a document with its inputs) is carried over as a transform-test case for the model that will own the rule ([`transform-tests.md`](../references/transform-tests.md)); validation against the original artifact's own output measures parity only (`reconciliation.md`).
 
 Finished example, the verdict matrix:
 

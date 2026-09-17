@@ -85,6 +85,18 @@ State and motion tables: reconcile by construction ([../reconciliation.md](../re
 - Gap threshold (the lapse that becomes churn plus reactivation): default one month, a named constant; `lead(mrr) = 0` confirms a `churned` month; record whether a pending cancellation counts.
 - Plan-shift pairs are moves, not churn (into a category outside scope: `churned`; out of it: `new`): declare and flag them, keep them out of churn counts; cancel-then-create upgrades and overlapping subscriptions in a migration are the same false pair, flagged, never silently corrected.
 
+## Cases a transform test pins
+
+Per model, the fixture rows and expectations [../transform-tests.md](../transform-tests.md) asks for; `cfg_<domain>` is an input in each.
+
+- Amortisation: one annual invoice anchored mid-month and one monthly; `equals` on subscription, month, amount gives twelve equal rows from the service start and one; `empty` where the spread per invoice does not sum to its basis within the declared tolerance.
+- Cadence ladder: one invoice per rung (price record, period-day band, subscription header, default) and one mid-cycle proration invoice; `equals` on invoice, cadence, `cadence_source`.
+- True-ups: a mid-cycle amendment on a short cycle (removed), one on a multi-period cycle (spread over the remaining term), a shorter-cycle invoice taking over a long spread (the spread stops from its month); `equals` on subscription, month, amount.
+- Stop rule: one cancelled subscription; `empty` on rows at or after the cancellation month, under whichever timestamp the checkpoint chose.
+- Corrections: one document per `treatment`; `equals` on document, `treatment`, `basis_treatment`, recognised amount.
+- Retention states: one customer per state in the ordered list, a plan-shift pair flagged as a move, a gap exactly at `gap_months` and one beyond it, the synthetic zero row as the exit; `equals` on customer, month, state, signed delta. A second test with the alternative `gap_months` in the `cfg` input shows what the open decision changes.
+- Rollup: `empty` where `ending_arr_usd <> mrr_usd * 12`, and where a customer-month has more than one state.
+
 ## Semantic checks
 
 - Per invoice, recognised equals total minus declared exclusions, within a stated tolerance.

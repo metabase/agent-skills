@@ -1,6 +1,6 @@
 # Data quality checks
 
-Read for every build that materialises a table.
+Read for every build that materialises a table. The checks here run on the data that landed; the rules the model applies to it are pinned first, on fixtures, by its transform tests ([transform-tests.md](transform-tests.md)). A check that fails on a case the test also covers is a fixture that did not match the source; a check that fails on a case no test covers gets that case as a fixture row before the SQL is fixed.
 
 ## The eight checks, one query per model
 
@@ -55,7 +55,7 @@ DQ: stg_acme_customer (slice: created_at >= 2026-08-01)
 
 ## Semantic checks structural checks cannot replace
 
-Report these as their own block.
+Report these as their own block. The first four are also transform-test expectations on a fixture built for them (one document per class, one row past each bound); the last three need real data.
 
 | Check | Catches |
 | --- | --- |

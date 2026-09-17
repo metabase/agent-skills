@@ -25,6 +25,15 @@ Metrics and segments live on the rollup and on the account table; the event tabl
 
 Activation and revenue meet only on the conformed customer table ([../entities-and-time.md](../entities-and-time.md)): find the crosswalk (an id column naming the other side, a shared external id, a normalised email domain), report the match rate, `[CHECKPOINT]` the key choice, and give every fact table the conformed key as a metadata FK. Never widen the event rollup with billing columns by whichever join is at hand.
 
+## Cases a transform test pins
+
+Per model, the fixture rows and expectations [../transform-tests.md](../transform-tests.md) asks for; the activation window and the engagement N, M, and window come from the `cfg_product` input.
+
+- Activation: one account whose milestone lands inside the window, one on its last day, one the day after, one that never emits it, one whose milestone precedes its signup (a finding row, flagged); `equals` on account, `activated_at`, `days_to_activation`, `is_activated`.
+- Account-day rollup: an account with events on two of five spine days; `equals` on account, day, event count, distinct users, the milestone booleans, so gap days are zero rows and not missing rows.
+- Engagement: one account exactly at N events on M days, one at N events on fewer days, one just outside the trailing window; `equals` on account, day, `is_active`, the continuous measures beside it.
+- Cohort: a signup in a month whose window has not closed by `last_complete_period`; `empty` where such a cohort is counted with `is_complete_period = true`.
+
 ## Checks
 
 - Every activated account has a signup timestamp before its milestone event; a violation is a clock or backfill finding, never clipped.

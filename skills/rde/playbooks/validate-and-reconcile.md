@@ -51,7 +51,7 @@ Bucket every non-match row with the ordered `CASE` in `reconciliation.md`, a col
 
 ## 5. Fix one rule at a time
 
-Each fix changes one rule and is re-measured against the same reference under the same universe, before and after per direction. Closing a gap with logic not in the plan is a `[CHECKPOINT]`; a headline that moved gets a timeline event and the contract's restatement protocol.
+Each fix changes one rule and is re-measured against the same reference under the same universe, before and after per direction. The row that exposed the rule becomes a fixture row and an expectation on the model's transform test before the SQL changes (`build-clean-tables.md` step 8; [`transform-tests.md`](../references/transform-tests.md)), so the bucket cannot reopen silently. Closing a gap with logic not in the plan is a `[CHECKPOINT]`; a headline that moved gets a timeline event and the contract's restatement protocol.
 
 ## 6. Declare the ceiling
 

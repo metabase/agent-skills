@@ -46,7 +46,7 @@ Per `semantic-layer-design.md`: the curated table (Library or not), no model ove
 
 ## 3. Metadata chain
 
-Per defining table in `semantic-layer-design.md`'s order, bodies above; gaps left by `build-clean-tables.md` step 5 close here.
+Per defining table in `semantic-layer-design.md`'s order, bodies above; gaps left by `build-clean-tables.md` step 6 close here.
 
 ## 4. Questions table
 

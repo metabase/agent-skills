@@ -11,7 +11,7 @@ Declare in the model header and in STATE.md's Decisions table ([state.md](state.
 | Latest by time (`loaded_at DESC`, `updated_at DESC`, `period_end_at DESC`) | Later rows supersede earlier ones: a re-synced record, a status that only advances | A later row is a fragment of the same event (a trailing correction): recency picks the less complete row |
 | Preferred by attribute (`is_partial ASC` then `amount DESC`, or a ranked category then a measure) | One row is structurally more authoritative: complete over fragment, settled over pending | The replacement is legitimately smaller (a downgrade): "largest wins" keeps the stale figure |
 
-Where the data contains the case that breaks the chosen family, write an explicit rule for it (stop carrying a value forward when a reducing record exists) and record the family, the breaking case, and its count.
+Where the data contains the case that breaks the chosen family, write an explicit rule for it (stop carrying a value forward when a reducing record exists) and record the family, the breaking case, and its count. The family, its breaking case, and a group of only fragments are the model's transform-test fixture, one group each, `equals` on the key and `is_selected` ([transform-tests.md](transform-tests.md)).
 
 Prefilter before ranking: a group of only fragments keeps all; one non-fragment is resolved; several narrow to the qualifying ones (a positive amount), then rank and keep rank 1. Flag losers with `is_selected`; never delete them.
 
@@ -48,6 +48,7 @@ Where no single column answers every row, write `coalesce(signal_1, signal_2, de
 - Encode a heuristic as bounded ranges with gaps, read off the profiled distribution (`BETWEEN low_a AND high_a` class a, `BETWEEN low_b AND high_b` class b, else null), never as nearest match.
 - The rung order is a decision: propose it with rows resolved per rung and rows falling through to the default; never copy a ladder from another build.
 - Emit `<attribute>_source` naming the rung that fired.
+- Pin the ladder with a transform test: one fixture row per rung and one that falls through, `equals` on the key, the attribute, and `<attribute>_source` ([transform-tests.md](transform-tests.md)); a rung change is a change to that expectation, shown in the hand-back.
 - When changing a rung, count each misclassification direction separately before and after; a lower total that grows the opposite error is no improvement.
 - Clamp a physically bounded measure, `greatest(x, 0)`, and report the rows changed; a large count means the derivation is wrong. Write negative filters null-safe: `(email IS NULL OR NOT (email LIKE '%@example.com'))`.
 
@@ -60,7 +61,7 @@ Emit the incomplete trailing period and mark it. Every model that materializes p
 - Point-in-time state (a balance, an active count, an ending run rate) is valid in the partial row and is the source of every "current" headline.
 - Rollups, rates, and period-over-period comparisons read complete periods only: filter `is_complete_period` before grouping.
 - Publish a `Complete periods` segment (`mb segment create`, filter `is_complete_period` is true) on every periodic table in the final layer, so a question excludes the partial period with one click; its description names the partial period.
-- Assert in the first model that materializes periods that exactly one period per entity has `is_complete_period = false` and that it is the newest: the `period_flag` check in [data-quality-checks.md](data-quality-checks.md).
+- Assert in the first model that materializes periods that exactly one period per entity has `is_complete_period = false` and that it is the newest: the `period_flag` check in [data-quality-checks.md](data-quality-checks.md), and the same query as an `empty` expectation on a fixture whose `cfg_<domain>` input sets `last_complete_period` one period before `cap_period` ([transform-tests.md](transform-tests.md)).
 - The spine's upper bound and `cap_period`: [entities-and-time.md](entities-and-time.md).
 
 Detect the last complete period from the source, never the calendar alone:
