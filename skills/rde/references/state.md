@@ -48,7 +48,7 @@ Status: `open`, `PROVISIONAL` (default in use), `decided`. Record each the momen
 - Decisions and check results: those tables; `open` or `PROVISIONAL` holds its `affects` at `Draft` ([collaboration-contract.md](collaboration-contract.md)).
 - An exclusion: a row in `dim_exclusion_rule` (predicate, entity, reason, source, source-enforced) plus a flagged column with a reason, never a `WHERE`.
 
-Nothing is written twice. Deployed means: filed per the company's convention (or landed outside Metabase); its transform tests pass (`tests` is a pass count, or `none` with a reason, or `unavailable` below v64; [transform-tests.md](transform-tests.md)); last run succeeded; rows above zero or a confirmed empty result; no FAIL in Checks.
+Nothing is written twice. Deployed means: filed per the company's convention (or landed outside Metabase); its transform tests pass (`tests` is a pass count, or `none` with a reason, or `unavailable` when the instance, the token, or the driver cannot run tests; [transform-tests.md](transform-tests.md)); last run succeeded; rows above zero or a confirmed empty result; no FAIL in Checks.
 
 ## Resume
 

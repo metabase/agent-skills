@@ -21,9 +21,9 @@ jq -n --argjson src "$(src ./.scratch/<m>.sql)" --rawfile d ./.scratch/<m>.desc 
 mb transform create --file ./.scratch/t.json | jq '{id,target}'
 jq -n --argjson src "$(src ./.scratch/<m>.sql)" '{source:$src}' > ./.scratch/patch.json
 mb transform update <id> --file ./.scratch/patch.json       # source-only patch
-mb transform-test create --file ./.scratch/<m>.test.json | jq '{id,name}'   # body: references/transform-tests.md; v64+
-mb transform-test run <id> | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "missing-rows", "extra-rows", "cell-mismatches", sample}]}'   # exit 1 unless passed
-mb transform-test update <id> --file ./.scratch/<m>.test.patch.json   # inputs and expectations replace whole
+mb transform-test create --file ./.scratch/<m>.test.json | jq '{id,name}'   # body: references/transform-tests.md; v65+. Refuses a mis-declared input set here, before any run
+mb transform-test run <id> | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "row-counts", "missing-rows", "extra-rows", "cell-mismatches", sample, error}]}'   # exit 1 unless passed
+mb transform-test update <id> --file ./.scratch/<m>.test.patch.json   # inputs and expectations replace whole, and re-validate
 mb transform-test list --transform <id> --fields id,name       # every test on a model
 mb transform run <id> --sync | jq '{status:.final.status, table:.target_table_id, msg:.final.message}'
 mb transform list --full | jq '[.data[] | select(.source.query.stages[0].native | test("<schema>.<name>")) | .id]'   # dependents
@@ -43,7 +43,7 @@ SQL in `./.scratch/<m>.sql`; `<m>.desc` carries the five facts plus every consta
 
 ## 4. Test
 
-For a model that carries a rule (every intermediate and final-layer model; a staging block only when it deduplicates or converts): one test body in `./.scratch/<m>.test.json` per `transform-tests.md`, one input per table the SQL reads (`cfg_<domain>` included), one expectation per rule in the header's Definition and Caveats and per `[DECIDED, reversible]` on the model; the domain file's cases. `transform-test create`, then `run`: red is fixed in `<m>.sql`, patched, run again; the fixture changes only when it was wrong, and the hand-back says so. On green write `tests` in the Models row (`3 pass`) and go to step 5; the model does not materialise on red. A model with nothing to test writes `tests: none` with the reason. The instance below v64: `tests: unavailable`, the `q()` fallback in `transform-tests.md`.
+For a model that carries a rule (every intermediate and final-layer model; a staging block only when it deduplicates or converts): one test body in `./.scratch/<m>.test.json` per `transform-tests.md`, one input per table the SQL reads (`cfg_<domain>` included), one expectation per rule in the header's Definition and Caveats and per `[DECIDED, reversible]` on the model; the domain file's cases. `transform-test create`, then `run`: red is fixed in `<m>.sql`, patched, run again; the fixture changes only when it was wrong, and the hand-back says so. On green write `tests` in the Models row (`3 pass`) and go to step 5; the model does not materialise on red. A model with nothing to test writes `tests: none` with the reason. Only an unknown `transform-test` command, a `402` on the token feature, or a `422 unsupported-driver` writes `tests: unavailable` and takes the `q()` fallback in `transform-tests.md` — never a version tag read off a head or dev build, which does not parse.
 
 ## 5. Gate
 
