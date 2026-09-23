@@ -48,7 +48,7 @@ Fill the grain-and-key inventory in `layering-and-naming.md` in the company's vo
 
 ## 7. Decision memo
 
-One memo in the contract's shape, grouped by who answers; ask for changes only. Each item is a STATE.md Decisions row with `affects`: `open` until built on its default, then `PROVISIONAL`; an irreversible one is a `[CHECKPOINT]`.
+One memo in the contract's shape, grouped by who answers; ask for changes only. It is delivered as item 4 of the pre-create gate in `SKILL.md` and the turn ends there — step 8 begins in the response after the gate returns. Each item is a STATE.md Decisions row with `affects`: `open` until built on its default, then `PROVISIONAL`; an irreversible one is a `[CHECKPOINT]`.
 
 ## 8. First slice
 
@@ -64,7 +64,7 @@ Options:
   A. ended_at: churn lands the month service stops; revenue counts through the paid period.
   B. canceled_at: churn a month earlier for 209 accounts; August churn 41 becomes 48.
 Recommendation: A; the billing system bills to ended_at and finance's sheet matches it.
-Action required: reply with a letter or give alternate instructions before this work continues.
+Action required: answer the question that follows; nothing else runs until it returns.
 ```
 
 ## Done when

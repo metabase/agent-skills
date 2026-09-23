@@ -31,7 +31,7 @@ mb transform list --full | jq '[.data[] | select(.source.query.stages[0].native 
 
 ## 1. Pre-flight
 
-Read STATE.md; confirm its tables exist (`mb table list --db-id $DB --fields id,name,schema`). Smoke-test the write path: transform `_rde_smoke` (one literal row into `out_schema`), `run --sync`, `delete-table --yes`, `transform delete --yes`; a permission or missing-schema error is a `[CHECKPOINT]` for the admin.
+Read STATE.md; confirm its tables exist (`mb table list --db-id $DB --fields id,name,schema`). Pre-flight fails if the pre-create gate in `SKILL.md` has not returned; run it here when an earlier playbook did not. Smoke-test the write path: transform `_rde_smoke` (one literal row into `out_schema`), `run --sync`, `delete-table --yes`, `transform delete --yes`; a permission or missing-schema error is a `[CHECKPOINT]` for the admin.
 
 ## 2. Collections, tag, job, rows
 
@@ -40,6 +40,8 @@ Reuse what exists; else one collection per layer, one tag per chain, one job ove
 ## 3. Build loop, one model at a time
 
 SQL in `./.scratch/<m>.sql`; `<m>.desc` carries the five facts plus every constant per `layering-and-naming.md`, mirrored in the SQL header. Raw-table blocks: `staging-rules.md`; staging is a CTE unless shared or expensive. Validate on a slice (a bounded predicate on the driving table) through `q` until the shape and the step 5 checks pass; drop the predicate, create or patch; alias every source table and qualify columns by the alias (step 4 needs it). Then step 4; on green, `run --sync`, then hide the new table (`visibility_type: technical`) until its gate passes. `table: null`: `mb transform get <id> --fields target_table_id`. A failed run: fix the file, patch, run again; unreadable: `mb skills path transform`, Read "Iterating on a failing transform". MBQL source: `jq .source.query ./.scratch/t.json | mb query --file - --dry-run` replaces `q`.
+
+At each layer boundary — staging, intermediate, dimensions, facts, and every later chain the inventory names — the turn ends on an `AskUserQuestion` carrying the decisions taken in that layer, recommendation first, batched per the contract. Do not open the next layer in the same response. A rule discovered mid-layer that changes a headline number is its own stop, taken where it was found, not saved for the boundary.
 
 ## 4. Test
 

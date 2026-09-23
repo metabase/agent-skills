@@ -15,6 +15,17 @@ You are the data engineer. Load one playbook, read what its `Read first` line na
 2. `mb --version`. If it fails, say the Metabase CLI is required and propose `npm i -g @metabase/cli`; run it once the user agrees. `mb auth list --json`: one profile, use it; several, ask which is the working instance; none, ask the user to run `mb auth login`.
 3. Read `references/collaboration-contract.md` once per job (its outputs, the owner and the autonomy mode, live in STATE.md).
 
+## The pre-create gate
+
+One `AskUserQuestion`, before the first `mb transform create` of a job. Never skipped, never folded into a later message. It carries only what profiling already measured:
+
+1. **Sign-off** — who owns what a number means, unless STATE.md already records it. Sets `autonomy` and every trust label.
+2. **Existing build** — when `mb transform list` shows transforms whose names or target could collide: are they live, and am I replacing, superseding, or building alongside? Name them with ids and schema.
+3. **Freshness** — `max(<event time>)` per source table and the `last_complete_period` it implies. Pinned to the extract, or to `current_date`?
+4. **The memo** — the open decisions, recommendation first, each with the alternative reading's effect on the headline number beside it.
+
+Nothing is created in `out_schema` until this returns. If no answer arrives, 1–3 go `PROVISIONAL` and are named in the first hand-back; the gate itself is not skippable. Four items is `AskUserQuestion`'s ceiling: drop item 2 when `mb transform list` is empty, never the others.
+
 ## mb conventions
 
 `--profile $PROFILE` and `--json` on every command; parse, never scrape. `--fields a,b` narrows a list. A list envelope is `{returned, offset, total, has_more, next_offset, data}`; continue with `--offset <next_offset>` while `has_more`. Bodies come from a file in `./.scratch` (`--file`) written with a quoted heredoc. `mb query` that cannot run fails on stderr with empty stdout; a query that runs and fails prints `{status:"failed"}` on stdout with exit 0; test `.status == "completed"`. Row ceilings and the extract path: `references/profiling-catalog.md`. Probe with `q()` from `references/state.md`. Browser links use the profile's `url` from `mb auth list`. Iterate with `update`, never delete and create: ids are referenced. A transform's rules are pinned by transform tests (`mb transform-test`, v65+ or a head build, with the `transforms-testing` feature, fixtures in, expectations out; not in the CLI's `latest` tag yet; `references/transform-tests.md`), run before the transform materialises and before every patch. Transforms file only in `--namespace transforms` collections; cards and dashboards in ordinary ones. Every Metabase mechanic lives in the bundled skills: run `mb <cmd> --help` before a verb you have not run, `mb skills path <name>` then Read the one section a step names, and `mb skills get core` only when a footgun bites.
@@ -51,6 +62,7 @@ Load by table-name test, say which fired, and record it as STATE.md `domain`: `r
 
 ## Invariants
 
+- Nothing is created in `out_schema` before the pre-create gate returns; a checkpoint the user never saw as an `AskUserQuestion` did not happen.
 - Profile before you model; a decision with no query result behind it is a `[CHECKPOINT]` or a `[DECIDED, reversible]` line, never an assumption.
 - Every model declares one row per what and its key before it is built, in the transform description; every rule a model carries is pinned by a transform test before the model materialises, and a red test never materialises; every model passes the quality gate before the next; every chain is tagged and scheduled before it is called done.
 - Structural checks are not correctness: one headline number is reconciled to an independent figure before it is labelled anything but Draft.
