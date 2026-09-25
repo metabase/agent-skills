@@ -54,17 +54,13 @@ One memo in the contract's shape, grouped by who answers; ask for changes only. 
 
 Take the first question, its tables only, through [`build-clean-tables.md`](build-clean-tables.md) on the defaults, labelled Draft; widen after the hand-back.
 
-Finished example, a checkpoint with counts:
+Finished example, a checkpoint with counts, as the `AskUserQuestion` it becomes (nothing printed before it but the finding in prose):
 
 ```
-[CHECKPOINT]
-Decision: which date ends a subscription for churn.
-Context: subscriptions 12,480 rows; canceled_at set on 3,912, ended_at on 3,860; they differ on 214 (5.5%), canceled_at earlier in 209, median gap 31 days.
-Options:
-  A. ended_at: churn lands the month service stops; revenue counts through the paid period.
-  B. canceled_at: churn a month earlier for 209 accounts; August churn 41 becomes 48.
-Recommendation: A; the billing system bills to ended_at and finance's sheet matches it.
-Action required: answer the question that follows; nothing else runs until it returns.
+question: 214 of 3,912 cancelled subscriptions (5.5%) have a cancellation date earlier than their end date, by a median of 31 days. Which date should end a subscription for churn?
+options:
+  - End date (Recommended): churn lands the month service stops; the billing system bills to it and finance's sheet matches.
+  - Cancellation date: churn a month earlier for 209 accounts; August churn 41 becomes 48.
 ```
 
 ## Done when

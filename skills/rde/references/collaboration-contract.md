@@ -18,9 +18,9 @@ Routine reversible decisions: date basis, inclusion filter, derived classificati
 
 A checkpoint is raised in the response that produced the fact. "I will report this in the hand-back" is not a checkpoint — by the hand-back, the work that depended on it is done. A write that lands outside `out_schema` stops before the next tool call of any kind, including before investigating it.
 
-## The checkpoint block
+## The checkpoint
 
-Use literally; never paraphrase into prose.
+A checkpoint is one `AskUserQuestion`, and nothing else runs in that response. Never print it as a text or code block as well: the question is the only place the user sees it. Draft it from these fields:
 
 ```
 [CHECKPOINT]
@@ -30,14 +30,13 @@ Options:
   A. <option and its tradeoff>
   B. <option and its tradeoff>
 Recommendation: <preferred option and a one-sentence rationale>
-Action required: answer the question that follows; nothing else runs until it returns.
 ```
 
-`Context` carries measured numbers: profile first, then ask. Two or more options, one recommendation. The block is the context; the stop is an `AskUserQuestion` carrying the same options, recommendation first. A printed block with no tool call behind it is not a checkpoint, and nothing else runs in that response. When a stop would carry more than three decisions, offer the batch rather than the list — accept all defaults as listed / show me the ones that move the headline number most / review each one — because over-asking ends with the user reading none of it.
+Then map them onto the tool call. The question text is the context in one plain sentence, then the decision as a question. Each option's label names the option, and its description gives the tradeoff with the measured figure it moves. The recommendation comes first, with `(Recommended)` on its label. `Context` carries measured numbers: profile first, then ask. Two or more options, one recommendation. The full block goes in the decision's STATE.md Decisions row (`decision`, `readings`, status `open`), not in chat. A block printed in chat with no tool call behind it is not a checkpoint. When a stop would carry more than three decisions, offer the batch rather than the list — accept all defaults as listed / show me the ones that move the headline number most / review each one — because over-asking ends with the user reading none of it.
 
 ## The decision memo
 
-Before building, list the open decisions once, grouped by who can answer, each as: the question in one sentence, the default you will use and where it came from, what changes if it is wrong. Ask for changes only. Record each as a Decisions row; the memo is delivered as item 4 of the pre-create gate in `SKILL.md`, and the first slice begins on whichever defaults the gate returns unchanged — never before it returns. An answered decision is never re-asked. An unanswered one proceeds as `PROVISIONAL`: named in the metric description and on the dashboard, and it blocks Library publishing and the `Reconciled` label. Never resolve a decision by inference from the data; never write a default as confirmed. More than three rows at `PROVISIONAL` at once is itself a stop: ask before building further, batched per the checkpoint block. Six unanswered decisions shaping a number reported as reconciled is the failure this prevents.
+Before building, list the open decisions once, grouped by who can answer, each as: the question in one sentence, the default you will use and where it came from, what changes if it is wrong. Ask for changes only. Record each as a Decisions row; the memo is delivered as item 4 of the pre-create gate in `SKILL.md`, and the first slice begins on whichever defaults the gate returns unchanged — never before it returns. An answered decision is never re-asked. An unanswered one proceeds as `PROVISIONAL`: named in the metric description and on the dashboard, and it blocks Library publishing and the `Reconciled` label. Never resolve a decision by inference from the data; never write a default as confirmed. More than three rows at `PROVISIONAL` at once is itself a stop: ask before building further, batched per the checkpoint rule. Six unanswered decisions shaping a number reported as reconciled is the failure this prevents.
 
 ## Zero-row tables and personal data
 
