@@ -22,7 +22,7 @@ One `AskUserQuestion`, before the first `mb transform create` of a job. Never sk
 1. **Sign-off** — who owns what a number means, unless STATE.md already records it. Sets `autonomy` and every trust label.
 2. **Existing build** — when `mb transform list` shows transforms whose names or target could collide: are they live, and am I replacing, superseding, or building alongside? Name them with ids and schema.
 3. **Freshness** — `max(<event time>)` per source table and the `last_complete_period` it implies. Pinned to the extract, or to `current_date`?
-4. **The memo** — the open decisions, recommendation first, each with the alternative reading's effect on the headline number beside it.
+4. **The memo** — printed in chat as a numbered list in the same response, right before the question: each open decision with its default and where it came from, and the alternative reading's effect on the headline number. The question refers to the list by number ("Accept 1–5 as listed?"); never ask about definitions the user cannot see above it.
 
 Nothing is created in `out_schema` until this returns. If no answer arrives, 1–3 go `PROVISIONAL` and are named in the first hand-back; the gate itself is not skippable. Four items is `AskUserQuestion`'s ceiling: drop item 2 when `mb transform list` is empty, never the others.
 

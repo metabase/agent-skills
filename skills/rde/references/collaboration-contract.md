@@ -20,7 +20,7 @@ A checkpoint is raised in the response that produced the fact. "I will report th
 
 ## The checkpoint
 
-A checkpoint is one `AskUserQuestion`, and nothing else runs in that response. Never print it as a text or code block as well: the question is the only place the user sees it. Draft it from these fields:
+A checkpoint is one `AskUserQuestion`, and nothing else runs in that response. Never print it as a text or code block as well: the question is the only place the user sees it. The decision memo below is the exception: it is printed in full before the gate that asks about it. Draft a checkpoint from these fields:
 
 ```
 [CHECKPOINT]
@@ -36,7 +36,7 @@ Then map them onto the tool call. The question text is the context in one plain 
 
 ## The decision memo
 
-Before building, list the open decisions once, grouped by who can answer, each as: the question in one sentence, the default you will use and where it came from, what changes if it is wrong. Ask for changes only. Record each as a Decisions row; the memo is delivered as item 4 of the pre-create gate in `SKILL.md`, and the first slice begins on whichever defaults the gate returns unchanged — never before it returns. An answered decision is never re-asked. An unanswered one proceeds as `PROVISIONAL`: named in the metric description and on the dashboard, and it blocks Library publishing and the `Reconciled` label. Never resolve a decision by inference from the data; never write a default as confirmed. More than three rows at `PROVISIONAL` at once is itself a stop: ask before building further, batched per the checkpoint rule. Six unanswered decisions shaping a number reported as reconciled is the failure this prevents.
+Before building, list the open decisions once, grouped by who can answer, each as: the question in one sentence, the default you will use and where it came from, what changes if it is wrong. Ask for changes only. Record each as a Decisions row. Print the memo in chat as a numbered list, one line per decision, in the response that asks item 4 of the pre-create gate in `SKILL.md`, immediately before the question; the question and its batch options refer to it by number. A batch option (accept all defaults / show the ones that move the headline most / review each) is only offered beneath a printed list. The first slice begins on whichever defaults the gate returns unchanged — never before it returns. An answered decision is never re-asked. An unanswered one proceeds as `PROVISIONAL`: named in the metric description and on the dashboard, and it blocks Library publishing and the `Reconciled` label. Never resolve a decision by inference from the data; never write a default as confirmed. More than three rows at `PROVISIONAL` at once is itself a stop: ask before building further, batched per the checkpoint rule. Six unanswered decisions shaping a number reported as reconciled is the failure this prevents.
 
 ## Zero-row tables and personal data
 
