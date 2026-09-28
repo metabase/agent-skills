@@ -20,20 +20,20 @@ mb subscription create --file ./.scratch/sub.json
 mb dashboard update <dash-id> --body '{"collection_id":<final collection id>}'
 ```
 
-Bodies (metric 301, segment 12, `period_month` 1717):
+Bodies (ids from STATE.md and `mb table get <table-id> --include fields`):
 
 ```json
 {"name":"MRR by month, paying accounts","display":"line","collection_id":<drafts>,"visualization_settings":{},
- "dataset_query":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,
-   "aggregation":[["metric",{},301]],"filters":[["segment",{},12]],"breakout":[["field",{"temporal-unit":"month"},1717]]}]}}
+ "dataset_query":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/mbql","source-table":<table-id>,
+   "aggregation":[["metric",{},<metric-id>]],"filters":[["segment",{},<segment-id>]],"breakout":[["field",{"temporal-unit":"month"},<period_month-id>]]}]}}
 {"name":"MRR","display":"smartscalar","collection_id":<drafts>,"dataset_query":{"... the same query ..."},
  "visualization_settings":{"scalar.comparisons":[{"id":"c1","type":"previousPeriod"},{"id":"c2","type":"staticNumber","value":100000,"label":"Target"}]}}
 {"name":"CEO weekly","collection_id":<drafts>,
  "parameters":[{"id":"period","name":"Period","slug":"period","type":"date/month-year"}],
  "dashcards":[
   {"id":-1,"card_id":null,"col":0,"row":0,"size_x":24,"size_y":2,"visualization_settings":{"virtual_card":{"display":"text"},"text":"Data through August 2026; September flagged incomplete. Refreshed daily 03:00 UTC, a day behind billing. MRR: Reconciled to finance on 2026-09-12, within 1%. Churn: Draft, provisional decisions: D7."}},
-  {"id":-2,"card_id":302,"col":0,"row":2,"size_x":6,"size_y":3,"parameter_mappings":[{"parameter_id":"period","card_id":302,"target":["dimension",["field",1717,null]]}]}]}
-{"name":"CEO weekly","dashboard_id":<dash-id>,"cards":[{"id":302,"dashboard_card_id":87,"include_csv":false,"include_xls":false}],
+  {"id":-2,"card_id":<card-id>,"col":0,"row":2,"size_x":6,"size_y":3,"parameter_mappings":[{"parameter_id":"period","card_id":<card-id>,"target":["dimension",["field",<period_month-id>,null]]}]}]}
+{"name":"CEO weekly","dashboard_id":<dash-id>,"cards":[{"id":<card-id>,"dashboard_card_id":<dashcard-id>,"include_csv":false,"include_xls":false}],
  "channels":[{"channel_type":"email","schedule_type":"weekly","schedule_hour":8,"schedule_day":"mon","recipients":[{"email":"ceo@acme.example"}]}]}
 ```
 

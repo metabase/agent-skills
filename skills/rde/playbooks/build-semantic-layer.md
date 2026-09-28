@@ -22,19 +22,19 @@ mb library publish --table-ids <ids>
 mb card update <metric-id> --body '{"collection_id":<library metrics collection id>}'
 ```
 
-Bodies (database 3, table 909; `mrr_usd` 1715, `period_month` 1717, `is_complete_period` 1721, `state` 1722, `activated_at` 1730):
+Bodies (`<column-id>` is that column's field id):
 
 ```json
-{"name":"Recurring revenue","description":"Recurring revenue, USD.","table_id":909,
- "definition":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,"aggregation":[["sum",{"name":"mrr_usd"},["field",{},1715]]]}]}}
-{"name":"Complete periods","description":"Months fully loaded.","table_id":909,
- "definition":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,"filters":[["=",{},["field",{},1721],true]]}]}}
-{"name":"Monthly recurring revenue","type":"metric","collection_id":17,"display":"line",
- "dataset_query":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,
-   "aggregation":[["measure",{},<measure-id>]],"breakout":[["field",{"temporal-unit":"month"},1717]]}]},"visualization_settings":{}}
+{"name":"Recurring revenue","description":"Recurring revenue, USD.","table_id":<table-id>,
+ "definition":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/mbql","source-table":<table-id>,"aggregation":[["sum",{"name":"mrr_usd"},["field",{},<mrr_usd-id>]]]}]}}
+{"name":"Complete periods","description":"Months fully loaded.","table_id":<table-id>,
+ "definition":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/mbql","source-table":<table-id>,"filters":[["=",{},["field",{},<is_complete_period-id>],true]]}]}}
+{"name":"Monthly recurring revenue","type":"metric","collection_id":<collection-id>,"display":"line",
+ "dataset_query":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/mbql","source-table":<table-id>,
+   "aggregation":[["measure",{},<measure-id>]],"breakout":[["field",{"temporal-unit":"month"},<period_month-id>]]}]},"visualization_settings":{}}
 ```
 
-The aggregation slot per definition: a sum `["sum",{"name":"mrr_usd"},["field",{},1715]]`; `count-where` `["count-where",{"name":"churned"},["=",{},["field",{},1722],"churned"]]`; `share` `["share",{"name":"activation_rate"},["not-null",{},["field",{},1730]]]`; a derived metric `["metric",{},<metric-id>]`. A definitional filter goes in `filters` of the same stage. On a model the stage reads `"source-card": <model-id>` instead of `source-table`.
+The aggregation slot per definition: a sum `["sum",{"name":"mrr_usd"},["field",{},<mrr_usd-id>]]`; `count-where` `["count-where",{"name":"churned"},["=",{},["field",{},<state-id>],"churned"]]`; `share` `["share",{"name":"activation_rate"},["not-null",{},["field",{},<activated_at-id>]]]`; a derived metric `["metric",{},<metric-id>]`. A definitional filter goes in `filters` of the same stage. On a model the stage reads `"source-card": <model-id>` instead of `source-table`.
 
 ## 1. STATE.md and tables
 

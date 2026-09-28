@@ -16,10 +16,10 @@ mb card get <id> --fields name,description,dataset_query          # what the def
 q "SELECT count(*) AS n FROM <schema.table>"
 q "SELECT <column>, count(*) AS n FROM <schema.table> GROUP BY 1 ORDER BY 2 DESC LIMIT 50"
 cat > ./.scratch/a.json <<'JSON'
-{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/mbql","source-table":909,
-  "aggregation":[["metric",{},305]],
-  "filters":[["time-interval",{},["field",{},1717],"last","month"]],
-  "breakout":[["field",{},1719]]}]}
+{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/mbql","source-table":<table-id>,
+  "aggregation":[["metric",{},<metric-id>]],
+  "filters":[["time-interval",{},["field",{},<date-field-id>],"last","month"]],
+  "breakout":[["field",{},<breakout-field-id>]]}]}
 JSON
 mb query --file ./.scratch/a.json --dry-run; mb query --file ./.scratch/a.json --fields status,data.rows
 q "SELECT sum(n) FROM (<the breakdown query>) b"                  # reconstruction: breakdown sums to the total

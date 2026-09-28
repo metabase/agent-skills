@@ -27,8 +27,8 @@ Bodies:
 
 ```json
 {"name":"DQ: customer_month failures","display":"table","collection_id":<dq collection id>,"visualization_settings":{},
- "dataset_query":{"lib/type":"mbql/query","database":3,"stages":[{"lib/type":"mbql.stage/native","native":"<the structural checks as one query, one row per failing check>"}]}}
-{"payload":{"card_id":410,"send_condition":"has_result","send_once":false},
+ "dataset_query":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/native","native":"<the structural checks as one query, one row per failing check>"}]}}
+{"payload":{"card_id":<dq card id>,"send_condition":"has_result","send_once":false},
  "subscriptions":[{"cron_schedule":"0 0 7 * * ? *"}],
  "handlers":[{"channel_type":"channel/email","recipients":[{"type":"notification-recipient/raw-value","details":{"value":"data@acme.example"}}]}]}
 ```

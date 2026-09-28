@@ -43,7 +43,7 @@ A staging block that neither deduplicates nor converts has nothing to test; a wi
 Finished example, the test for a customer-month model under the gap rule (D7):
 
 ```json
-{ "transform_id": 41, "name": "mart_billing_fct_customer_month: retention states",
+{ "transform_id": <transform-id>, "name": "mart_billing_fct_customer_month: retention states",
   "description": "Cases: customer 1 new, retained, churned after a one-month gap, reactivation; customer 2 active through the last complete period, exit row in the partial period.",
   "inputs": [
     { "table": { "schema": "analytics", "name": "cfg_billing" }, "format": "rows",
