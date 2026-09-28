@@ -19,7 +19,7 @@ library: data=12 metrics=13   # or: unavailable
 tag: rde_billing=7  job: 4
 autonomy: balanced            # owner of definitions: <who>
 environment: production       # or: staging, branch <name>
-domain: subscription-revenue  # or none
+domain: subscription-revenue  # or none, or two when a table genuinely straddles domains
 stage: build-clean-tables
 next: model 8 of 15, blocked on D7
 last_complete_period: 2026-08 # max(event_at)=09-11, ratio 0.31
