@@ -36,6 +36,6 @@ Production (one instance: built tables stay internal until approved, dashboards 
 
 - `SKILL.md`: route, invariants, `mb` conventions, domain-note triggers.
 - `playbooks/`: `explore`, `build`, `semantic`, `deliver`, `answer`, `reconcile`, `change`, `extract`, `sync`; each with its commands, steps, and a done-when with the hand-back.
-- `references/`: the method the playbooks cite, one owner per rule: `orient`, `collaboration`, `state`, `profiling`, `modeling`, `time-and-entities`, `quality-checks`, `transform-tests`, `semantic-layer`, `dashboards`, `reconciliation`, `extraction`.
+- `references/`: the method the playbooks cite, one owner per rule: `orient`, `collaboration`, `state`, `recovery`, `profiling`, `modeling`, `time-and-entities`, `quality-checks`, `transform-tests`, `semantic-layer`, `dashboards`, `reconciliation`, `extraction`.
 - `references/domains/`: subscription revenue, payments, commerce orders, general ledger, sales pipeline, product usage events, event and registration data; each with its metrics, owner questions (default, probe, effect if wrong), traps, invariants, test cases, and answering rules.
 - `references/methods/retention-and-cohorts.md`: retention, NRR and GRR, cohort tables, activation.

@@ -42,6 +42,9 @@ intake: answered 2026-09-28 (<who>)
 proposal <slice>: answered 2026-09-28 (<who>)
 go-live <layer>: answered 2026-09-28 (<who>)
 
+## Recovery
+2026-09-28 [shadowed-mb]: mb 0.2.1 from Homebrew ran before 0.3.1; the user removed the old one; by user
+
 ## Questions
 | question (verbatim) | definition | home table, time column | flags, breakouts | exists or build | status |
 
@@ -52,6 +55,8 @@ go-live <layer>: answered 2026-09-28 (<who>)
 `profile` and `url` name the Metabase every command uses, and `chosen` says how it was picked: the step of `SKILL.md`, Which Metabase, that matched (`env`, `named`, `installer`, `only`, `asked`), or `state` for a file from before format 1, whose pick is re-checked but whose reason is unknown. A file without the format line gets it, and `chosen: state`, at its first write.
 
 `## Stops` gets one line per planned stop (`references/collaboration.md`, The planned stops) the moment it returns, never before; a headless run writes `unanswered (headless)` in place of `answered …`. A stop with no line did not happen.
+
+`## Recovery` gets one line per cause `references/recovery.md` found: what was wrong, what was done, and by whom (`pending (user)` while a command waits in the user's terminal).
 
 Keep `./.scratch` out of git: it holds probe output, row samples, and CSV diffs, and often sits inside the git-sync working directory, where a `git add -A` would commit it. When the working directory is inside a git repository, the first write to `./.scratch` also adds `.scratch/` to `.git/info/exclude` (in a worktree, the file `git rev-parse --git-path info/exclude` names), which is untracked and changes nothing anyone else sees:
 
@@ -64,4 +69,4 @@ x=$(git rev-parse --git-path info/exclude 2>/dev/null) && { mkdir -p "$(dirname 
 
 ## Resume
 
-If the file exists: re-check its instance first (`SKILL.md`, Which Metabase, step 1); when it no longer answers, say so plainly and re-run that order instead of silently switching. Then use its ids without asking; re-read what it names on the instance (transforms, runs, descriptions, caveats, the Document's decisions); trust the instance and name any drift; continue at `stage` and `next`. What is built, passing, and decided is done, whoever did it. If the file is missing but the work exists (`mb search "How to use" --models document`), rebuild it from the Document and the objects before asking anything; otherwise create it once the Metabase is picked.
+If the file exists: re-check its instance first (`SKILL.md`, Which Metabase, step 1); when it no longer answers, say so plainly and re-run that order instead of silently switching. Read its `## Recovery` lines before any other `mb` call, so a known cause is not rediscovered. Then use its ids without asking; re-read what it names on the instance (transforms, runs, descriptions, caveats, the Document's decisions); trust the instance and name any drift; continue at `stage` and `next`. What is built, passing, and decided is done, whoever did it. If the file is missing but the work exists (`mb search "How to use" --models document`), rebuild it from the Document and the objects before asking anything; otherwise create it once the Metabase is picked.

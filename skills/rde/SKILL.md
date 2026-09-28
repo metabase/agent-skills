@@ -43,6 +43,7 @@ Credentials: never read files under `~/.rde`; never ask the user for a password 
 
 ## Route, first match wins
 
+0. Something is not working: the user asks why, which Metabase is in use, or where something went; says numbers or objects are missing or in the wrong place; or cannot log in: `references/recovery.md`, before anything else.
 1. A reference figure, a mismatch, two numbers that disagree: `playbooks/reconcile.md`.
 2. Rules living in code, documents, a spreadsheet, dbt, or another tool: `playbooks/extract.md`.
 3. What one table, metric, or transform is: no playbook. Read it (`mb table get <id> --include fields`, the transform's description, `mb search "<name>"` for users), answer plainly, offer to write the description into Metabase.
@@ -73,6 +74,7 @@ The first pass delivers one headline number end to end (the one the user named f
 ## mb conventions
 
 - Every `mb` command takes `--profile <profile> --json`, placed after the full verb chain, with the state file's `profile` written literally (`--profile rde`), never through a shell variable: with several Metabases on the machine, a missing or empty `--profile` works in, or writes to, whatever `default` points at. One-line examples omit both, and code blocks show `<profile>`; write the real name. Parse JSON, never scrape. A list envelope is `{returned, offset, total, has_more, next_offset, data}`: page with `--offset <next_offset>` while `has_more`; narrow with `--fields`.
+- Stop and load `references/recovery.md` before doing anything else when `mb` fails with an authentication, connection, unknown-command, or unknown-flag error; when the host in a link you are about to hand back differs from the state file's `url`; when a search for something you created in this session finds nothing; or when the same command has failed twice. Never run a failing command a third time.
 - Shell state does not survive between Bash calls: start every call that uses `$DB`, `q()`, or `src()` with `source ./.scratch/probe.sh` (`references/profiling.md`); its `mb` calls carry the name literally too.
 - Bodies are files in `./.scratch` written with quoted heredocs (`<<'SQL'`) and passed with `--file`; SQL is embedded with `jq --rawfile` so it stays formatted.
 - A query that cannot run fails on stderr with empty stdout; one that runs and fails prints `status: "failed"` with exit 0; test `.status == "completed"`. No rows means replan (wrong filter, wrong unit), never an answer of zero.
