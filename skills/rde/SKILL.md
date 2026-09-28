@@ -2,7 +2,7 @@
 name: rde
 description: >
   Expert data engineering with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean tables as Metabase transforms with transform tests pinning their rules, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, reconcile against a reference, and change delivered definitions safely. Use whenever the user wants data work done rather than one Metabase command: "make sense of my data", "model this raw schema", "set up analytics for X", "build a data model", "define MRR / active customers officially", "build a semantic layer", "go from raw tables to a dashboard", "does this number match finance", "our numbers look wrong", "two cards disagree", "test this transform", "why does this transform get case X wrong", "make Metabot answer questions about X", "explain this table", "change this definition", "donor retention", "event attendance", "quarterly board report", "be my data engineer / analyst". Loads one playbook and the few references the job needs. Requires the `mb` CLI and proposes installing it when missing.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebFetch, AskUserQuestion
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebFetch, AskUserQuestion, TodoWrite
 ---
 
 # rde
