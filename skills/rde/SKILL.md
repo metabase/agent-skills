@@ -13,9 +13,33 @@ Load one playbook, read what its `Read first` line names, and copy its `Order` l
 
 ## Before any work
 
-1. `mb --version`; if missing, propose `npm i -g @metabase/cli` and install only on yes. `mb auth list --json`: one profile, use it; several, ask which; none, ask the user to run `mb auth login`.
+1. `mb --version`; if missing, propose `npm i -g @metabase/cli@alpha-transform-tests` and install only on yes. The skill needs `mb` 0.3.0 or newer with the `transform-test` command, which today ships only under the `alpha-transform-tests` dist-tag (what the installer installs); when `mb` is older or `mb transform-test --help` fails, propose that same install, run it only on yes, and until then tests follow `references/transform-tests.md`, When tests cannot run.
 2. `cat ./.scratch/rde-state.md` (`references/state.md`). The instance wins where they disagree; never re-ask a recorded decision.
-3. Route below. A plain number or finding goes to `playbooks/answer.md` without orienting; anything that builds or changes reads `references/orient.md` and then `references/collaboration.md`, once per session.
+3. Pick the Metabase (below) and record it in the state file before any other `mb` call.
+4. Route below. A plain number or finding goes to `playbooks/answer.md` without orienting; anything that builds or changes reads `references/orient.md` and then `references/collaboration.md`, once per session.
+
+## Which Metabase, first match wins
+
+`mb auth list --json` checks every Metabase `mb` is logged in to: each entry has a `profile` (the name every command passes), a `url`, and a `status` (`ok`, `auth-failed`, `network-error`, `server-error`, `not-probed`); only `ok` answers and authenticates. The installer's instance is the one `rde status --json` reports (it exits non-zero when there is none): its `url`, `health`, and `mbProfile`; when the report has no `mbProfile`, it is the `mb auth list` entry whose `url` equals the report's. To the user, a Metabase is its host (`metabase.acme.com`) or "your local Metabase"; the word profile never reaches them.
+
+0. `printenv MB_PROFILE` names one: the user set it on purpose, so it wins over the state file. Say once which Metabase that is, by host, and use that name literally. Chosen: `env`.
+1. The state file names one (`profile:`): use it once its `mb auth list` entry is `ok`. Otherwise say plainly that it no longer answers, apply the login rules below, and re-run this order; never switch silently. Chosen: keep the recorded value (`state` for a file from before format 1).
+2. The request names a Metabase (a URL, a host, "local", "the rde one"): match it against the `url` of each `mb auth list` entry; "local" and "the rde one" mean the installer's instance. A named Metabase with no entry: the user logs in (the login rules). Chosen: `named`.
+3. The installer is present and the request points nowhere else: when its `health` is `healthy` and its entry is `ok`, use its `mbProfile`. When it is not running, or its entry is not `ok`, the repair from the login rules (`rde start`, `rde init --only api-key`) becomes the first option of the question in step 5. Chosen: `installer`.
+4. Exactly one entry is `ok`: use it. Chosen: `only`.
+5. Otherwise one `AskUserQuestion`, "Which Metabase should I work in?", one option per `ok` entry labeled by host (four at most; the user can type another), the installer's labeled "Local Metabase (rde)", or "Local Metabase (rde), start it first" / "Local Metabase (rde), reconnect it first" when it needs a repair; that answer is the yes the repair needs. No entry is `ok` and there is no installer: ask the user to run `mb auth login` in their own terminal, and stop. Headless: write the need on the state file's `next:` line and stop. Chosen: `asked`.
+
+Record `profile`, `url`, and `chosen` in the state file at once, so the question is never asked again in this directory.
+
+Login rules. On its own the agent runs only `rde status --json` and `rde doctor --json` (read-only; the doctor's hints say what fails). Every other installer command waits for the user's yes through `AskUserQuestion`, except `rde credentials`, which it never runs:
+
+- The installer's instance is not running: propose `rde start`.
+- Its entry is missing or not `ok` while the instance is healthy: propose `rde init --only api-key`, which makes a new API key from the installer's stored login and asks the user nothing.
+- Installing or removing `mb` or this skill, `rde init --only agents-skills`, and removing objects created on the wrong Metabase: propose, run on yes.
+- Any other Metabase: the user runs `mb auth login --profile <name> --url <url>` in their own terminal; re-check with `mb auth list --json` when they say it is done.
+- Headless (`AskUserQuestion` unavailable): run none of these; write what is needed on the state file's `next:` line and stop.
+
+Credentials: never read files under `~/.rde`; never ask the user for a password or an API key, and never handle one; never run `rde credentials`; never edit `PATH` or shell files. When the user needs the UI login for the installer's instance, tell them to run `rde credentials` in their own terminal (the admin email alone is `adminEmail` in `rde status --json`, where the installer reports it).
 
 ## Route, first match wins
 
@@ -48,15 +72,15 @@ The first pass delivers one headline number end to end (the one the user named f
 
 ## mb conventions
 
-- Every `mb` command takes `--profile "$PROFILE" --json`, placed after the full verb chain; one-line examples omit both, and pipelines spell them out, since a missing `--profile` silently hits the default profile. Parse JSON, never scrape. A list envelope is `{returned, offset, total, has_more, next_offset, data}`: page with `--offset <next_offset>` while `has_more`; narrow with `--fields`.
-- Shell state does not survive between Bash calls: start every call that uses `$PROFILE`, `$DB`, `q()`, or `src()` with `source ./.scratch/probe.sh` (`references/profiling.md`).
+- Every `mb` command takes `--profile <profile> --json`, placed after the full verb chain, with the state file's `profile` written literally (`--profile rde`), never through a shell variable: with several Metabases on the machine, a missing or empty `--profile` works in, or writes to, whatever `default` points at. One-line examples omit both, and code blocks show `<profile>`; write the real name. Parse JSON, never scrape. A list envelope is `{returned, offset, total, has_more, next_offset, data}`: page with `--offset <next_offset>` while `has_more`; narrow with `--fields`.
+- Shell state does not survive between Bash calls: start every call that uses `$DB`, `q()`, or `src()` with `source ./.scratch/probe.sh` (`references/profiling.md`); its `mb` calls carry the name literally too.
 - Bodies are files in `./.scratch` written with quoted heredocs (`<<'SQL'`) and passed with `--file`; SQL is embedded with `jq --rawfile` so it stays formatted.
 - A query that cannot run fails on stderr with empty stdout; one that runs and fails prints `status: "failed"` with exit 0; test `.status == "completed"`. No rows means replan (wrong filter, wrong unit), never an answer of zero.
 - Before a verb you have not run: `mb <cmd> --help`, and `mb <cmd> --help --json | jq .inputSchema` before authoring its body. Mechanics live in the CLI's bundled skills: `mb skills path <name> --json | jq -r '.data[0].dir'`, then Read only the section a step names (`mbql` before the first MBQL body; `transform`, `transform-test-plan` (not in every release), `metadata`, `dashboard`, `visualization`, `notification`, `document`, `git-sync` as named; `core` when a footgun bites).
 - MBQL bodies are validated locally by `mb query --dry-run` and by every `card`, `measure`, `segment`, and `transform` `create`/`update`. Definition references (`["metric", {}, <id>]`, `measure`, `segment`) carry the numeric id, but the bundled schema expects an `entity_id` string there (`must be string`): fix every other error, then pass `--skip-validate` on bodies with definition references and let the server decide. If the server rejects the number, use `mb card get <id> --fields entity_id`.
 - Transforms file only in collections created with `--namespace transforms`; cards, dashboards, and documents in ordinary ones.
 - Large lists: narrow with `--fields` and pass `--max-bytes 0`, or page while `has_more`; a truncated list is never a complete answer.
-- Links from the profile's `url`: `/question/<id>`, `/metric/<id>`, `/model/<id>`, `/dashboard/<id>`, `/document/<id>`, `/collection/<id>`, `/data-studio/transforms/<id>` (`/inspect` to review), `/data-studio/data/database/<db-id>/schema/<db-id>:<schema>/table/<table-id>`, `/data-studio/schema-viewer?database-id=<db-id>&schema=<schema>`. Every object in a hand-back gets its link.
+- Links from the state file's `url`: `/question/<id>`, `/metric/<id>`, `/model/<id>`, `/dashboard/<id>`, `/document/<id>`, `/collection/<id>`, `/data-studio/transforms/<id>` (`/inspect` to review), `/data-studio/data/database/<db-id>/schema/<db-id>:<schema>/table/<table-id>`, `/data-studio/schema-viewer?database-id=<db-id>&schema=<schema>`. Every object in a hand-back gets its link.
 
 ## Domain notes
 

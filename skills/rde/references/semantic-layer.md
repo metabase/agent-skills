@@ -54,8 +54,8 @@ On the 5–15 tables people query, one batch per table, entity tables first, in 
 When a job run can add category values, schedule `mb db rescan-values <db-id>` beside the job (after each run).
 
 ```bash
-mb table update <table-id> --body '{"description":"<grain, scope, required filters>","caveats":"<…>","owner_email":"<owner>","data_layer":"final","entity_type":"entity/TransactionTable"}'
-mb field update <field-id> --body '{"semantic_type":"type/FK","fk_target_field_id":<target-pk-field-id>}'
+mb table update <table-id> --body '{"description":"<grain, scope, required filters>","caveats":"<…>","owner_email":"<owner>","data_layer":"final","entity_type":"entity/TransactionTable"}' --profile <profile> --json
+mb field update <field-id> --body '{"semantic_type":"type/FK","fk_target_field_id":<target-pk-field-id>}' --profile <profile> --json
 ```
 
 ## The questions table

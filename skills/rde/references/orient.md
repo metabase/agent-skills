@@ -4,14 +4,14 @@ Read before anything that builds or changes. One read-only pass over the scope t
 
 ```bash
 source ./.scratch/probe.sh
-mb db list --profile "$PROFILE" --json; mb db get "$DB" --include tables --profile "$PROFILE" --json
-mb table list --db-id "$DB" --fields id,schema,name,data_layer,data_source,is_published,owner_email,description --max-bytes 0 --profile "$PROFILE" --json \
+mb db list --profile <profile> --json; mb db get "$DB" --include tables --profile <profile> --json
+mb table list --db-id "$DB" --fields id,schema,name,data_layer,data_source,is_published,owner_email,description --max-bytes 0 --profile <profile> --json \
   | jq '[.data[] | {id, schema, name, data_layer, data_source, is_published, owner_email, described: (.description != null)}]'
-mb transform list --fields id,name,description,target --max-bytes 0 --profile "$PROFILE" --json
-mb search --models metric,measure,segment,dataset --db-id "$DB" --limit 50 --profile "$PROFILE" --json
-mb search --verified --db-id "$DB" --profile "$PROFILE" --json
-mb collection tree --profile "$PROFILE" --json; mb git-sync status --profile "$PROFILE" --json
-mb db get "$DB" --profile "$PROFILE" --json | jq .engine    # Snowflake or BigQuery: transform tests cannot run (references/transform-tests.md)
+mb transform list --fields id,name,description,target --max-bytes 0 --profile <profile> --json
+mb search --models metric,measure,segment,dataset --db-id "$DB" --limit 50 --profile <profile> --json
+mb search --verified --db-id "$DB" --profile <profile> --json
+mb collection tree --profile <profile> --json; mb git-sync status --profile <profile> --json
+mb db get "$DB" --profile <profile> --json | jq .engine    # Snowflake or BigQuery: transform tests cannot run (references/transform-tests.md)
 ```
 
 A list whose `has_more` is still true is incomplete; page it before judging.

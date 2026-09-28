@@ -11,7 +11,7 @@ Order: 1 find the rule and dependents, 2 plan (the stop for a definition or disp
 Read the object as it stands (the transform's description, SQL, runs, tests; the definition's body and description; its decisions in the state file and the domain Document). The rule lives in one place: a transform's SQL, `cfg_<domain>`, or a definition's query. List dependents: transforms reading its table, cards and metrics naming its id or table, dashboards holding them (`mb dashboard cards`), documents embedding them, subscriptions and alerts on them:
 
 ```bash
-source ./.scratch/probe.sh; P=(--profile "$PROFILE" --json --max-bytes 0)
+source ./.scratch/probe.sh; P=(--profile <profile> --json --max-bytes 0)
 mb search "<name>" --models card,metric,dataset,dashboard,document,transform,segment,measure --limit 500 "${P[@]}"   # search defaults to 20; page while has_more
 mb transform list --fields id,name,source "${P[@]}" | jq --argjson t <table-id> '[.data[] | select((.source | tostring | test("<schema>\\.<table>"; "i")) or (.source | tostring | test("\"source-table\":\($t)[,}]"))) | {id, name}]'
 mb card list --fields id,name,type,dataset_query "${P[@]}" | jq --argjson id <definition-id> --argjson t <table-id> '[.data[] | select(.dataset_query | tostring | test("\"(metric|measure|segment)\",\\{[^}]*\\},\($id)[],]") or test("\"source-table\":\($t)[,}]")) | {id, name, type}]'

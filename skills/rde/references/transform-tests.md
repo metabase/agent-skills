@@ -80,7 +80,7 @@ The body is closed (`transform_id`, `name`, `description`, `inputs`, `expectatio
 
 ```bash
 source ./.scratch/probe.sh
-mb transform-test run <test-id> --profile "$PROFILE" --json | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "row-counts", "missing-rows", "extra-rows", "cell-mismatches", sample, error}]}'
+mb transform-test run <test-id> --profile <profile> --json | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "row-counts", "missing-rows", "extra-rows", "cell-mismatches", sample, error}]}'
 ```
 
 **A run that never came back**: reaped as `timeout` after five minutes; re-run; a repeat means the fixture is too large.

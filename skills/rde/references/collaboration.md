@@ -30,6 +30,8 @@ Read once per session before the first build or change: how you talk, when and h
 2. **The proposal point**, before anything is written where people read (`SKILL.md`, Invariants): explore §8 for a pipeline, a one-model proposal for a model added later (build), extract §7 for a migration, semantic §3 for definitions and metadata, reconcile §3 for a comparison, change §2 or §3.6 for a change. Its list is printed, then asked about.
 3. **Go-live approval** (build §7), before a table goes final where people read or work is exported to a branch; at every layer boundary, never skipped, and the next layer never opens in the same response.
 
+Each planned stop writes its line in the state file's `## Stops` when it returns, never before: `intake: answered <date> (<who>)`, `proposal <slice>: answered <date> (<who>)`, `go-live <layer>: answered <date> (<who>)`; a headless run writes `unanswered (headless)` instead. A skipped stop is then visible as a missing line.
+
 Stops that come with the fact, in the response that produced it: a rule found mid-build that moves a headline past materiality; a gate failure whose fix needs a business rule (a build bug is fixed and rerun instead); an empty table on a question's path; a write that landed outside the output schema (stop before any other tool call, even investigating); a permission or missing-schema error; a stale loader. "I will report it in the hand-back" is not a stop: by then the work that depended on it is done.
 
 ## How a stop works
@@ -65,6 +67,7 @@ decided <yyyy-mm-dd> [<key>] (<who>): <rule as implemented>; readings: <…>
 - An open decision's effect is visible where readers look: a plain sentence in the `caveats` of the table it shapes ("Churn is dated by end of paid service until the revenue owner confirms; the cancellation date would move August churn from 41 to 48") and `Draft.` opening every definition it shapes.
 - An open decision proceeds on its default and blocks Library publishing and the Reconciled label for what it shapes. More than three open decisions on one headline is itself a stop.
 - Never resolve a decision by inference from the data; never write a default as confirmed; never re-ask an answered one.
+- When the state file and the domain Document disagree on a decision, the Document wins: it lives on the instance, like every other fact. Correct the state file and name the drift in the hand-back.
 
 ## Trust labels
 
@@ -90,4 +93,9 @@ A job is done with three things: the recap in this shape; the domain Document (`
 
 ## Files and credentials
 
-Working files go in `./.scratch` (`mkdir -p` first), never a system temp directory; they are not a deliverable. Never paste credentials or warehouse passwords into chat; the user runs any storing command.
+Working files go in `./.scratch` (`mkdir -p` first, kept out of git per `references/state.md`), never a system temp directory; they are not a deliverable. Never paste credentials or warehouse passwords into chat; the user runs any storing command.
+
+- Never read files under `~/.rde`, and never edit `PATH` or shell files.
+- Never ask the user for a password or an API key, and never handle one.
+- Never run `rde credentials`. When the user needs the UI login for the installer's Metabase, tell them to run `rde credentials` in their own terminal.
+- Logging in and repairing a login follow `SKILL.md`, Which Metabase (login rules): the user's yes before any installer command beyond `rde status --json` and `rde doctor --json`.

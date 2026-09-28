@@ -13,14 +13,13 @@ Read before any modeling decision: a grain, a cast, a join key, a definition.
 
 ## The helper
 
-Written once per working directory with the values filled in literally, and sourced at the start of every Bash call that uses them:
+Written once per working directory with the values filled in literally, the `--profile` name included, and sourced at the start of every Bash call that uses them:
 
 ```bash
 mkdir -p ./.scratch
 cat > ./.scratch/probe.sh <<'SH'
-PROFILE=<profile>
 DB=<db-id>
-q() { jq -n --arg q "$1" --argjson db "$DB" '{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$q}]}' | mb query --file - --profile "$PROFILE" --json | jq -c '{status, error, cols: [.data.cols[]?.name], rows: .data.rows}'; }
+q() { jq -n --arg q "$1" --argjson db "$DB" '{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$q}]}' | mb query --file - --profile <profile> --json | jq -c '{status, error, cols: [.data.cols[]?.name], rows: .data.rows}'; }
 src() { jq -n --rawfile s "$1" --argjson db "$DB" '{type:"query",query:{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$s}]}}'; }
 SH
 source ./.scratch/probe.sh && q "SELECT count(*) AS n FROM <schema>.<table>"

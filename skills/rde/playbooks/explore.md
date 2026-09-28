@@ -24,7 +24,7 @@ One query over every table in the schemas the questions name (above ten million 
 
 ```bash
 source ./.scratch/probe.sh
-mb table list --db-id "$DB" --fields id,name,schema --max-bytes 0 --profile "$PROFILE" --json \
+mb table list --db-id "$DB" --fields id,name,schema --max-bytes 0 --profile <profile> --json \
   | jq -r --arg q "'" '.data[] | select(.schema | IN("<schema>", "<schema>")) | "SELECT \($q)\(.schema).\(.name)\($q) AS t, count(*) AS n FROM \(.schema).\(.name)"' \
   | sed '$!s/$/ UNION ALL/' > ./.scratch/counts.sql && q "$(cat ./.scratch/counts.sql)"
 ```

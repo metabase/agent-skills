@@ -8,7 +8,7 @@ Order: 1 pre-flight, 2 collection/tag/job; then per layer (staging, intermediate
 
 ## 1. Pre-flight
 
-- A proposal point has returned (or, headless, is recorded unanswered); otherwise run it now. Build only the models on the current slice's path; more needs a yes to widen.
+- Before the first write into the output schema (the smoke transform below included), the state file's `## Stops` has this slice's `proposal <slice>:` line, answered or `unanswered (headless)`; without it, run the proposal point now. Build only the models on the current slice's path; more needs a yes to widen.
 - Re-read those tables and existing transforms with their last runs and tests: built, passing, and decided is done.
 - Record `environment`: production (what you write is what people see) or staging (changes reach production as a reviewed branch; `mb git-sync status`).
 - Prove the write path unless your transforms already run into that schema: a throwaway `_rde_smoke` transform writing one literal row into the output schema, `run --sync`, then `mb transform delete-table <id> --yes` and `mb transform delete <id> --yes`. A permission or missing-schema error is a stop for the admin, never a reason to write elsewhere.
@@ -18,9 +18,9 @@ Order: 1 pre-flight, 2 collection/tag/job; then per layer (staging, intermediate
 Reuse what exists; else one transforms collection per domain, one tag per chain, one job over the tag at the loader's cadence (default daily after the load, a decided line):
 
 ```bash
-mb collection create --body '{"name":"<domain>"}' --namespace transforms
-mb transform-tag create --body '{"name":"<domain>"}'
-mb transform-job create --body '{"name":"<domain> daily","schedule":"<quartz cron after the load>","tag_ids":[<tag-id>]}'
+mb collection create --body '{"name":"<domain>"}' --namespace transforms --profile <profile> --json
+mb transform-tag create --body '{"name":"<domain>"}' --profile <profile> --json
+mb transform-job create --body '{"name":"<domain> daily","schedule":"<quartz cron after the load>","tag_ids":[<tag-id>]}' --profile <profile> --json
 ```
 
 Transforms are created untagged and join the tag only when approved in §7, so no scheduled run builds an untested or unapproved model. Ids go into the state file; one build-list row per model in dependency order, `cfg_<domain>` first when warranted, snapshot and history models (`references/time-and-entities.md`) in the layer that needs them when the source keeps no history.
@@ -34,7 +34,7 @@ source ./.scratch/probe.sh
 jq -n --argjson src "$(src ./.scratch/<model>.sql)" --rawfile d ./.scratch/<model>.desc --argjson db "$DB" \
   '{name:"<model>", description:$d, collection_id:<transforms-collection-id>, owner_email:"<owner>", source:$src,
     target:{type:"table", database:$db, schema:"<out_schema>", name:"<model>"}}' > ./.scratch/<model>.transform.json
-mb transform create --file ./.scratch/<model>.transform.json --profile "$PROFILE" --json | jq '{id, target}'
+mb transform create --file ./.scratch/<model>.transform.json --profile <profile> --json | jq '{id, target}'
 ```
 
 An MBQL source is validated by the create itself (`SKILL.md`, mb conventions). A rule discovered mid-layer that moves a headline past materiality is a stop where it was found.
@@ -46,7 +46,7 @@ Per `references/transform-tests.md`, before the first run. Red is fixed in the S
 ```bash
 source ./.scratch/probe.sh
 jq -n --argjson src "$(src ./.scratch/<model>.sql)" '{source:$src}' > ./.scratch/<model>.patch.json
-mb transform update <transform-id> --file ./.scratch/<model>.patch.json --profile "$PROFILE" --json
+mb transform update <transform-id> --file ./.scratch/<model>.patch.json --profile <profile> --json
 ```
 
 For "test this transform" or "it gets case X wrong" on a live model: its tests as they stand, the case added and failing, then the fix through `playbooks/change.md`.
