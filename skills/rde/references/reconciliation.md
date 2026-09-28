@@ -1,79 +1,85 @@
 # Reconciliation
 
-Read whenever a build produces a number somebody will compare with another, or two numbers in the instance already disagree.
+The method behind `playbooks/reconcile.md`.
 
-## Pick a baseline at intake
+## Validation modes
 
-- Ask for the reference at intake: an export at the finest grain available, from an existing report, a file, or a finance figure. Never fabricate one.
-- Search the warehouse for baseline-shaped tables before asking (the baseline probe in [profiling-catalog.md](profiling-catalog.md)); present candidates, let the user disqualify.
+Declared before comparing; the trust label reads from it.
 
-Disqualify explicitly: entity coverage a small fraction of the build's scope; no actual rows, only forecast or forward-filled ones; an earlier build of the same specification; a grain mismatch bridged by a mapping that is itself unvalidated.
-
-## Validation mode
-
-Declare the mode before comparing; it fixes what a pass rate may mean, and the trust label ([collaboration-contract.md](collaboration-contract.md)) reads from it.
-
-| Mode | When | What a pass rate proves |
+| Mode | When | A pass proves |
 | --- | --- | --- |
-| `external_baseline` | An independent row-level reference exists | Correctness; a shared upstream error agrees on both sides, so record a shared upstream |
-| `source_parity` | The reference is the user's own existing model output, or another number already in the instance | Translation fidelity only; say so wherever the number appears |
-| `none` | No baseline | Nothing about correctness; the checks prove self-consistency, and the report says so |
+| `external_baseline` | a reference outside the build: a finance export, a source-system report, a table marked `data_authority: authoritative` | agreement with it for the scope and period compared, within the acceptance pair; a shared upstream error agrees on both sides, so name any shared upstream |
+| `source_parity` | the build against its own raw source, or one definition against another in the instance | nothing lost or duplicated, or faithful translation; nothing about whether the definition is right |
+| `none` | no reference | self-consistency only, said so |
 
-Two numbers in the instance disagreeing ("the dashboard says X, the report says Y") is `source_parity` with the metric as the reference: read both definitions (`mb card get <id> --fields name,dataset_query --json`), compare at the narrowest grain below, attribute the gap to the buckets, and the fix is one definition: the card that re-derived the number is re-pointed at the metric ([semantic-layer-design.md](semantic-layer-design.md)).
+Two numbers in the instance disagreeing is `source_parity` with the metric as reference: read both queries (`mb card get <id> --fields name,dataset_query`), compare at the finest grain, bucket the gap; the fix is one definition, the re-deriving card re-pointed at the metric.
 
-## Filter the baseline to the build's scope first
+## Baselines and disqualifiers
 
-Apply each filter with its reason recorded: categories the build recognises, actual rows, complete periods. Assert any exclusion both sides claim to apply. Rows outside the reference's own scope go in `scope` below, not the error.
+Search for baseline-shaped and `authoritative` tables before asking; then ask once for a reference at its finest grain, keyed by something both sides carry. Never fabricate one. With two owners holding different references, which is canonical is theirs.
 
-## Compare at the narrowest common grain
+Not a baseline: computed from this build or an earlier build of the same spec; another definition (billed vs recognised, bookings vs revenue) with no bridge; a period open at export or restated since; an unconvertible currency or FX basis; coverage a small fraction of the scope; forecast or forward-filled rows; grains bridged by an unvalidated mapping; totals only. Name the disqualifier and fall back to `source_parity`.
 
-Compare at the grain the model produces; roll up only after the narrower comparison passes. Join on a declared key both sides carry, full outer, never inner; an aggregate match hides compensating errors. The comparison is a transform so it re-runs after every fix:
+## Scope the reference
+
+Read what it counts first: population (statuses, test and internal accounts, entities, subsidiaries), date column and cut-off, timezone, currency, net of refunds, credits, tax. Match the build to it in the comparison query, never by editing the definition; each filter carries its reason; rows outside the reference's scope land in `scope`, not error. One sentence states the comparison universe every figure is quoted against.
+
+## The acceptance pair
+
+A row hit rate (reference rows matched within tolerance) and a cap on the aggregate gap (net gap over the reference total), set with the owner before the first measurement and never moved after. High hit rate with a large net gap: a missing population. Small net gap with a low hit rate: offsetting errors. Report agreement at several bands (defaults to confirm: exact, 1, 5, 10 percent).
+
+## The roll-forward identity first
+
+Before any external comparison and after every fix: opening + movements = closing per entity and period (opening MRR + new + expansion + reactivation − contraction − churn = closing MRR; opening balance + credits − debits = closing). A query returning rows only where it breaks; any row is a build bug, fixed before the reference is looked at again.
+
+## Compare at the finest shared grain
+
+The finest grain both sides carry (invoice line, invoice, customer-month), the key named the same on both sides. Full outer join, never inner, never totals alone. The comparison is a transform, `cmp_<number>`, `data_layer: internal`, so it re-runs after every fix:
 
 ```sql
 SELECT coalesce(r.k, b.k) AS k, r.value AS reference_value, b.value AS build_value, b.value - r.value AS gap,
-       CASE WHEN r.k IS NULL THEN 'only_in_build' WHEN b.k IS NULL THEN 'only_in_reference'
-            WHEN abs(b.value - r.value) <= <tolerance> * abs(r.value) THEN 'match' ELSE 'differ' END AS state
-FROM <reference> r FULL OUTER JOIN <build> b ON b.k = r.k
+  CASE WHEN r.k IS NULL THEN 'only_in_build' WHEN b.k IS NULL THEN 'only_in_reference'
+       WHEN abs(b.value - r.value) <= <tolerance> * abs(r.value) THEN 'match' ELSE 'differ' END AS state,
+  CASE WHEN <outside the reference's scope> THEN 'scope' WHEN <same row, other period> THEN 'timing'
+       WHEN <same row, other amount or category> THEN 'classification' WHEN <duplicate on one side> THEN 'dedup'
+       WHEN abs(coalesce(b.value, 0) - coalesce(r.value, 0)) > <tolerance> * abs(coalesce(r.value, 0)) THEN 'unexplained' END AS bucket
+FROM <reference> r FULL OUTER JOIN <build at the same grain> b ON b.k = r.k
 ```
 
-- Report agreement at several tolerances (defaults to confirm: exact, 1, 5, 10 percent).
-- Acceptance is a pair, a row-level hit rate and an aggregate gap cap, both defaults the user confirms; passing one and failing the other is a finding.
-- Deliver the row-level file: one row per compared key with both values, gap, state, and context columns; say what was excluded and why.
+Summary: `SELECT c.state, c.bucket, count(*) AS n, sum(c.gap) AS net, sum(abs(c.gap)) AS gross FROM <out_schema>.cmp_<number> c GROUP BY 1, 2`. Roll up only after the row level passes. The row-level file, on request: a native question over the comparison table, `mb card query <card-id> --export-format csv`.
 
 ## Decompose the gap
 
-Attribute every non-`match` row to one bucket with an ordered `CASE`, each disputed threshold a named constant; per bucket report rows, signed and absolute contribution, share of total absolute gap.
+Every non-match in exactly one bucket by the ordered `CASE`, disputed thresholds named constants; per bucket rows, net, gross, share of total absolute gap; buckets sum to the total.
 
 | Bucket | Contents |
 | --- | --- |
-| `scope` | Rows one side covers and the other structurally does not |
-| `timing` | Same value, different period |
-| `classification` | Same value, different category or dimension |
-| `dedup` | Rows one side collapses and the other does not, or one-sided eligibility |
-| `unexplained` | Not yet attributed to a rule |
+| `scope` | a row only one side's population holds |
+| `timing` | the same row in another period (date basis, cut-off, timezone, late row) |
+| `classification` | the same row with another amount or category (discounts, tax, refunds, FX, proration) |
+| `dedup` | a duplicate on one side, or one-sided eligibility |
+| `unexplained` | what is left, with sample rows |
 
-- Report net and gross separately; a near-zero net over a large gross means offsetting buckets, a grain or attribution problem.
-- Read the top rows by absolute gap; attribute each bucket to a rule in your build or theirs; compare the classification column too, as a confusion matrix.
-- Re-measure after every fix against the same reference and universe; report total absolute gap, hit rate, and each misclassification count before and after, per direction.
-- A gap from past periods carrying the entity's current attribute needs a history source ([entities-and-time.md](entities-and-time.md)); a reference covering one segment where the build covers several is scope, not error.
+Near-zero net over a large gross means offsetting buckets (a grain or attribution problem). Read the top rows by absolute gap one by one; compare classification columns as a confusion matrix, not only the measure. A gap from past periods carrying current attributes needs history (`references/time-and-entities.md`). Every headline count is computed from the comparison table, never remembered.
 
-## Declare the ceiling instead of closing it
+## Fix one rule, re-measure
 
-Before the build runs, list by name everything in the baseline the inputs cannot produce, with reason and effect; a residual attributable to that list is a correct result. Keep a separate list of logic deliberately deferred; never conflate "cannot" with "chose not to". When the remaining gap is dominated by data the source does not carry, say so and stop. Closing a gap with logic not in the specification is the user's decision, never a rule you invent.
+One rule per fix, through `playbooks/change.md`; the row that exposed it becomes a test case first. Re-run under the same reference and universe and compare buckets per direction: the fix closes its bucket and moves no other (moving another is a bug). Closing a gap with logic the definition does not hold is the owner's call; never tune a rule only to hit the reference.
 
-## Reconcile by construction without a baseline
+## The ceiling
 
-- State table: one row per entity, sub-entity, category, and period on the dense spine ([entities-and-time.md](entities-and-time.md)) with the period value, every dimension key, exclusions as flagged columns not `WHERE` clauses.
-- Motion table: one row per entity, period, and change type, derived only from the state table, so that `prior_period_value + sum(change rows for the period) = current_period_value`.
-- A delta the classifier cannot explain becomes an `unexplained` row; its share is the headline quality measure, and an empty bucket in a messy domain means the plug is not wired.
-- Label the identity holding as structural: the arithmetic closes; the figures are not thereby right.
+What remains, in two parts with sizes: what the sources cannot close (data not held, history before the horizon, manual adjustments only in the reference) and what was chosen not to close (an owner's rule that differs). Never conflate them; when the first dominates, say so and stop.
 
-## Snapshot and restatement
+## Reconcile by construction, without a baseline
 
-Snapshot table: an append incremental transform on the job, run on the first day of each period (the `snap_` shape in [entities-and-time.md](entities-and-time.md)), one row per entity, period, and snapshot date, so past snapshots survive the next run. Restatement table: one row per entity, period, and snapshot date where the value moved, with the delta; nothing shows until two snapshots exist. A restatement that moves a shipped number follows the restatement protocol in [collaboration-contract.md](collaboration-contract.md).
+- State table: one row per entity, sub-entity, category, period on the dense spine, exclusions as flagged columns, not `WHERE` clauses.
+- Movements table derived only from the state table, so the roll-forward holds; a delta the classifier cannot explain is an `unexplained` movement whose share is the headline quality measure (an empty bucket in a messy domain means the plug is not wired).
+- Say what the identity proves: the arithmetic closes; the figures are not thereby right.
+
+## Snapshots and restatement
+
+Snapshot: an append incremental transform on the job, run the first day of each period, one row per entity, period, snapshot date. Restatement table: rows where a value moved between snapshots, with the delta (empty until two snapshots exist). A restatement that moves a shipped number follows `playbooks/change.md` §5.
 
 ## Standing controls
 
-Defaults shipped with every reconciled number, each an alert on a saved question that returns rows only on failure ([data-quality-checks.md](data-quality-checks.md)): freshness (stale beyond the refresh interval, tighter at period open) and structural integrity (duplicate on the grain, orphan, negative amount, broken identity).
-
-On request, or after a first incident: restatement detection (a closed period moved beyond a small relative threshold, read from the restatement table); residual size (`unexplained` share above a threshold); an independent crosscheck (the same measure from another input path, variance broken down by cause, never swapping the reported number for the preferred one); one assertion per past incident. A crosscheck whose divergence is explained rather than measured is an open question, not a control.
+With every reconciled number, as branches of the domain's check card and its alert (`references/quality-checks.md`, The standing check): freshness, structural integrity, the roll-forward identity, and the aggregate gap against a refreshed reference when one arrives on a cadence. On request or after an incident: restatement detection (a closed period moved beyond a small threshold), the unexplained share above a threshold, an independent crosscheck (the same measure by another path, variance by cause, never swapping the reported number for the preferred one), one assertion per past incident. A divergence explained rather than measured is an open question, not a control. Each control names a threshold and an owner.

@@ -1,84 +1,108 @@
 # Event and registration data
 
-Any event, webinar, survey, or registration source: grains, the completion rule, threshold derivation, matching registrants to customer records, and the three report families; the router sends you here when the source is registration, attendance, or survey data. Every threshold and match rule is a default to profile, propose with evidence, and confirm at a `[CHECKPOINT]` ([../collaboration-contract.md](../collaboration-contract.md)).
+Fires on event, webinar, survey, and registration sources.
+
+## Metrics
+
+- Registrations: registrants per event in the counted statuses; "registered" and "confirmed" differ.
+- Attendance rate: registrants who attended live / registrants; over confirmed registrants as a variant.
+- Completion rate: registrants satisfying either completion path / registrants; variants over attendees, live only.
+- Average watch time: time in session per attendee, summed over joins; median as a variant, replay time apart.
+- Match rate: registrants matched to a customer record / registrants, exact email only or with the domain fallback.
+
+Webinar tools report attended yes or no, join and leave times, and total time in session per registrant, with dial-in and room attendees listed apart (Zoom).
 
 ## Grains
 
-Build in this order, each model declaring its grain ([../layering-and-naming.md](../layering-and-naming.md)):
+Build in this order, each model's grain in its description before it is built:
 
 | Grain | One row per | Carries |
 | --- | --- | --- |
-| Registrant per event | person per event | registration, attendance, watch behaviour, customer match; the only grain that can be re-cut later |
-| Event | event | registrations, attendees, completions, conversion rates, average watch duration, rolled up on the row |
-| Series | recurring programme or campaign, where the source has one | the event metric set |
-| Cohort and segment rollups | event type, customer status, plan, or acquisition cohort ([../entities-and-time.md](../entities-and-time.md) for the base set, follow set, and rate) | the same metric set sliced one way; siblings over the atomic model, never independent queries |
+| Registrant per event | person per event | registration, attendance, watch behaviour, customer match; the only grain that can be re-cut |
+| Event | event | registrations, attendees, completions, rates, average watch time |
+| Series | recurring programme or campaign, where one exists | the event metric set |
+| Cohort and segment rollups | event type, customer status, plan, or acquisition cohort | siblings over the atomic model, never independent queries |
 
-Two shapes for question data: a wide per-registrant table (one column per single-answer question) and a long answers table (one row per registrant, question, answer) for multi-select. Read the question catalog first: which questions exist and whether each is single-select, multi-select, or free text.
+Question data takes two shapes: a wide per-registrant table (one column per single-answer question) and a long answers table (registrant, question, answer) for multi-select. Read the question catalogue first (single-select, multi-select, free text), and read question labels from it in the query, never typed as literals.
 
-## The completion rule has two paths
+## Completion and thresholds
 
-One boolean satisfied by either path: attended live above a minimum duration, or watched the replay above a duration or percentage threshold.
+One boolean satisfied by either path: attended live above a minimum duration, or watched the replay above a duration or percentage.
 
-- Define each path's rule on its own distribution; live and replay never share a cutoff.
-- State the combination explicitly (default: union) and carry the satisfying path as a column.
-- Carry the continuous measures (watch duration, watch percentage) beside the boolean so a different threshold is a re-run.
-- If a path's measure is absent from the source, report the absence and stop; never substitute a constant.
+- Each path's cutoff comes from its own distribution; live and replay never share one. Default combination: union, the satisfying path carried as a column.
+- Carry watch duration and percentage beside the boolean so another threshold is a re-run.
+- A path whose measure is absent from the source is reported and stops; never a constant in its place.
 
-## Derive every threshold from the distribution
+The derivation rule, for any boolean over a continuous measure (duration behind attended, percentage behind completed, recency behind active):
 
-1. Name the continuous measure behind the requested boolean: watch duration or percentage behind "completed", attendance duration behind "attended", recency behind "active".
-2. Pull its distribution over the whole population, bucketed finely enough to see shape (deciles or fixed-width bands).
-3. Find the natural break: a discontinuity, a knee, or an 80/20 boundary.
-4. Present the distribution, the proposed cutoff, and the population each candidate captures; wait for confirmation.
-5. Record the derivation beside the decision, and hold the value as a named constant.
+1. Pull the distribution over the whole population through `q()`, in deciles or fixed bands.
+2. Find the natural break: a discontinuity, a knee, an 80/20 boundary.
+3. Offer each candidate cutoff with the population it captures; the chosen one is a decision, the derivation in its readings, the value in `cfg_<domain>`.
 
-## Short-attendance edge cases
-
-A presence event is not an engagement event. Profile the low end before treating attended, opened, visited, or logged in as a fact:
-
-| Shape | Treatment |
+| Low-end shape | Treatment |
 | --- | --- |
-| Spike at or near zero duration | bots, accidental clicks, bounces, or instrumentation; report its size and ask whether it counts |
-| Very short attendance and immediate drop-off | count them separately; a minimum-duration floor can move the headline more than any other rule, so measure what it removes before proposing it |
-| Mass at the theoretical maximum | a cap, default, or saturated counter; check from that side too |
-| Missing duration with a join timestamp present | a distinct population; null, never zero |
+| Spike at or near zero duration | bots, accidental clicks, bounces; report its size and ask |
+| Very short attendance | count apart; a floor can move the headline more than any other rule, so measure what it removes |
+| Mass at the theoretical maximum | a cap, a default, or a saturated counter |
+| Join time present, duration missing | a distinct population; null, never zero |
 
-## Matching registrants to customer records
+## Matching registrants to customers
 
-Registration forms are self-typed, so the match is a hypothesis; the general conformed-entity procedure is in [../entities-and-time.md](../entities-and-time.md), and these are its email rules.
+Registration forms are self-typed, so the match is a hypothesis (`references/time-and-entities.md`, Conformed entities).
 
-1. Exact match first on normalised email (trimmed, lower-cased); report the exact-match rate before proposing anything else.
-2. Domain match only as a fallback where exact fails and the business accepts company-level attribution; exclude consumer and free-mail domains with a maintained list, and carry the match method on every row.
-3. Duplicates on the customer side (several rows per email or domain) fan out the join: `[CHECKPOINT]` with the volume, a sample, and the candidate tiebreakers (most recently created, earliest created, most recently active) for the owner to pick.
-4. Unmatched rows stay, flagged as not an existing customer with customer columns null; never inner-join an enrichment, never drop or carry forward.
-5. Re-check the match rate after every enrichment join against a threshold agreed up front (default: pause when the unmatched share exceeds 20 percent) and show the unmatched volume with sample rows.
+1. Exact match on normalised email (trimmed, lower-cased); report its rate first.
+2. Domain match only as a fallback the business accepts, free-mail domains excluded by a maintained list, the match method on every row.
+3. Several customer rows per email or domain fan out the join: a stop with the volume, a sample, and the tiebreakers (most recent, earliest, most recently active).
+4. Unmatched rows stay, customer columns null, flagged; never inner-join an enrichment.
 
-The atomic model carries the match method and a matched boolean.
-
-## The three report families
+## Report families
 
 | Family | Shape | Rule |
 | --- | --- | --- |
-| Roster | who registered: name, company, role, status; a filtered, ordered read of the wide table | state which statuses count; "registered" and "confirmed" differ |
-| Distribution | how the group splits on a single-select question or attribute, as shares | name the denominator; multi-select goes to the long table, grouped by question then answer, and the reply says shares sum past 100 percent |
-| Open-ended digest | what people wrote in free text | quote the actual responses grouped into a few themes, with response count and empty count; counts alone discard the content |
+| Roster | who registered, a filtered read of the wide table | state the counted statuses; personal fields only with consent |
+| Distribution | shares across a single-select question or attribute | name the denominator; multi-select reads the long table and its shares sum past 100 percent |
+| Open-ended digest | what people wrote | quote responses grouped into a few themes, with response and empty counts; counts alone discard the content |
 
-Every report states its scope (all-time or a window, everyone or only confirmed) and its denominator.
+Every report states its scope (window, statuses) and its denominator.
 
-## Cases a transform test pins
+## Questions for the owner
 
-Per model, the fixture rows and expectations [../transform-tests.md](../transform-tests.md) asks for; the thresholds come from the `cfg_<domain>` input, so a re-derived cutoff is a change to the fixture's constant, not to the SQL.
+- `counted-statuses`: which registration statuses count? Default: confirmed and attended. Probe: registrants by status. If wrong: registrations over- or under-stated.
+- `live-threshold`: minimum live minutes to count as attended? Default: the distribution's break. Probe: attendees per candidate cutoff. If wrong: attendance rate moves most.
+- `replay-threshold`: replay duration or percentage that completes? Default: the replay distribution's break. Probe: completions per cutoff. If wrong: completion rate off.
+- `completion-paths`: union of live and replay, or live only? Default: union. Probe: completions per path and both. If wrong: completion rate off by the replay share.
+- `match-method`: exact email only, or the domain fallback? Default: exact, domain only if accepted. Probe: match rate each way, a sample of domain matches. If wrong: customer attribution wrong.
+- `unmatched-pause`: unmatched share that stops the build? Default: 20 percent. Probe: unmatched volume with sample rows. If wrong: a bad join ships silently.
 
-- Registrant grain: one repeat registration that is a duplicate and one that is a real second sign-up, by the source's own identifiers; `equals` on registrant, event, `is_selected`.
-- Completion: one registrant per path (live above the minimum, replay above the threshold), one satisfying both, one satisfying neither; `equals` on registrant, `is_completed`, the satisfying-path column.
-- Thresholds: one row exactly at each cutoff and one just under it; `equals` on the boolean, the continuous measure carried beside it.
-- Short attendance: a zero-duration row, a row with a join timestamp and no duration (null, never zero), a row at the theoretical maximum; `equals` on the treatment column.
-- Event rollup: `empty` where attendees exceed registrants, where completions exceed attendees plus replay viewers, or where a registration falls after the event.
+## Traps
 
-## Checks
+- One person joins several times: sum the joins, never count rows as attendees.
+- A repeat registration is a duplicate or a real second sign-up; decide from the source's own identifiers.
+- Dial-in and room attendees sit apart from named registrants (Zoom).
+- A presence event is not engagement: profile the low end before counting attended, opened, or visited.
 
-- One row per registrant per event, asserted; a repeat registration is a duplicate to resolve or a real second sign-up, decided from the source's own identifiers.
-- Attendees never exceed registrants per event; completions never exceed attendees plus replay viewers.
-- Every event's registration window closes at or before the event; a row outside it is a finding.
-- A raw source table with zero rows falls under the zero-row rule in [../collaboration-contract.md](../collaboration-contract.md).
-- Report the population each threshold excludes beside the number it produces.
+## Invariants
+
+- One row per registrant per event.
+- Attendees ≤ registrants per event; completions ≤ attendees plus replay viewers.
+- Every registration falls at or before its event; a row outside is a finding.
+- The match rate is re-checked after every enrichment join.
+
+## Test cases
+
+Per model; thresholds are inputs of the fixture, so a re-derived cutoff changes the fixture's constant, not the SQL.
+
+- Registrant grain: a duplicate repeat registration and a real second sign-up; `equals` on the winning rows' registrant and event.
+- Completion: one registrant per path, one satisfying both, one neither; `equals` on registrant, `is_completed`, the satisfying path.
+- Thresholds: a row exactly at each cutoff and one just under; `equals` on the boolean and its measure.
+- Short attendance: zero duration, a join with no duration (null), a row at the maximum; `equals` on the treatment column.
+- Event rollup: `empty` where attendees exceed registrants or a registration falls after the event.
+
+## For answering
+
+- State the counted statuses and the denominator (registrants, confirmed, attendees).
+- Completion is live or replay above cutoffs the owner chose; name them.
+- Customer attribution is a match; give the method and the match rate.
+- Multi-select shares sum past 100 percent.
+
+Sources: Zoom webinar attendee report documentation.

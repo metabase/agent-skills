@@ -1,93 +1,92 @@
 # Transform tests
 
-Read before the first model that carries a rule, and before changing a deployed one. Tests need three things: the endpoint on the instance (v65 and later, and any head or EE build of master), the `transforms-testing` feature on its token, and a warehouse driver that supports testing (Postgres, MySQL/MariaDB, Redshift, ClickHouse, SQL Server, H2 — not Snowflake, not BigQuery). Establish that by running the command, never by reading a version tag: a dev or head build reports `vLOCAL_DEV` or a `-SNAPSHOT` tag that the CLI cannot parse, so it logs an unknown-version warning and proceeds, and an agent that gates on the tag itself would drop a working instance into the fallback. The fallback, and the three signals that call for it, are at the end. `mb transform-test` does not ship in the CLI's `latest` tag yet: if `mb transform-test --help` is unknown, install `@metabase/cli@alpha-transform-tests` — and if it refuses a `cast_type` column, the CLI predates the rename and needs the same upgrade.
+Read before the first model that carries a rule and before changing a deployed one. Tests need `mb transform-test`, which not every CLI release ships (When tests cannot run). Where it ships, verbs and body shapes are in the `transform` skill, "Transform tests", and deeper planning (fixture casts, hand-derived expected rows, coverage matrices, mutation probes) in the `transform-test-plan` skill, read when logic is intricate or the user asks for a plan.
 
-## What a test is, and what it is for
+## What a test is
 
-A transform test runs the transform against fixtures instead of its real sources: one input per table the transform reads, the transform run into a temp table, each expectation checked against that output, the temp tables dropped. Nothing reads or writes a real table, the transform need not have run, and a test takes seconds. Query transforms only (native SQL or MBQL); a Python transform has no test.
-
-The gate ([data-quality-checks.md](data-quality-checks.md)) checks the data that landed: shape, parity, grain, on the rows that exist today. A test checks the logic: it pins a rule on rows chosen to exercise it, including cases the data does not hold yet (a customer whose gap is exactly the threshold, a refund line, a placeholder string in a lossy cast), and it fails the moment a patch or a constant changes the behaviour. The gate runs on every model, tests on every model that carries a rule; neither replaces the other, and neither replaces reconciliation ([reconciliation.md](reconciliation.md)).
+It runs the transform against fixtures instead of its sources: one input per table it reads, the output into a temp table, each expectation checked, temp tables dropped. Nothing real is read or written, the transform need not have run, it takes seconds. Query transforms only (native SQL or MBQL), never Python. The gate checks the data that landed; a test pins a rule on rows chosen to exercise it, including cases the data lacks yet (a lapse exactly at the grace window, a refund line, an `"N/A"` in a lossy cast), and fails the moment a patch or constant changes behaviour. Neither replaces the other, nor reconciliation.
 
 ## What to test
 
-One test per model that carries a rule; one expectation per rule. The rules to pin are the ones the header's Definition and Caveats name, plus every `[DECIDED, reversible]` recorded for the model: the decision's alternative is what a future patch will try, and the expectation is what tells the user the number moved because the rule did.
+Logic that is easy to get wrong (window functions, date math, state machines, ladders, spreading and allocation, dedup with a breaking case), and every model a headline reads. A block that only renames and casts has nothing to test (`tests: none, rename only`). One expectation per rule in the description and per decision recorded for the model (its alternative is what a future patch will try), plus the domain note's Test cases.
 
 | Rule | Fixture rows | Expectation |
 | --- | --- | --- |
-| Which row wins ([modeling-decisions.md](modeling-decisions.md)) | one group per case: a plain supersede, the family's breaking case, a group of only fragments | `equals` on the key and `is_selected` |
-| Attribute ladder | one row per rung, one that falls through to the default | `equals` on the key, the attribute, and `<attribute>_source` |
-| State and motion per period | one entity per state; the gap exactly at the constant and one beyond it | `equals` on entity, period, state |
-| Flagged incomplete period | a source whose newest period is the partial one | `empty` over the `period_flag` failure query |
-| Amortisation, allocation, conversion | one document per cadence, plus one mid-cycle change | `equals` on document, period, amount; `empty` where the spread does not sum to the total |
-| Exclusion rule | one row per predicate, one that matches none | `equals` on the key and the flag column |
-| Dedup, unit or epoch conversion, placeholder nulls in staging | one duplicate group, a minor-unit amount, an epoch, a `"N/A"`, a lossy text value | `equals` on the source column beside the cast |
-| Invariants the gate also checks | any of the above | `empty` on the `dup_key`, `null_required`, and `non_negative` shapes over the output |
+| Which row wins | a plain supersede, the breaking case, a group of only fragments | `equals` on key and the deciding columns |
+| Attribute ladder | one row per rung, one falling to the default | `equals` on key, attribute, `<attribute>_source` |
+| State per period | one entity per state; a lapse at the grace window and one beyond | `equals` on entity, period, state |
+| Incomplete period | a source whose newest period is partial | `empty` over the `period_flag` failure query |
+| Spreading, allocation, conversion | one document per cadence, one mid-cycle change | `equals` on document, period, amount; `empty` where the spread misses the total |
+| Exclusion | one row per predicate, one matching none | `equals` on key, flag, `exclusion_reason` |
+| Staging dedup, units, epochs, placeholders | a duplicate group, a minor-unit amount, an epoch, an `"N/A"` | `equals` on key and converted columns |
+| Gate invariants | any of the above | `empty` over `dup_key`, `null_required`, `non_negative` shapes |
 
-A staging block that neither deduplicates nor converts has nothing to test; a wide table tests each rule it inlines. The domain file STATE.md names carries the cases its rules need. A fixture is small enough to read at a glance: one case per row, ids numbered in case order, the case list in the test's `description`. A fixture of hundreds of copied production rows is a second gate, not a test, and carries personal data into the test body ([collaboration-contract.md](collaboration-contract.md)).
+## Fixtures
 
-## Fixture rules
-
-- Inputs cover exactly the tables the transform reads: one for every source, none for a table it never reads, and never two for the same table. The declared set has to equal the read set, and `create` and `update` refuse the body before anything runs — a missing input would leave that read pointing at the real table and pass green on production data. A model that cross-joins `cfg_<domain>` declares it as an input, so the constant under test is visible in the test, and a second test runs the same model under the alternative value.
-- `format: "rows"` by default: `columns` as `{name, cast_type}`, `rows` as objects, `null` where the source is null. Every row carries exactly the declared columns — a key that names no column, or a column a row omits, is refused; a column whose value is null is still present as a key. An empty `rows` list is legal and stands for a source table with no rows, which is a case worth pinning. `format: "sql"` builds a fixture a literal list would bloat: a calendar spine, a series of periods.
-- `cast_type` is a `CAST` target, not the type the warehouse reports, and the two vocabularies diverge per engine: MySQL takes `SIGNED` and reports `BIGINT`, ClickHouse takes `Nullable(Int32)` where the column reads back as `Int64`. Never copy a `database_type` out of a run result into a `cast_type`, and expect a body to be warehouse-specific. It is not checked when the test is saved; the database refuses it at run time, as `setup-failed`.
-- The transform's SQL runs unchanged against the fixture, so every column it reads exists in the input with a type that casts and compares as the real column does; read the real types from `mb table get <id> --include fields`, then write the cast target the engine takes for each.
-- Fixture dates sit at fixed points relative to the `last_complete_period` in the `cfg_<domain>` input, never relative to today, so the test does not rot; a rule that reads `current_date` (a freshness check) is exercised on rows the clock cannot reach or left to the gate.
-- In the model's SQL, alias every source table and qualify columns by the alias (`FROM raw_billing.invoice i ... i.amount`), never by the table name: the rewrite to temp tables leaves a table-name qualifier dangling and the run refuses it. Same in expectation SQL.
+- Small enough to read at a glance: one case per row, ids in case order, the case list in `description`. Always include the edges: a zero case per outer join and aggregation, a group of two or more per grouping and join, one dirty row per defect the source can carry. Copied production rows are a second gate, not a test, and carry personal data.
+- Expected rows are derived by hand from the fixture's story, never captured from output (that only proves the transform equals itself).
+- Inputs cover exactly the tables the transform reads, one each; `create` and `update` refuse a mismatch before anything runs (a missing input would read the real table). A model reading `cfg_<domain>` declares it, and a second test runs the decision's alternative value.
+- `format: "rows"` by default: `columns` as `{name, cast_type}`, rows with exactly the declared keys (nulls still present). Empty `rows` is an empty source, worth pinning. `format: "sql"` for inputs a literal list would bloat (a spine).
+- `cast_type` is a `CAST` target, not the reported type, and differs per engine (MySQL takes `SIGNED` and reports `INTEGER`; ClickHouse takes `Nullable(Int32)`, reads back `Int64`). Read real types with `mb table get <id> --include fields`, write the engine's cast target; a wrong one fails at run time as `setup-failed`.
+- Dates are fixed points, never relative to today; a `current_date` rule is exercised on rows the clock cannot reach, or left to the gate.
+- In the model's SQL and in expectation SQL, alias every table and qualify columns by alias, never by table name: the temp-table rewrite leaves table-name qualifiers dangling and the run refuses them.
 
 ## Expectations
 
-- `equals`: the output holds exactly the declared rows over exactly the declared columns, as a multiset, order ignored. Columns not named are not compared, so name the key and the columns the rule decides; leave load timestamps out. `format: "rows"` with `columns` (`{name, cast_type}`) and `rows` — the only form that runs. `format: "sql"` on an `equals` is accepted when saved and refused when run (`transform-test.unsupported-format`, 501): state the expected rows literally, or restate the rule as an `empty` over its violation.
-- `empty`: a query that must return no rows. It may name only the transform's target (`<out_schema>.<model>`; the run redirects it to the output temp table) and the test's declared inputs — every other table is left exactly as written and reads the real one, so the run refuses it (`transform-test.unremapped-reference`) rather than letting a test touch production. The gate's `dup_key`, `null_required`, and `non_negative` branches wrapped so only violations return, or a rule stated as its violation: `SELECT * FROM analytics.mart_billing_fct_customer_month m WHERE m.state = 'churned' AND m.prior_mrr_usd = 0`.
-- Names are unique within a test, case-sensitively, and name the rule, not the mechanism: `gap of exactly 1 month is retained`, `annual invoice spreads into 12 equal rows`.
+- `equals`: exactly the declared rows over the declared columns, as a multiset. Name the key and the columns the rule decides; leave volatile columns out. Only `format: "rows"` runs; `format: "sql"` on `equals` saves but is refused at run (`unsupported-format`).
+- `empty`: a query that must return nothing, naming only the target and declared inputs (anything else reads the real table and is refused: `unremapped-reference`). Open its SQL with a `--` line naming the invariant and what it catches.
+- Names state the rule: `lapse at the grace window stays retained`. A failure leads with the name.
+- Never author an expectation you expect to fire. A tolerated oddity is a row in the `equals`, noted in the build list with its real-data count.
 
-Finished example, the test for a customer-month model under the gap rule (D7):
+Shape, for a customer-month movements model:
 
 ```json
-{ "transform_id": 41, "name": "mart_billing_fct_customer_month: retention states",
-  "description": "Cases: customer 1 new, retained, churned after a one-month gap, reactivation; customer 2 active through the last complete period, exit row in the partial period.",
-  "inputs": [
-    { "table": { "schema": "analytics", "name": "cfg_billing" }, "format": "rows",
-      "columns": [ { "name": "gap_months", "cast_type": "INTEGER" }, { "name": "last_complete_period", "cast_type": "DATE" }, { "name": "cap_period", "cast_type": "DATE" } ],
-      "rows": [ { "gap_months": 1, "last_complete_period": "2026-07-01", "cap_period": "2026-08-01" } ] },
-    { "table": { "schema": "analytics", "name": "int_billing_invoice_line_spread" }, "format": "rows",
-      "columns": [ { "name": "customer_id", "cast_type": "INTEGER" }, { "name": "revenue_month", "cast_type": "DATE" }, { "name": "recognized_usd", "cast_type": "NUMERIC(12,2)" } ],
-      "rows": [ { "customer_id": 1, "revenue_month": "2026-05-01", "recognized_usd": 100 }, { "customer_id": 1, "revenue_month": "2026-06-01", "recognized_usd": 100 }, { "customer_id": 1, "revenue_month": "2026-08-01", "recognized_usd": 100 },
-                { "customer_id": 2, "revenue_month": "2026-06-01", "recognized_usd": 50 }, { "customer_id": 2, "revenue_month": "2026-07-01", "recognized_usd": 50 } ] } ],
-  "expectations": [
-    { "type": "equals", "name": "one state per case", "format": "rows",
-      "columns": [ { "name": "customer_id", "cast_type": "INTEGER" }, { "name": "period_month", "cast_type": "DATE" }, { "name": "state", "cast_type": "VARCHAR(32)" } ],
-      "rows": [ { "customer_id": 1, "period_month": "2026-05-01", "state": "new" }, { "customer_id": 1, "period_month": "2026-06-01", "state": "retained" }, { "customer_id": 1, "period_month": "2026-07-01", "state": "churned" }, { "customer_id": 1, "period_month": "2026-08-01", "state": "reactivation" },
-                { "customer_id": 2, "period_month": "2026-06-01", "state": "new" }, { "customer_id": 2, "period_month": "2026-07-01", "state": "retained" }, { "customer_id": 2, "period_month": "2026-08-01", "state": "churned" } ] },
-    { "type": "empty", "name": "churn only follows a positive month",
-      "sql": "SELECT m.customer_id, m.period_month FROM analytics.mart_billing_fct_customer_month m WHERE m.state = 'churned' AND m.prior_mrr_usd = 0" } ] }
+{"transform_id": <transform-id>, "name": "customer_months: movement states",
+ "description": "Cases: customer 1 new, expansion, churn after a zero month, reactivation; customer 2 new, retained, exit row after its last month.",
+ "inputs": [
+  {"table": {"schema": "<out_schema>", "name": "cfg_billing"}, "format": "rows",
+   "columns": [{"name": "grace_days", "cast_type": "INTEGER"}], "rows": [{"grace_days": 0}]},
+  {"table": {"schema": "<out_schema>", "name": "int_billing__customer_revenue_months"}, "format": "rows",
+   "columns": [{"name": "customer_id", "cast_type": "INTEGER"}, {"name": "revenue_month", "cast_type": "DATE"}, {"name": "mrr_usd", "cast_type": "NUMERIC(12,2)"}],
+   "rows": [{"customer_id": 1, "revenue_month": "2026-05-01", "mrr_usd": 100}, {"customer_id": 1, "revenue_month": "2026-06-01", "mrr_usd": 150}, {"customer_id": 1, "revenue_month": "2026-08-01", "mrr_usd": 100},
+            {"customer_id": 2, "revenue_month": "2026-06-01", "mrr_usd": 50}, {"customer_id": 2, "revenue_month": "2026-07-01", "mrr_usd": 50}]}],
+ "expectations": [
+  {"type": "equals", "name": "one movement per customer-month", "format": "rows",
+   "columns": [{"name": "customer_id", "cast_type": "INTEGER"}, {"name": "month", "cast_type": "DATE"}, {"name": "movement", "cast_type": "VARCHAR(32)"}],
+   "rows": [{"customer_id": 1, "month": "2026-05-01", "movement": "new"}, {"customer_id": 1, "month": "2026-06-01", "movement": "expansion"}, {"customer_id": 1, "month": "2026-07-01", "movement": "churned"}, {"customer_id": 1, "month": "2026-08-01", "movement": "reactivation"},
+            {"customer_id": 2, "month": "2026-06-01", "movement": "new"}, {"customer_id": 2, "month": "2026-07-01", "movement": "retained"}, {"customer_id": 2, "month": "2026-08-01", "movement": "churned"}]},
+  {"type": "empty", "name": "churn only follows a positive month",
+   "sql": "-- a churned month with no prior revenue is a phantom exit\nSELECT m.customer_id FROM <out_schema>.customer_months m WHERE m.movement = 'churned' AND m.prior_mrr_usd = 0"}]}
 ```
 
-The body is closed: `transform_id`, `name`, `description`, `inputs`, `expectations`, nothing else; `update` replaces `inputs` and `expectations` whole, and re-validates the whole test against the transform. Strip `id`, `entity_id`, `creator_id`, `created_at`, and `updated_at` from a `get --full` body before sending it back. Commands, the run report keys, and the `get --full` round-trip: `mb skills path transform`, Read "Transform tests".
+The body is closed (`transform_id`, `name`, `description`, `inputs`, `expectations`); `update` replaces inputs and expectations whole and re-validates; strip `id`, `entity_id`, `creator_id`, `created_at`, `updated_at` from a `get --full` body before sending it back.
 
 ## Cadence
 
-- Write the tests after `transform create` and before the first `transform run --sync`; `transform-test create` already refuses a test whose inputs do not match what the SQL reads, so a clean create means the declaration is right and only the rules are still in question. A red expectation is fixed in the SQL file, patched, re-run; the model materialises only on green. Record the count and the result in the Models row `tests` column ([state.md](state.md)).
-- After every source patch, the model's tests run before its gate. After a change to `cfg_<domain>`, every test in the domain's job runs (`mb transform-test list --transform <id>` per Models row).
-- Changing a deployed model starts by running its tests as they stand. A new case: add the expectation, see it fail, fix, see it pass. A changed rule: the expectation's old and new rows are the change, shown in the hand-back and updated in the same patch, never deleted. A test that has to be deleted for a change to pass is a `[CHECKPOINT]`.
-- Renaming or dropping a source table breaks the input declaration, so `update` on the test comes in the same patch as the SQL: a stale input is an `unused-inputs` refusal, not a silent pass.
-- In staging, tests export with their transforms on the job branch; the hand-back names them so the reviewer runs them before importing. In production, a red test never materialises.
+- Write tests after `transform create`, before the first run; a clean `create` proves the input declaration. Red is fixed in the SQL, never in the test; the model runs into its table only on green. Record the count in the build list.
+- After every source patch, the model's tests run before its gate; after a `cfg_<domain>` change, the tests of every model reading it.
+- Changing a deployed model starts by running its tests as they stand. A new case: add it, see it fail, fix, see it pass. A changed rule: the expectation's old and new rows are the change, shown in the hand-back, never deleted; a test that must be deleted is a stop. A renamed or dropped source table means the test's `update` ships in the same patch.
+- Once per new test, prove it has teeth: corrupt one expected cell, run, see `cell-mismatches` name that column, revert (every `empty` passes on an empty output).
+- On staging, tests export with their transforms; the hand-back names them for the reviewer.
 
-## Reading a failure
+## Reading a result
 
-Separate the three outcomes; they mean different things and only one of them is a bug in the model.
+**A refusal** (`transform-test.<code>`; switch on the code): `400` is the test's authoring: `missing-inputs`, `unused-inputs`, `duplicate-input-table`, `unremapped-reference` (alias and qualify), `unparseable-source`, `unknown-column`, `ambiguous-column`. `422` means the run cannot happen here: `unsupported-transform` (Python), `unsupported-driver`, `transform-failed` (fix the SQL, not the test), `setup-failed` (usually a `cast_type`). `501`: `unsupported-format`.
 
-**A refusal** — `create`, `update`, or `run` returns a non-2xx with an `error-code` of the form `transform-test.<name>`. Switch on the code, not the prose. `400` is the test's own authoring: `missing-inputs` (a table the SQL reads with no input), `unused-inputs` (an input for a table it never reads), `duplicate-input-table` (two inputs a reference cannot tell apart — the same table twice, or once bare and once in the default schema; names are compared case-agnostically), `unremapped-reference` (a real table or a dangling table-name qualifier survived the rewrite, in the transform or in a named expectation — alias and qualify by the alias), `unparseable-source`, `unknown-column` and `ambiguous-column` (an `equals` naming a column the output does not have, or one that matches several case aside). `422` means the test is fine and the run cannot happen here: `unsupported-transform` (a Python transform), `unsupported-driver` (Snowflake, BigQuery, anything else without the feature), `transform-failed` (the transform itself would not run on the fixture — fix the SQL, not the test), `setup-failed` (an input could not be materialized, usually a `cast_type` the engine rejects). `501` is `unsupported-format`, today only `equals` with `format: "sql"`.
+**A run that happened** (`run` exits non-zero unless passed; report `{status, expectations, tables}`):
 
-**A run that happened** — `200`, and `run` exits non-zero unless it passed. The report is `{status, expectations, tables}`, `status` one of `passed` or `failed`, and `tables` mapping each temp table to the table it stood in for. Every expectation reports `{name, type, status}`; table names in any message are rewritten back to the names you wrote.
+- failed `equals`: `missing-rows`, `extra-rows`, `row-counts {actual, expected}`, and `cell-mismatches` (only when exactly one row is missing and one extra); `columns` gives each column's actual `database_type`, the cast target you should have written. Decimals come back as strings at the warehouse's scale (`"1.50"` vs `"1.5"` is scale, not value). `truncated` counts rows past the 50-row cap.
+- failed `empty`: `sample` holds violating rows. `status: "error"` on one expectation is its own SQL failing.
 
-- A failed `equals`: `missing-rows` the rule did not produce, `extra-rows` it should not have, `row-counts` as `{actual, expected}`, and `cell-mismatches` per column — filled only when exactly one row is missing and exactly one is extra, since any larger diff has no honest pairing. These keys are present on a pass too, empty; `columns` reports each declared column with the `database_type` the output actually has, which is how you learn the cast target you should have written. `truncated` counts rows the 50-row report cap dropped. A decimal comes back as a string at the scale the warehouse gave it, so `"1.50"` against `"1.5"` is a scale difference, not a value one.
-- A failed `empty`: `sample` holds the violating rows, `columns` describes them, `truncated` counts what the cap dropped.
-- `status: "error"` on one expectation is that expectation's own SQL failing; `error` is `{type, message}` and the others still report.
+```bash
+source ./.scratch/probe.sh
+mb transform-test run <test-id> --profile "$PROFILE" --json | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "row-counts", "missing-rows", "extra-rows", "cell-mismatches", sample, error}]}'
+```
 
-**A run that never came back** — runs are tracked, and one whose process stops heartbeating is reaped as `timeout` after five minutes. Re-run it; a repeat means the fixture is too large to be a test.
+**A run that never came back**: reaped as `timeout` after five minutes; re-run; a repeat means the fixture is too large.
 
-A fixture is edited only when it was wrong, and the hand-back says which; an expectation is never loosened to pass.
+Fixtures change only when they were wrong (said in the hand-back); expectations are never loosened. A test exposing a live bug is never softened: report the damage at fixture and warehouse scale ("908 of 2,050 orders dropped"), then fix, or hold the correct expectation and record the red with the minimal fix.
 
 ## When tests cannot run
 
-Three answers from the instance itself, not from its version string, send you here: `mb transform-test` is an unknown command and the CLI cannot be upgraded, a `402` says the token lacks `transforms-testing`, or a `422 transform-test.unsupported-driver` says the warehouse is one that cannot run tests (Snowflake and BigQuery today). Record `tests: unavailable` in STATE.md with which of the three it was, and prove each rule once through `q()`: the fixture as a `VALUES` CTE in place of the source in a copy of the model SQL, the expectation as a query over it, the result in the Models row `note`, the SQL kept in `./.scratch/<m>.test.sql` so it becomes the test once the block lifts. When transforms run in the company's own tool, the same cases go into that tool's test facility ([layering-and-naming.md](layering-and-naming.md), transformations that run outside Metabase).
+Establish availability by running the command, never from a version string (dev builds report tags the CLI cannot parse). If `mb transform-test --help` is unknown, or the CLI refuses a `cast_type` key, the installed release lacks it: `npm view @metabase/cli dist-tags` shows whether any published release ships it; offer to install that one only on the user's yes, and otherwise take the fallback. The warehouse matters too: Snowflake and BigQuery cannot run tests today (orient reads the engine), so say so at the proposal point. Fallback signals: no release with the command (or the user declines one), a `402` (the license lacks transform testing), or `422 unsupported-driver`. Record `tests: unavailable` with the signal and prove each rule once through `q()`: the fixture as a `VALUES` CTE in place of the source in a copy of the SQL, the expectation as a query over it, the result in the build list's note, the SQL kept in `./.scratch/<model>.test.sql` for later. Transforms run in the company's own tool put the same cases in its test facility.
