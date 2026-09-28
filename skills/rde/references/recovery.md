@@ -1,6 +1,6 @@
 # Recovery
 
-When something is not right: find the cause in one read-only pass, explain it plainly, fix what you may, and hand the rest to the user as an exact command. Never guess, never run a failing command a third time, and never touch credentials (`references/collaboration.md`, Files and credentials).
+When something is not right: find the cause in one read-only pass, explain it plainly, fix what you may, and hand the rest to the user as an exact command. Never guess, never run a failing command a third time, and never look for or reset a password (`references/collaboration.md`, Files and credentials).
 
 ## When it loads
 
@@ -45,7 +45,7 @@ For example: "Your `mb` is 0.2.1 from Homebrew, found before the 0.3.1 the insta
 
 ## 3. Causes and fixes
 
-Fixes follow `SKILL.md`, Which Metabase (login rules): unasked, the agent runs only the pass; every other fix it runs needs the user's yes through `AskUserQuestion`; the rest are handed over as the exact command for the user's own terminal. Headless: write the needed fix on the state file's `next:` line and stop.
+Fixes follow `SKILL.md`, Which Metabase (login rules): unasked, the agent runs only the pass (and `rde credentials` when the user asks for the login); every other fix it runs needs the user's yes through `AskUserQuestion`; the rest are handed over as the exact command for the user's own terminal. Headless: write the needed fix on the state file's `next:` line and stop.
 
 | Cause | Confirm from the pass | Fix, and who runs it |
 | --- | --- | --- |
@@ -53,6 +53,7 @@ Fixes follow `SKILL.md`, Which Metabase (login rules): unasked, the agent runs o
 | An old or shadowed `mb` | More than one `mb` on PATH with different versions, the first older than 0.3.0 or without `transform-test`; the doctor's `mb` row | Show both paths and versions. Propose the doctor's hint, or `npm i -g @metabase/cli@alpha-transform-tests` plus removing the old one with the package manager that owns its path; run on yes. The user edits PATH or shell files, never the agent; a new terminal and a restarted agent session pick up the change |
 | The installer's instance is stopped | `rde status --json` `health` is not `healthy`; the doctor's `health` row | Propose `rde start`; run on yes |
 | Its login fails | The instance is healthy, and its entry is missing or not `ok`; the doctor's `api-key` or `mb-profile` row | Propose `rde init --only api-key`; run on yes |
+| The user cannot sign in to Metabase in the browser | The state file's `url` is the Metabase they mean; for the installer's, `adminVariant` in `rde status --json` | Answer per `SKILL.md`, Which Metabase (the login question): the installer's instance, run `rde credentials` and reply with its URL, email, and password; a `prompted` admin or any other Metabase, the password is the user's own, and a forgotten one is reset by them or their Metabase admin, never by the agent |
 | Another Metabase's login fails | Its entry is `auth-failed` | The user runs `mb auth login --profile <name> --url <url>` in their own terminal; re-check with `mb auth list --json` when they say it is done |
 | `MB_PROFILE` points elsewhere | It names a Metabase other than the state file's, or than the one the user means | Say which host it points at. Offer to work in that one, or ask the user to unset it in their own terminal (and in their shell file if they export it there) and restart the agent session |
 | `MB_URL` or `MB_API_KEY` is set | Either line in the environment section | Every `mb` call goes to that URL or uses that key, whatever `--profile` says. Ask the user to unset them in their own terminal and restart the agent session |

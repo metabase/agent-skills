@@ -93,9 +93,9 @@ A job is done with three things: the recap in this shape; the domain Document (`
 
 ## Files and credentials
 
-Working files go in `./.scratch` (`mkdir -p` first, kept out of git per `references/state.md`), never a system temp directory; they are not a deliverable. Never paste credentials or warehouse passwords into chat; the user runs any storing command.
+Working files go in `./.scratch` (`mkdir -p` first, kept out of git per `references/state.md`), never a system temp directory; they are not a deliverable. Never paste an API key or a warehouse password into chat; the installer's admin login, when the user asks for it, is the one password given there. The user runs any storing command.
 
 - Never read files under `~/.rde`, and never edit `PATH` or shell files.
-- Never ask the user for a password or an API key, and never handle one.
-- Never run `rde credentials`. When the user needs the UI login for the installer's Metabase, tell them to run `rde credentials` in their own terminal.
-- Logging in and repairing a login follow `SKILL.md`, Which Metabase (login rules): the user's yes before any installer command beyond `rde status --json` and `rde doctor --json`.
+- Never ask the user for a password or an API key. Never write a password into `./.scratch`, the state file, a Document, or any Metabase object; never search files or repositories for one, and never reset one.
+- Asked how to log in, for the login, or for credentials: that is the browser sign-in to the Metabase in use, answered per `SKILL.md`, Which Metabase: `rde credentials` for the installer's instance, run then and only then, its URL, email, and password given in the reply; for any other Metabase, or a `prompted` admin, the password is the user's own.
+- Logging in and repairing a login follow `SKILL.md`, Which Metabase (login rules): the user's yes before any installer command beyond `rde status --json`, `rde doctor --json`, and `rde credentials` for the login question.

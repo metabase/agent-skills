@@ -31,7 +31,7 @@ Load one playbook, read what its `Read first` line names, and copy its `Order` l
 
 Record `profile`, `url`, and `chosen` in the state file at once, so the question is never asked again in this directory.
 
-Login rules. On its own the agent runs only `rde status --json` and `rde doctor --json` (read-only; the doctor's hints say what fails). Every other installer command waits for the user's yes through `AskUserQuestion`, except `rde credentials`, which it never runs:
+Login rules. On its own the agent runs only `rde status --json` and `rde doctor --json` (read-only; the doctor's hints say what fails). Every other installer command waits for the user's yes through `AskUserQuestion`, except `rde credentials`, which it runs only when the user asks for the login (below):
 
 - The installer's instance is not running: propose `rde start`.
 - Its entry is missing or not `ok` while the instance is healthy: propose `rde init --only api-key`, which makes a new API key from the installer's stored login and asks the user nothing.
@@ -39,7 +39,12 @@ Login rules. On its own the agent runs only `rde status --json` and `rde doctor 
 - Any other Metabase: the user runs `mb auth login --profile <name> --url <url>` in their own terminal; re-check with `mb auth list --json` when they say it is done.
 - Headless (`AskUserQuestion` unavailable): run none of these; write what is needed on the state file's `next:` line and stop.
 
-Credentials: never read files under `~/.rde`; never ask the user for a password or an API key, and never handle one; never run `rde credentials`; never edit `PATH` or shell files. When the user needs the UI login for the installer's instance, tell them to run `rde credentials` in their own terminal (the admin email alone is `adminEmail` in `rde status --json`, where the installer reports it).
+Asked how to log in, for the login, or for credentials: the user means signing in to the Metabase in use (the state file's; pick it first when there is none) in the browser, not `mb`'s login unless they say CLI or `mb`, and never another Metabase they did not name. Tell them which credentials to use:
+
+- The installer's instance: run `rde credentials` and reply with its URL, email, and password. When it says the password was never stored (a `prompted` admin), answer as for any other Metabase. When it prints only to a terminal (an older installer) or does not exist, give the URL and `adminEmail` from `rde status --json` and ask the user to run `rde credentials` in their own terminal.
+- Any other Metabase: say plainly that the password is the user's own and the agent does not have it, and name the account the agent works as when `mb auth list --json` shows it (`user.name`; an `apiKey` login is a key, not anyone's password).
+
+Credentials: never read files under `~/.rde`; never ask the user for a password or an API key; never write a password into `./.scratch`, the state file, a Document, or any Metabase object; never search files or repositories for a password, and never reset one; never edit `PATH` or shell files.
 
 ## Route, first match wins
 
@@ -73,7 +78,7 @@ The first pass delivers one headline number end to end (the one the user named f
 
 ## mb conventions
 
-- Every `mb` command takes `--profile <profile> --json`, placed after the full verb chain, with the state file's `profile` written literally (`--profile rde`), never through a shell variable: with several Metabases on the machine, a missing or empty `--profile` works in, or writes to, whatever `default` points at. One-line examples omit both, and code blocks show `<profile>`; write the real name. Parse JSON, never scrape. A list envelope is `{returned, offset, total, has_more, next_offset, data}`: page with `--offset <next_offset>` while `has_more`; narrow with `--fields`.
+- Every `mb` command takes `--profile <profile> --json`, placed after the full verb chain, with the state file's `profile` written literally (`--profile acme-prod`), never through a shell variable: with several Metabases on the machine, a missing or empty `--profile` works in, or writes to, whatever `default` points at. One-line examples omit both, and code blocks show `<profile>`; write the real name. Parse JSON, never scrape. A list envelope is `{returned, offset, total, has_more, next_offset, data}`: page with `--offset <next_offset>` while `has_more`; narrow with `--fields`.
 - Stop and load `references/recovery.md` before doing anything else when `mb` fails with an authentication, connection, unknown-command, or unknown-flag error; when the host in a link you are about to hand back differs from the state file's `url`; when a search for something you created in this session finds nothing; or when the same command has failed twice. Never run a failing command a third time.
 - Shell state does not survive between Bash calls: start every call that uses `$DB`, `q()`, or `src()` with `source ./.scratch/probe.sh` (`references/profiling.md`); its `mb` calls carry the name literally too.
 - Bodies are files in `./.scratch` written with quoted heredocs (`<<'SQL'`) and passed with `--file`; SQL is embedded with `jq --rawfile` so it stays formatted.
