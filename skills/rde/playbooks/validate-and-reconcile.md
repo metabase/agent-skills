@@ -1,10 +1,12 @@
 # Validate and reconcile
 
-Applies: a built number must be proven against something outside itself, or two numbers disagree. Produces a declared validation mode, a row-level comparison at the narrowest shared grain, a gap with a cause per bucket, a fix or a ceiling per cause, and standing controls.
+Applies: a built number must be proven against something outside itself, or two numbers disagree. Produces a declared validation mode, a row-level comparison at the narrowest shared grain, a gap with a cause per bucket, a fix or a ceiling per cause, and standing controls when the user asks for them.
 
 Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 reference, mode` `2 scope` `3 comparison` `4 buckets` `5.<rule> fix` `6 ceiling` `7 controls` `reply`.
 
-Read first: [`reconciliation.md`](../references/reconciliation.md), [`state.md`](../references/state.md), and the domain file STATE.md names.
+Read first: [`diagnose-number-disagreements.md`](../references/diagnose-number-disagreements.md), [`reconciliation.md`](../references/reconciliation.md), [`state.md`](../references/state.md), and the domain file STATE.md names.
+
+**Diagnostic first.** If the ask is only to explain or verify a disagreement (read-only), run [`diagnose-number-disagreements.md`](../references/diagnose-number-disagreements.md): resolve the definition, rebuild the target from the base ingested tables to isolate the faulty layer (ingestion vs transform vs query), attribute, reply. Stand up the comparison transform and the standing controls below only when the number must be reconciled on a cadence or a fix must ship — not to answer "why are these two different".
 
 ## Commands you will run
 
@@ -26,9 +28,9 @@ mb timeline-event create --body '{"name":"Churn gap 1 to 2 months","description"
 Bodies:
 
 ```json
-{"name":"DQ: customer_month failures","display":"table","collection_id":<dq collection id>,"visualization_settings":{},
- "dataset_query":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/native","native":"<the structural checks as one query, one row per failing check>"}]}}
-{"payload":{"card_id":<dq card id>,"send_condition":"has_result","send_once":false},
+{"name":"Control: billing freshness","display":"table","collection_id":<analytics collection id>,"visualization_settings":{},
+ "dataset_query":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/native","native":"<the control as one query that returns rows only on failure>"}]}}
+{"payload":{"card_id":<control card id>,"send_condition":"has_result","send_once":false},
  "subscriptions":[{"cron_schedule":"0 0 7 * * ? *"}],
  "handlers":[{"channel_type":"channel/email","recipients":[{"type":"notification-recipient/raw-value","details":{"value":"data@acme.example"}}]}]}
 ```
@@ -74,7 +76,7 @@ Reconciled to finance's MRR sheet, August 2026: build 412,300 vs reference 398,1
 
 ## Done when
 
-Every bucket has a cause or an explicit non-attribution; every fix is re-measured; the residual is named with its causes; the controls run unattended.
+Every bucket has a cause or an explicit non-attribution; every fix is re-measured; the residual is named with its causes; every control the user asked for runs unattended.
 
 ## Reply
 
