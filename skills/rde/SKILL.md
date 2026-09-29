@@ -35,6 +35,8 @@ Ask once, record in STATE.md as `environment`: **production** (one instance; the
 
 ## Route, first match wins
 
+An explicit ask for an app ("build me an app for X", "a data app", "add a page to my app") goes to the `rde-data-apps` skill before any route below; a dashboard is not an app.
+
 1. STATE.md exists: continue at its `stage`.
 2. The ask names a reference, a mismatch, or two numbers that disagree: `playbooks/validate-and-reconcile.md`.
 3. It names code, documents, a spreadsheet, or another tool's project as the source of rules: `playbooks/extract-business-logic.md`.
