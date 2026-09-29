@@ -55,10 +55,10 @@ Five parts, in this order, in every Reply:
 1. What you can now do, with a browser link.
 2. The headline numbers, each with its trust label.
 3. What I decided for you: reversible, one line each; tables, keys, tests, and checks only here, only when they changed a number.
-4. **What I need from you** — carried by `AskUserQuestion`, not prose, and limited to items that could not have been asked earlier: they need a person, another system, or a file you must produce. Two or three, recommendation first.
+4. **What I need from you** — carried by `AskUserQuestion`, not prose, and limited to items that could not have been asked earlier: they need a person, another system, or a file you must produce. Two or three, recommendation first. What to build next is never one of them: that is item 5.
 
    Test each item before it goes here: *when did I first know this?* If it could have been a two-option question at that moment, it belonged in a checkpoint then, and listing it here is the failure the hand-back exists to surface. Any item that sat unasked across more than one playbook step is reported with the step at which it was known.
-5. What comes next and roughly how long.
+5. What comes next and roughly how long, as a statement, never a question: the next STATE.md Questions row in the order the user gave, which the user redirects by exception.
 
 ## Trust labels and restatement
 
