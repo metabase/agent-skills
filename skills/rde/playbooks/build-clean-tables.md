@@ -31,7 +31,7 @@ mb transform list --full | jq '[.data[] | select(.source.query.stages[0].native 
 
 ## 1. Pre-flight
 
-Read STATE.md; confirm its tables exist (`mb table list --db-id $DB --fields id,name,schema`). Pre-flight fails if the pre-create gate in `SKILL.md` has not returned; run it here when an earlier playbook did not. Smoke-test the write path: transform `_rde_smoke` (one literal row into `out_schema`), `run --sync`, `delete-table --yes`, `transform delete --yes`; a permission or missing-schema error is a `[CHECKPOINT]` for the admin.
+Read STATE.md; confirm its tables exist (`mb table list --db-id $DB --fields id,name,schema`). Pre-flight fails if the pre-create gate in `SKILL.md` has not returned; run it here when an earlier playbook did not. The first model's run proves the write path; a permission or missing-schema error there is a `[CHECKPOINT]` for the admin. Never create a transform or table only to delete it: `delete-table` drops through the read connection and fails on a database with separate write credentials, leaving the table behind.
 
 ## 2. Collections, tag, job, rows
 
