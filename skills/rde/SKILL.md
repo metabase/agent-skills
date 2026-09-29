@@ -32,7 +32,7 @@ Nothing is created in `out_schema` until this returns. If no answer arrives, 1â€
 
 ## Where the work lands
 
-Ask once, record in STATE.md as `environment`: **production** (one instance; the CLI writes what people see) or **staging** (a dev or staging instance whose changes reach production as a reviewed change through remote sync; `mb git-sync status --json` reports whether it is configured). In production: prove the write path with a throwaway transform before building, keep unfinished tables hidden from the picker and unfinished dashboards in a Drafts collection until they pass their gate, never overwrite a table or card people read. In staging: build freely, then export the work to a job branch with `mb git-sync export --branch <job-branch> -m "<what and why>"`, never to the main branch without confirmation, and hand back the branch for review; importing into production is the reviewer's step. Mechanics: `mb skills path git-sync`.
+Ask once, record in STATE.md as `environment`: **production** (one instance; the CLI writes what people see) or **staging** (a dev or staging instance whose changes reach production as a reviewed change through remote sync; `mb git-sync status --json` reports whether it is configured). In production: keep unfinished tables hidden from the picker and unfinished dashboards in a Drafts collection until they pass their gate, never overwrite a table or card people read. In staging: build freely, then export the work to a job branch with `mb git-sync export --branch <job-branch> -m "<what and why>"`, never to the main branch without confirmation, and hand back the branch for review; importing into production is the reviewer's step. Mechanics: `mb skills path git-sync`.
 
 ## Route, first match wins
 
