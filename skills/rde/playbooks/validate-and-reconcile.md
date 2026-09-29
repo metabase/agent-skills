@@ -59,7 +59,7 @@ Per `reconciliation.md`: each item the sources cannot carry with its reason and 
 
 ## 7. Standing controls
 
-Freshness and structural checks by default, the rest on request (`reconciliation.md`). Each is a check card returning rows only on failure plus a `has_result` alert (channel first: `mb setting get 'email-configured?'`; test with `mb alert send <id>` to yourself; more in `mb skills path notification`, Read "Alerts"), or a scheduled transform-job (`mb skills path transform`, Read "Transform jobs (schedules)"); a snapshot is an append transform on the job (`entities-and-time.md`). Each control names a threshold and an owner.
+Only on request (`reconciliation.md`); structural checks are never among them, since transform tests pin those rules. Each is a check card returning rows only on failure plus a `has_result` alert (channel first: `mb setting get 'email-configured?'`; test with `mb alert send <id>` to yourself; more in `mb skills path notification`, Read "Alerts"), or a scheduled transform-job (`mb skills path transform`, Read "Transform jobs (schedules)"); a snapshot is an append transform on the job (`entities-and-time.md`). Each control names a threshold and an owner.
 
 Finished example, the verdict and gap table:
 

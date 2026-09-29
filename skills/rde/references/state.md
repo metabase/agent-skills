@@ -14,7 +14,7 @@ engine: <from mb db get>
 raw_schema: raw_billing
 out_schema: analytics
 layers: stg, int, mart        # theirs, or the default
-collections: stg=41 int=42 mart=43 analytics=17 drafts=18 dq=19
+collections: stg=41 int=42 mart=43 analytics=17 drafts=18
 library: data=12 metrics=13   # or: unavailable
 tag: rde_billing=7  job: 4
 autonomy: balanced            # owner of definitions: the user, unless they name someone

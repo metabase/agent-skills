@@ -1,8 +1,8 @@
 # Build clean tables
 
-Applies: an approved inventory, or one model added later (skip to step 3, add its Models row, tag it into the job), or one case a transform gets wrong (steps 4 and 5 on that model). Produces transforms, their rules pinned by transform tests, gated, hidden until final, scheduled, with a standing check alert.
+Applies: an approved inventory, or one model added later (skip to step 3, add its Models row, tag it into the job), or one case a transform gets wrong (steps 4 and 5 on that model). Produces transforms, their rules pinned by transform tests, gated, hidden until final, scheduled.
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 pre-flight` `2 collections, tag, job` `3.<model> build` `4.<model> test` `5.<model> gate` `6.<table> metadata` `7 job, alert` `8 change` `reply`.
+Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 pre-flight` `2 collections, tag, job` `3.<model> build` `4.<model> test` `5.<model> gate` `6.<table> metadata` `7 job` `8 change` `reply`.
 
 Read first: [`layering-and-naming.md`](../references/layering-and-naming.md), [`transform-tests.md`](../references/transform-tests.md), [`data-quality-checks.md`](../references/data-quality-checks.md), and the domain file STATE.md names.
 
@@ -55,9 +55,9 @@ The eight checks as one query per `data-quality-checks.md`, at its cadence. A FA
 
 Per table, unhide it (`"visibility_type":null`), then in the order `semantic-layer-design.md` gives, bodies in [`build-semantic-layer.md`](build-semantic-layer.md). Under time pressure stop after keys, foreign keys, currency, and hidden plumbing, and say what remains.
 
-## 7. Schedule, run once, leave a check
+## 7. Schedule, run once
 
-`mb transform-job transforms $JOB` lists every model; `mb transform-job run $JOB`, then `mb transform runs` until none is `started`: every member `succeeded`. Per layer, the standing check card and its `has_result` alert (bodies in `data-quality-checks.md`, Checks that outlive the build).
+`mb transform-job transforms $JOB` lists every model; `mb transform-job run $JOB`, then `mb transform runs` until none is `started`: every member `succeeded`.
 
 ## 8. Change a deployed model
 
@@ -71,7 +71,7 @@ One row per customer per month (key: customer_id, period_month). Sources: int_bi
 
 ## Done when
 
-Every Models row has `transform_id`, `table_id`, rows, `tests` (a pass count, `none` with a reason, or `unavailable`), no FAIL; the job ran once, every member `succeeded`; plumbing hidden; metadata done or its stop stated; check card and alert exist; STATE.md `next` is empty.
+Every Models row has `transform_id`, `table_id`, rows, `tests` (a pass count, `none` with a reason, or `unavailable`), no FAIL; the job ran once, every member `succeeded`; plumbing hidden; metadata done or its stop stated; STATE.md `next` is empty.
 
 ## Reply
 

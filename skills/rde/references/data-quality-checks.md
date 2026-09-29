@@ -84,27 +84,6 @@ Report these as their own block. The first four are also transform-test expectat
 | Orphans | Unenforced foreign keys leave children with no parent | The foreign-key match-rate probe |
 | Non-customer rows | Test, staff-owned, demo, seeded catalogue rows | The identifier-domain probe; the exclusion rule in [state.md](state.md) |
 
-## Checks that outlive the build
+## After the build
 
-Per layer, save the structural checks as one native card in the data-quality collection that returns rows only on failure, and attach an alert that fires on any row, on the job's cadence. Hand back the card and the alert with the tables; fuller controls: [reconciliation.md](reconciliation.md).
-
-The card: the `dup_key`, `null_required`, `non_negative`, and `period_flag` branches of every model in the layer as integer counts, plus freshness per driving table, wrapped so only failures return:
-
-```sql
-SELECT k, n FROM (
-  SELECT '<model>|dup_key' AS k, count(*) AS n FROM (SELECT <key> FROM <model> GROUP BY 1 HAVING count(*) > 1) d
-  UNION ALL
-  SELECT '<model>|freshness', CASE WHEN current_date - cast(max(<loaded_at>) AS date) > <cadence_days> THEN 1 ELSE 0 END FROM <model>
-  UNION ALL ...
-) c WHERE n > 0
-```
-
-The alert, once `mb setting get 'email-configured?' --json` reports `true` (else stop: an admin configures it):
-
-```json
-{ "payload": { "card_id": <card-id>, "send_condition": "has_result", "send_once": false },
-  "subscriptions": [{ "cron_schedule": "0 0 7 * * ? *" }],
-  "handlers": [{ "channel_type": "channel/email", "recipients": [{ "type": "notification-recipient/raw-value", "details": { "value": "<owner email>" } }] }] }
-```
-
-`mb alert create --file ./.scratch/dq-alert.json --json`. The cron is seven-field Quartz in the instance's report timezone, set after the job's run; `mb alert send <id>` with yourself as the only recipient proves the channel, then add the owner by read-modify-write (`mb skills path notification`, the Updating section).
+Never save these checks as a card or attach an alert to them. The rules they cover are pinned by transform tests, which run before every patch; a check that needs real data after the build is a reconciliation control, built only on request ([validate-and-reconcile.md](../playbooks/validate-and-reconcile.md), step 7).
