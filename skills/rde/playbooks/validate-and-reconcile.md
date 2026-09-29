@@ -28,9 +28,9 @@ mb timeline-event create --body '{"name":"Churn gap 1 to 2 months","description"
 Bodies:
 
 ```json
-{"name":"Control: billing freshness","display":"table","collection_id":<analytics collection id>,"visualization_settings":{},
- "dataset_query":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/native","native":"<the control as one query that returns rows only on failure>"}]}}
-{"payload":{"card_id":<control card id>,"send_condition":"has_result","send_once":false},
+{"name":"DQ: customer_month failures","display":"table","collection_id":<dq collection id>,"visualization_settings":{},
+ "dataset_query":{"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/native","native":"<the structural checks as one query, one row per failing check>"}]}}
+{"payload":{"card_id":<dq card id>,"send_condition":"has_result","send_once":false},
  "subscriptions":[{"cron_schedule":"0 0 7 * * ? *"}],
  "handlers":[{"channel_type":"channel/email","recipients":[{"type":"notification-recipient/raw-value","details":{"value":"data@acme.example"}}]}]}
 ```
@@ -76,7 +76,7 @@ Reconciled to finance's MRR sheet, August 2026: build 412,300 vs reference 398,1
 
 ## Done when
 
-Every bucket has a cause or an explicit non-attribution; every fix is re-measured; the residual is named with its causes; every control the user asked for runs unattended.
+Every bucket has a cause or an explicit non-attribution; every fix is re-measured; the residual is named with its causes; the controls run unattended.
 
 ## Reply
 
