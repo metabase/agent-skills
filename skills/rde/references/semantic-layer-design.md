@@ -43,7 +43,7 @@ In STATE.md ([state.md](state.md)), one row per cluster with the columns there. 
 
 Canonical set: the home tables the Questions table names plus the entity tables they reach by foreign key; nothing atomic or intermediate. Ask for a yes on that list. Cascade guard: publishing cascades to upstream FK targets, so before `mb library publish --table-ids <ids>` every FK on a published table targets a final-layer table; a FK into staging publishes staging. Without the Library, `Definitions` is the canonical set.
 
-The Library is also what reaches git: measures and segments serialize only on Library-published tables in a synced Library collection, so a definition meant to be versioned, or read by a data app, is published there, not left on an unpublished table.
+When remote sync is configured, the Library is also what reaches git: measures and segments serialize only on Library-published tables in a synced Library collection, so a definition meant to be versioned, or read by a data app, is published there, not left on an unpublished table.
 
 ## Own, file, change, retire
 

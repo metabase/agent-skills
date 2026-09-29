@@ -72,7 +72,7 @@ The four checks under Verify before handing back in `semantic-layer-design.md`, 
 
 Canonical set and cascade guard per `semantic-layer-design.md`, Library. Publishing is irreversible, `[CHECKPOINT]`, never while a decision it reads is open. Metrics enter the Library by filing in its Metrics collection; no Library: a `Definitions` collection, stated. Changing a delivered definition: the flow in `semantic-layer-design.md`; timeline event body in [`validate-and-reconcile.md`](validate-and-reconcile.md). `owner_email` on every final-layer table and transform; every description ends with the owner; ask the user to mark canonical metrics verified in the UI (the CLI cannot).
 
-With remote sync configured, sync the canonical set once it is published: flag the Library's Data and Metrics collections (`mb git-sync add-collection <id>`) and export, each step confirmed first as `SKILL.md`'s "What belongs in git" says. A "not now" is recorded in STATE.md and named in the hand-back; a data app cannot be built on the set until it is synced.
+When STATE.md `remote_sync` is not `none`, sync the canonical set once it is published (with `none`, skip this paragraph and say nothing about syncing): flag the Library's Data and Metrics collections (`mb git-sync add-collection <id>`) and export, each step confirmed first as `SKILL.md`'s "What belongs in git" says. A "not now" is recorded in STATE.md and named in the hand-back; a data app cannot be built on the set until it is synced.
 
 ## Done when
 

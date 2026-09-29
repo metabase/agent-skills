@@ -19,6 +19,7 @@ library: data=12 metrics=13   # or: unavailable
 tag: rde_billing=7  job: 4
 autonomy: balanced            # owner of definitions: the user, unless they name someone
 environment: production       # or: staging, branch <name>
+remote_sync: none             # or: <branch>, read-write | read-only; from mb git-sync status; none means never raise syncing
 domain: subscription-revenue  # or none, or two when a table genuinely straddles domains
 stage: build-clean-tables
 next: model 8 of 15, blocked on D7

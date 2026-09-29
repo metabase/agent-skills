@@ -33,6 +33,9 @@ Never run `rde credentials --api-key` where its output comes back to you, and ne
 
 ## 4. The repository is the source of truth
 
+A data app exists only through remote sync, so here it is a requirement, not a suggestion: section 2 sets it up when it is missing, and that is the only place rde proposes remote sync unprompted, because the user asked for an app. Record it in STATE.md as `remote_sync`. Outside an app, the `rde` skill raises syncing only when remote sync is already configured.
+
+
 The bundle refers to Metabase objects by id and through the typed schema. An app built on content that lives only in the instance works there and nowhere else: importing the repository into another instance brings the app without the definitions it reads, and its queries fail. So everything the app reads is in the repository before the app is built, and everything the build creates goes there with the app.
 
 - **What the app may read.** Library-published tables with their field metadata, measures, and segments; metrics filed in the Library's Metrics collection; models whose actions the app runs, in a synced collection. Nothing else.
