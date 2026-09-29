@@ -69,11 +69,11 @@ Readers who do not open Metabase: a subscription on the cadence (channel configu
 
 ## 8. Final collection
 
-Move the dashboard after the pass; record it in the STATE.md Questions rows. Then `mb collection items <drafts>`: if a `Drafts` collection you created is empty, `mb collection archive <drafts>` and remove it from STATE.md `collections`; never leave an empty one behind.
+Move the dashboard after the pass and pin it to the top of its collection in the same call: `mb dashboard update <dash-id> --body '{"collection_id":<final collection id>,"collection_position":1}'`; the `How to use <area> numbers` document goes beside it at position 2 (`mb document update`). Record it in the STATE.md Questions rows. Then `mb collection items <drafts>`: if a `Drafts` collection you created is empty, `mb collection archive <drafts>` and remove it from STATE.md `collections`; never leave an empty one behind.
 
 ## Done when
 
-Every card traces to a Questions row and composes a definition by id; text card, date filters, and definitions card are on the page; the plausibility pass is clean; every audience in the plan has its delivery; omissions written down.
+Every card traces to a Questions row and composes a definition by id; text card, date filters, and definitions card are on the page; the plausibility pass is clean; the dashboard is pinned in its final collection; every audience in the plan has its delivery; omissions written down.
 
 ## Reply
 
