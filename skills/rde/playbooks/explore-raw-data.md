@@ -28,7 +28,7 @@ With a loader: the user lands it untouched, then `sync-schema --wait`. Without o
 
 ## 2. Intake
 
-Ask in one message, in their words: the owner question from the contract; which questions this must answer, in the order they matter; whether a number you will build already exists somewhere, and its export at the finest grain; where the raw data sits if more than one database is visible. Documentation is welcome, never required; never an ERD. Each question goes verbatim into STATE.md Questions.
+Ask in one message, in their words: which questions this must answer, in the order they matter; whether a number you will build already exists somewhere, and its export at the finest grain; where the raw data sits if more than one database is visible. Documentation is welcome, never required; never an ERD. Each question goes verbatim into STATE.md Questions.
 
 ## 3. Discover once
 
@@ -48,7 +48,7 @@ Fill the grain-and-key inventory in `layering-and-naming.md` in the company's vo
 
 ## 7. Decision memo
 
-One memo in the contract's shape, grouped by who answers; ask for changes only. Print it as a numbered list, then ask item 4 of the pre-create gate in `SKILL.md` about it by number, and the turn ends there — step 8 begins in the response after the gate returns. Each item is a STATE.md Decisions row with `affects`: `open` until built on its default, then `PROVISIONAL`; an irreversible one is a `[CHECKPOINT]`.
+One memo in the contract's shape, grouped by who answers; ask for changes only. Print it as a numbered list, then ask item 3 of the pre-create gate in `SKILL.md` about it by number, and the turn ends there — step 8 begins in the response after the gate returns. Each item is a STATE.md Decisions row with `affects`: `open` until built on its default, then `PROVISIONAL`; an irreversible one is a `[CHECKPOINT]`.
 
 ## 8. First slice
 

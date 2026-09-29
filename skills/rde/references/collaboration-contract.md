@@ -2,9 +2,9 @@
 
 Read once per job; its outputs (owner, mode, decisions, the personal-data answer) live in STATE.md ([state.md](state.md)).
 
-## Owner, then mode
+## Mode
 
-Carried by item 1 of the pre-create gate in `SKILL.md` when STATE.md does not already record it: "Who signs off on what a number means (what counts as a customer, a donor, revenue)? I will batch definition questions to them and decide the rest, showing you what I decided." Default to Balanced. Move to Check with me when the user corrects two decisions in a row or asks to see everything; move to Just go when they say so. Record both in STATE.md; never re-ask.
+Never ask who owns definitions: the person in the session does, unless they name someone else, and the decision memo carries the definition questions themselves. Default to Balanced. Move to Check with me when the user corrects two decisions in a row or asks to see everything; move to Just go when they say so. Record both in STATE.md; never re-ask.
 
 ## Decide and show, or stop
 
@@ -36,7 +36,7 @@ Then map them onto the tool call. The question text is the context in one plain 
 
 ## The decision memo
 
-Before building, list the open decisions once, grouped by who can answer, each as: the question in one sentence, the default you will use and where it came from, what changes if it is wrong. Ask for changes only. Record each as a Decisions row. Print the memo in chat as a numbered list, one line per decision, in the response that asks item 4 of the pre-create gate in `SKILL.md`, immediately before the question; the question and its batch options refer to it by number. A batch option (accept all defaults / show the ones that move the headline most / review each) is only offered beneath a printed list. The first slice begins on whichever defaults the gate returns unchanged — never before it returns. An answered decision is never re-asked. An unanswered one proceeds as `PROVISIONAL`: named in the metric description and on the dashboard, and it blocks Library publishing and the `Reconciled` label. Never resolve a decision by inference from the data; never write a default as confirmed. More than three rows at `PROVISIONAL` at once is itself a stop: ask before building further, batched per the checkpoint rule. Six unanswered decisions shaping a number reported as reconciled is the failure this prevents.
+Before building, list the open decisions once, grouped by who can answer, each as: the question in one sentence, the default you will use and where it came from, what changes if it is wrong. Ask for changes only. Record each as a Decisions row. Print the memo in chat as a numbered list, one line per decision, in the response that asks item 3 of the pre-create gate in `SKILL.md`, immediately before the question; the question and its batch options refer to it by number. A batch option (accept all defaults / show the ones that move the headline most / review each) is only offered beneath a printed list. The first slice begins on whichever defaults the gate returns unchanged — never before it returns. An answered decision is never re-asked. An unanswered one proceeds as `PROVISIONAL`: named in the metric description and on the dashboard, and it blocks Library publishing and the `Reconciled` label. Never resolve a decision by inference from the data; never write a default as confirmed. More than three rows at `PROVISIONAL` at once is itself a stop: ask before building further, batched per the checkpoint rule. Six unanswered decisions shaping a number reported as reconciled is the failure this prevents.
 
 ## Zero-row tables and personal data
 

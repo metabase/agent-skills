@@ -17,7 +17,7 @@ layers: stg, int, mart        # theirs, or the default
 collections: stg=41 int=42 mart=43 analytics=17 drafts=18 dq=19
 library: data=12 metrics=13   # or: unavailable
 tag: rde_billing=7  job: 4
-autonomy: balanced            # owner of definitions: <who>
+autonomy: balanced            # owner of definitions: the user, unless they name someone
 environment: production       # or: staging, branch <name>
 domain: subscription-revenue  # or none, or two when a table genuinely straddles domains
 stage: build-clean-tables
@@ -52,7 +52,7 @@ Nothing is written twice. Deployed means: filed per the company's convention (or
 
 ## Resume
 
-`cat ./.scratch/STATE.md` first. If it exists: use its profile, ids, environment, and autonomy without asking; `mb transform list --fields id,name,description,target --json` confirms its models; continue at `stage` and `next`; copy the playbook checklist into TodoWrite, ticking done steps. If not, create it once the profile is known; the owner question fills `autonomy`.
+`cat ./.scratch/STATE.md` first. If it exists: use its profile, ids, environment, and autonomy without asking; `mb transform list --fields id,name,description,target --json` confirms its models; continue at `stage` and `next`; copy the playbook checklist into TodoWrite, ticking done steps. If not, create it once the profile is known, with `autonomy: balanced`.
 
 ## The probe helper
 
