@@ -40,7 +40,7 @@ Ask once, record in STATE.md as `environment`: **production** (one instance; the
 An explicit ask for an app ("build me an app for X", "a data app", "add a page to my app") goes to the `rde-data-apps` skill before any route below; a dashboard is not an app.
 
 1. STATE.md exists: continue at its `stage`.
-2. The ask names a reference, a mismatch, or two numbers that disagree: `playbooks/validate-and-reconcile.md`.
+2. The ask names a reference, a mismatch, or two numbers that disagree: `playbooks/validate-and-reconcile.md`; read-only ("why is X", "which is right", "is this number correct", no standing check asked) starts at its front end `references/diagnose-number-disagreements.md` — resolve the definition, rebuild from the base tables to isolate the layer, attribute — and stops there unless a fix or a recurring control is wanted.
 3. It names code, documents, a spreadsheet, or another tool's project as the source of rules: `playbooks/extract-business-logic.md`.
 4. It asks what one existing table or object is: no playbook. Read `mb table get <id> --include fields --json`, the transform's description, and `mb search "<name>" --json` for consumers; answer in plain language; offer to write the description into Metabase.
 5. It asks to change, add, or dispute a delivered definition or number: the change flow below.
