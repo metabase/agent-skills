@@ -49,7 +49,7 @@ Ask once, record in STATE.md as `environment`: **production** (one instance; the
 
 ## Thin slice first
 
-The first pass of any pipeline delivers one headline number end to end: the number the user named first, through explore, build, define, and chart for only the tables it touches, reconciled to any reference the user already quotes, handed back in the first session labelled `Draft`. Widen to the next number only after that hand-back. Scope from the questions backward: a table on no path from a named question to a number is listed with its row count and left raw, not profiled, staged, or checkpointed.
+The first pass of any pipeline delivers one headline number end to end: the number the user named first, through explore, build, define, and chart for only the tables it touches, reconciled to any reference the user already quotes, handed back in the first session labelled `Draft`. Widen to the next number only after that hand-back, and without asking which: take the next STATE.md Questions row in the order the user gave (the recommended one when they gave none), name it in the hand-back's "What comes next", and let the user redirect by exception. Scope from the questions backward: a table on no path from a named question to a number is listed with its row count and left raw, not profiled, staged, or checkpointed.
 
 ## Change a delivered definition
 
