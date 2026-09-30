@@ -54,13 +54,13 @@ One memo in the contract's shape, grouped by who answers; ask for changes only. 
 
 Take the first question, its tables only, through [`build-clean-tables.md`](build-clean-tables.md) on the defaults, labelled Draft; widen after the hand-back.
 
-Finished example, a checkpoint with counts, as the `AskUserQuestion` it becomes (nothing printed before it but the finding in prose):
+Finished example, a checkpoint led by one record, as the `AskUserQuestion` it becomes (nothing printed before it but the finding in prose):
 
 ```
-question: 214 of 3,912 cancelled subscriptions (5.5%) have a cancellation date earlier than their end date, by a median of 31 days. Which date should end a subscription for churn?
+question: Subscription sub_4471 was cancelled on 30 July but paid through 31 August. 214 of 3,912 cancelled subscriptions (5.5%) look like it, a median of 31 days apart. Does sub_4471 count as churned in August or in July?
 options:
-  - End date (Recommended): churn lands the month service stops; the billing system bills to it and finance's sheet matches.
-  - Cancellation date: churn a month earlier for 209 accounts; August churn 41 becomes 48.
+  - August, when service stops (Recommended): the billing system bills to 31 August and finance's sheet counts it there.
+  - July, when they cancelled: 209 accounts churn a month earlier; August churn 41 becomes 48.
 ```
 
 ## Done when
