@@ -69,9 +69,14 @@ Written once, sourced every session (`DB`, `PROFILE` from STATE.md):
 
 ```bash
 cat > ./.scratch/probe.sh <<'SH'
-q() { jq -n --arg q "$1" --argjson db "$DB" '{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$q}]}' | mb query --file - --profile "$PROFILE" --json | jq -c '{status, error, cols: [.data.cols[]?.name], rows: .data.rows}'; }
+q() { jq -n --arg q "$1" --argjson db "$DB" '{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$q}]}' \
+  | mb query --file - --profile "$PROFILE" --json --max-bytes 0 2>&1 \
+  | grep -v 'Could not parse the Metabase version' \
+  | jq -cR '(fromjson? // {ok: false, error: {message: .}})
+           | if .ok == false then {status: "failed", error: .error.message}
+             else {status, error, cols: [.data.cols[]?.name], rows: .data.rows} end'; }
 SH
 source ./.scratch/probe.sh
 ```
 
-`q "SELECT count(*) FROM raw.orders"` is one call. Pass: `status == "completed"`; else read `error`, or stderr when output is empty.
+`q "SELECT count(*) FROM raw.orders"` is one call. Pass: `status == "completed"`; else read `error`. A warehouse SQL error, an unreachable instance, and a bad profile or database id all reach `mb` as `{"ok": false, "error": {...}}` on stderr with empty stdout; `q` merges stderr and returns each as `status: "failed"`, and any other stray stderr line as its own `failed` line. Never add `2>/dev/null` to `q` or `mb query`: the only noise, the head-build version warning, is already dropped, and silencing stderr loses the error. `--max-bytes 0` lifts the CLI's 24 KB output cap; the instance's row limits still apply ([profiling-catalog.md](profiling-catalog.md)).
