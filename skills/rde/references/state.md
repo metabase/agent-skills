@@ -6,8 +6,9 @@ Every playbook reads and writes here.
 
 `./.scratch/STATE.md`, this schema:
 
-```markdown
+````markdown
 # STATE
+```yaml
 profile: prod
 db_id: 3
 engine: <from mb db get>
@@ -24,20 +25,27 @@ domain: subscription-revenue  # or none, or two when a table genuinely straddles
 stage: build-clean-tables
 next: model 8 of 15, blocked on D7
 last_complete_period: 2026-08 # max(event_at)=09-11, ratio 0.31
+```
 
 ## Models
 | model | transform_id | table_id | rows | tests | gate | note |
+|---|---|---|---|---|---|---|
 
 ## Decisions
 | id | decision | answer | readings | by | date | status | affects |
+|---|---|---|---|---|---|---|---|
 | D7 | churn gap, months | 1 | 1: 41 churned; 2: 48 (+17%, of 284 Aug churn) | CEO | | PROVISIONAL | churn metric |
 
 ## Questions
 | question (verbatim) | metric | home table, time column | definitional filter | breakouts (own, or FK to entity.column) | exists or build | status |
+|---|---|---|---|---|---|---|
 
 ## Checks
 | model | dup_key | null_required | cast | rows | grain | non_negative | period_flag | enum |
-```
+|---|---|---|---|---|---|---|---|---|
+````
+
+The header stays inside its `yaml` fence. Every table keeps its `|---|` delimiter row; append rows below it.
 
 Status: `open`, `PROVISIONAL` (default in use), `decided`. Record each the moment it is known. `readings` carries both measured figures and the gap for a decision on a column traced to a headline number, `n/a` otherwise ([collaboration-contract.md](collaboration-contract.md)).
 
