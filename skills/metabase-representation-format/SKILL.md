@@ -1,6 +1,6 @@
 ---
 name: metabase-representation-format
-description: Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms). Use when the user needs to create, edit, understand, or validate Metabase representation YAML files, or when working with Metabase serialization/deserialization (serdes). Covers entity schemas, MBQL and native queries, visualization settings, parameters, and folder structure.
+description: Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms, actions, and data apps' resources). Use when the user needs to create, edit, understand, or validate Metabase representation YAML files, or when working with Metabase serialization/deserialization (serdes). Covers entity schemas, MBQL and native queries, visualization settings, parameters, and folder structure.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -13,7 +13,7 @@ The format is defined by a spec bundled alongside this file as `spec.md` (upstre
 
 ## Entities
 
-The format defines 11 entity types.
+The format defines 13 entity types.
 
 | Entity | SerDes Model | Description |
 |--------|-------------|-------------|
@@ -28,6 +28,8 @@ The format defines 11 entity types.
 | **TransformTag** | `TransformTag` | Label for categorizing transforms. Built-in types: `"hourly"`, `"daily"`, `"weekly"`, `"monthly"`, or `null` for custom. |
 | **TransformJob** | `TransformJob` | Scheduled job (cron) that executes transforms matching specific tags. |
 | **PythonLibrary** | `PythonLibrary` | Shared Python source file available to Python-based transforms. |
+| **Action** | `Action` | Writes to a database through a model: **implicit** (creates, updates, or deletes a row of the model's table), **query** (native SQL), or **HTTP** (calls a URL). Attached to its model via `model_id`; exactly one of `implicit`, `query`, `http` holds the definition its `type` names. |
+| **Data App** | — | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (no `serdes/meta`; the directory names the app), a built bundle, and a `resources/` directory of the Collection, Cards, and Actions it owns. |
 
 ## Ownership and hierarchy
 
@@ -49,6 +51,8 @@ Metabase only imports YAML from these top-level directories; anything outside is
 - `databases/` — **only** the `segments/` and `measures/` subdirectories under each table are imported.
 - `python_libraries/` (also accepted as `python-libraries/`).
 - `transforms/` — contains `transform_jobs/` and `transform_tags/`.
+- `actions/` — actions.
+- `data_apps/<slug>/resources/` — a data app's resources: its collection (`collection.yaml`), cards (`cards/`), and actions (`actions/`). Loaded when Metabase pulls the repository through git sync, together with the app's `data_app.yaml`.
 
 ## `serdes/meta`
 
@@ -67,7 +71,7 @@ serdes/meta:
 
 This skill ships with a local snapshot of the spec as `spec.md` alongside `SKILL.md`.
 
-Beyond the per-entity shapes summarized in this SKILL, `spec.md` also covers: MBQL query form (stages, field references, joins, expressions, aggregations, filter/expression operators, temporal bucketing, binning), native queries and template tags (`text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`), visualization settings, click behavior, and dashboard/card parameters. Reach for `spec.md` whenever edits touch any of those.
+Beyond the per-entity shapes summarized in this SKILL, `spec.md` also covers: MBQL query form (stages, field references, joins, expressions, aggregations, filter/expression operators, temporal bucketing, binning), native queries and template tags (`text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`), visualization settings, click behavior, dashboard/card parameters, and the data app layout (`data_app.yaml` and `resources/`). Reach for `spec.md` whenever edits touch any of those.
 
 **Read on demand, not eagerly.** Open `spec.md` only when you are about to read or modify content files for the entities listed above — e.g. the user asks to edit a card, add a dashcard, tweak a transform, or similar work that implies YAML edits. Do not open it at session start or for tasks unrelated to representation YAML.
 

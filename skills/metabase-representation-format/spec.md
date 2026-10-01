@@ -19,12 +19,14 @@ This specification covers user-created content entities. Database metadata entit
 7. [Parameter](#parameter)
 8. [Collection](#collection)
 9. [Card](#card)
-10. [Dashboard](#dashboard)
-11. [Document](#document)
-12. [Segment](#segment)
-13. [Measure](#measure)
-14. [Snippet](#snippet)
-15. [Transform](#transform)
+10. [Action](#action)
+11. [Dashboard](#dashboard)
+12. [Document](#document)
+13. [Segment](#segment)
+14. [Measure](#measure)
+15. [Snippet](#snippet)
+16. [Transform](#transform)
+17. [Data App](#data-app)
 
 ---
 
@@ -85,13 +87,20 @@ serdes/meta:
 
 **Important:** Metabase ignores directory structure when importing — all collection relationships are determined solely by each entity's `collection_id` field. The layout below is how Metabase represents user content when exporting; it mirrors the collection hierarchy on disk for readability, but only `collection_id` is authoritative.
 
-Metabase only checks for importable YAML files in these top-level directories: `collections/`, `databases/` (only `segments/` and `measures/` subdirectories), `python_libraries/` (also accepted as `python-libraries/`), and `transforms/`. Files outside these directories are ignored during import.
+Metabase only checks for importable YAML files in these top-level directories: `actions/`, `collections/`, `databases/` (only `segments/` and `measures/` subdirectories), `python_libraries/` (also accepted as `python-libraries/`), and `transforms/`, plus each data app's `data_apps/<slug>/resources/`. Files outside these directories are ignored during import.
 
 Collections are organized by namespace. The `main` namespace holds regular content (cards, dashboards, etc.), `snippets` holds SQL snippet collections, and `transforms` holds transform entities. Subcollections must set `parent_id` to the entity_id of their parent collection. All entity types within a collection are stored flat in the same folder — there are no `cards/`, `dashboards/` subdirectories.
 
 ```
 export-root/
 ├── settings.yaml
+├── actions/                                # Actions, each on a model card
+│   └── {slug}.yaml
+├── data_apps/                              # Data apps (see Data App)
+│   └── {app_slug}/
+│       ├── data_app.yaml                   # Manifest
+│       ├── dist/index.js                   # Built bundle, at the manifest's `path`
+│       └── resources/                      # The app's collection, cards, and actions
 ├── collections/
 │   ├── main/                               # Main namespace (regular content)
 │   │   ├── {slug}.yaml                     # Entities in root collection
@@ -1296,12 +1305,12 @@ database: Sample Database
 stages:
 - "lib/type": mbql.stage/native
   native: SELECT * FROM PRODUCTS
-  template-tags: {}
+  template-tags: []
 ```
 
 ### Template Tags
 
-Template tags are placeholders in native SQL queries (`{{tag_name}}`) that become interactive filters or dynamic references. They are defined in the `template-tags` map, where each key must match the tag's `name` property.
+Template tags are placeholders in native SQL queries (`{{tag_name}}`) that become interactive filters or dynamic references. They are defined in the `template-tags` list, where each tag's `name` must be unique within the list.
 
 #### Common Properties
 
@@ -1310,7 +1319,7 @@ All template tags share these properties:
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `type` | string | Yes | Tag type: `text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table` |
-| `name` | string | Yes | Tag name — must match the key in `template-tags` and the `{{name}}` in the SQL |
+| `name` | string | Yes | Tag name — must match the `{{name}}` in the SQL and be unique within `template-tags` |
 | `id` | string | Yes | UUID identifier |
 | `display-name` | string | Yes | Label shown in the UI |
 
@@ -1329,8 +1338,7 @@ A string variable. Metabase wraps the value in single quotes in the compiled SQL
 native:
   query: "SELECT * FROM PRODUCTS WHERE CATEGORY = {{category}}"
   template-tags:
-    category:
-      type: text
+    - type: text
       name: category
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Category
@@ -1355,8 +1363,7 @@ A numeric variable. The value is inserted as-is (no quoting).
 native:
   query: "SELECT * FROM PRODUCTS WHERE PRICE > {{min_price}}"
   template-tags:
-    min_price:
-      type: number
+    - type: number
       name: min_price
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Minimum Price
@@ -1380,8 +1387,7 @@ A date variable. The value is wrapped in single quotes.
 native:
   query: "SELECT * FROM ORDERS WHERE CREATED_AT > {{after_date}}"
   template-tags:
-    after_date:
-      type: date
+    - type: date
       name: after_date
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: After Date
@@ -1405,8 +1411,7 @@ A boolean variable. Metabase replaces the tag with `1 = 1` (true) or `1 <> 1` (f
 native:
   query: "SELECT * FROM PRODUCTS WHERE {{is_active}}"
   template-tags:
-    is_active:
-      type: boolean
+    - type: boolean
       name: is_active
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Is Active
@@ -1436,8 +1441,7 @@ When no value is provided, the entire `WHERE {{tag}}` clause is omitted (the que
 native:
   query: "SELECT * FROM PRODUCTS WHERE {{category_filter}}"
   template-tags:
-    category_filter:
-      type: dimension
+    - type: dimension
       name: category_filter
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Category
@@ -1474,8 +1478,7 @@ Without `alias` — Metabase uses the column name from `dimension` (`CREATED_AT`
 native:
   query: "SELECT {{created_at}} AS created_at, COUNT(*) FROM ORDERS GROUP BY {{created_at}}"
   template-tags:
-    created_at:
-      type: temporal-unit
+    - type: temporal-unit
       name: created_at
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Created At
@@ -1497,8 +1500,7 @@ With `alias` — when the query uses a table alias (`o`), set `alias` so the gen
 native:
   query: "SELECT {{created_at}} AS created_at, COUNT(*) FROM ORDERS o GROUP BY {{created_at}}"
   template-tags:
-    created_at:
-      type: temporal-unit
+    - type: temporal-unit
       name: created_at
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Created At
@@ -1531,8 +1533,7 @@ Note: `default` and `required` are not applicable for card tags.
 native:
   query: "SELECT * FROM {{#42-products_question}} WHERE PRICE > 50"
   template-tags:
-    "#42-products_question":
-      type: card
+    - type: card
       name: "#42-products_question"
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Products Question
@@ -1563,8 +1564,7 @@ Note: `default` and `required` are not applicable for snippet tags.
 native:
   query: "SELECT * FROM ORDERS WHERE {{snippet: Active Order Filter}}"
   template-tags:
-    "snippet: Active Order Filter":
-      type: snippet
+    - type: snippet
       name: "snippet: Active Order Filter"
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: "Snippet: Active Order Filter"
@@ -1593,8 +1593,7 @@ Reference a table dynamically. The user selects a table from a dropdown and Meta
 native:
   query: "SELECT * FROM {{source_table}}"
   template-tags:
-    source_table:
-      type: table
+    - type: table
       name: source_table
       id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
       display-name: Source Table
@@ -2316,6 +2315,131 @@ serdes/meta:
 
 ---
 
+## Action
+
+An action writes to a database through a model card. An **implicit** action creates, updates, or deletes a row of the model's table; a **query** action runs native SQL; an **HTTP** action calls a URL. Its permissions follow its model, so an action is always attached to one (`model_id`).
+
+Actions are stored under the top-level `actions/` directory. Exactly one of the nested `implicit`, `query`, and `http` arrays holds the action's definition, the one its `type` names; the other two are empty.
+
+### Schema
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Action name |
+| `entity_id` | string | Yes | NanoID identifier |
+| `type` | string | Yes | `"implicit"`, `"query"`, or `"http"` |
+| `model_id` | string | Yes | Card FK (entity_id) of the model the action belongs to |
+| `serdes/meta` | array | Yes | Identity path with `model: Action` |
+| `implicit` | array | No | `[{kind}]` when `type` is `implicit`, otherwise `[]`. `kind`: `row/create`, `row/update`, `row/delete`, `bulk/create`, `bulk/update`, `bulk/delete` |
+| `query` | array | No | `[{database_id, dataset_query}]` when `type` is `query`, otherwise `[]`. `database_id` is a Database FK; `dataset_query` is a [Native Query](#native-query) whose template tags the parameters target |
+| `http` | array | No | `[{template, response_handle, error_handle}]` when `type` is `http`, otherwise `[]` |
+| `parameters` | array | No | The action's inputs: `id`, `type`, and for a query action a `target` on one of its template tags (see [Parameter Targets](#parameter-targets)), plus optional `name`, `slug`, `required`. An implicit action's parameters are computed from the model's fields, so they are stored empty `[]` |
+| `parameter_mappings` | array | No | Unused, usually empty `[]` |
+| `visualization_settings` | map | No | The action's form (see below) |
+| `creator_id` | string | No | User FK (email) |
+| `description` | string | No | Description |
+| `archived` | boolean | No | Whether archived (default: `false`) |
+| `public_uuid` | string | No | Public sharing UUID |
+| `made_public_by_id` | string | No | User FK (email) |
+| `created_at` | string | No | ISO 8601 timestamp |
+
+### Form Settings
+
+`visualization_settings.fields` maps a parameter `id` to that field's settings in the action's form. Two of them change what executing the action accepts:
+
+| Setting | Effect |
+|---------|--------|
+| `hidden` | The field is not shown, and executing the action **rejects** a value for it |
+| `defaultValue` | Used when the action is executed without a value for the field |
+
+The rest (`title`, `description`, `placeholder`, `order`, `required`, `inputType`, `fieldType`, `valueOptions`, ...) only control how Metabase's own form shows the field. Settings left unset are omitted; an action whose form was never customized has no `visualization_settings`.
+
+### Example
+
+**Implicit action:**
+
+```yaml
+name: Create order
+entity_id: XgqYIEGPfvCklZUxOLp9m
+creator_id: admin@example.com
+type: implicit
+model_id: 4eroqa4ZYl4WkNjP8XTvu
+implicit:
+- kind: row/create
+query: []
+http: []
+parameters: []
+parameter_mappings: []
+visualization_settings:
+  fields:
+    DISCOUNT:
+      id: DISCOUNT
+      hidden: true
+    QUANTITY:
+      id: QUANTITY
+      defaultValue: 1
+serdes/meta:
+- id: XgqYIEGPfvCklZUxOLp9m
+  label: create_order
+  model: Action
+```
+
+**Query action:**
+
+```yaml
+name: Apply discount
+entity_id: NJksetfXk2oh530o3RD_5
+creator_id: admin@example.com
+type: query
+model_id: 4eroqa4ZYl4WkNjP8XTvu
+implicit: []
+query:
+- database_id: Sample Database
+  dataset_query:
+    "lib/type": mbql/query
+    database: Sample Database
+    stages:
+      - "lib/type": mbql.stage/native
+        native: "UPDATE ORDERS SET DISCOUNT = {{discount}} WHERE ID = {{order_id}}"
+        template-tags:
+          discount:
+            type: number
+            name: discount
+            id: 0b6f6e0a-5c2b-4c47-9a4e-4f3d2c1b0a99
+            display-name: Discount
+          order_id:
+            type: number
+            name: order_id
+            id: 7d2f1c3e-9b8a-4e6d-8c5b-1a2b3c4d5e6f
+            display-name: Order ID
+http: []
+parameters:
+- id: discount
+  name: Discount
+  slug: discount
+  type: number/=
+  target:
+  - variable
+  - - template-tag
+    - discount
+- id: order_id
+  name: Order ID
+  slug: order_id
+  type: number/=
+  required: true
+  target:
+  - variable
+  - - template-tag
+    - order_id
+parameter_mappings: []
+serdes/meta:
+- id: NJksetfXk2oh530o3RD_5
+  label: apply_discount
+  model: Action
+```
+
+---
+
 ## Dashboard
 
 A dashboard is a collection of cards arranged in a grid layout. Dashboards contain dashboard cards (`dashcards`), parameters for filtering, and optional tabs.
@@ -2960,6 +3084,152 @@ serdes/meta:
 - id: rT5vWxYz1aBcDeFgHiJkL
   label: product_summary
   model: Transform
+```
+
+---
+
+## Data App
+
+A data app is a custom React application that runs inside Metabase, reading and writing data through the content it ships with. It lives in its own directory, `data_apps/{app_slug}/`, and is loaded when Metabase pulls the repository through remote sync. Unlike the other entities, it is not a single YAML file: it is a manifest, a built JavaScript bundle, and a `resources/` directory of ordinary Collection, Card, and Action files that the app owns.
+
+### Directory Layout
+
+```
+data_apps/
+└── {app_slug}/
+    ├── data_app.yaml           # Manifest (see below)
+    ├── dist/index.js           # Built bundle, at the manifest's `path`
+    └── resources/
+        ├── collection.yaml     # The app's collection
+        ├── cards/
+        │   └── {slug}.yaml     # Saved questions, and copies of the models and metrics they use
+        └── actions/
+            └── {slug}.yaml     # Copies of the actions the app runs, on the copies of their models
+```
+
+`{app_slug}` — the directory's name — is the app's slug, used verbatim as its URL: lowercase letters and numbers separated by single dashes (`sales-dashboard`), and neither `repo-status` nor `sandbox-host`, which collide with Metabase's own routes.
+
+Files under `resources/` are recognized by their location: `collection.yaml`, `cards/*.yaml`, and `actions/*.yaml`. Anything else there (another file or directory, or a file in `cards/` or `actions/` that isn't `.yaml`) makes the pull refuse the app's resources; only dotfiles are skipped.
+
+### Manifest
+
+`data_app.yaml` describes the app. It has no `serdes/meta`: the app is identified by its directory.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Display name |
+| `path` | string | Yes | Path of the built bundle, relative to the app's directory (e.g., `./dist/index.js`). Must not contain `..` |
+| `collection` | string | Yes | Collection FK (entity_id) of the app's collection, the one `resources/collection.yaml` holds |
+| `version` | integer | No | The data app contract version the app was built for: a positive integer, `1` when absent. An app below the version the instance supports is marked outdated and not served |
+| `description` | string | No | One-line summary, at most 255 characters |
+| `allowed_hosts` | array | No | Origins the app may call with `fetch`/XHR: a scheme and host, with an optional `*.` subdomain wildcard and port, and no path (e.g., `https://api.example.com`, `https://*.internal.example.com`). Every other origin is blocked |
+
+### Resources
+
+The app's resources are what it reads and runs: a saved question for each query it makes, and copies of the models, metrics, and actions those use. They are copies because the app's viewers are granted access to the app's collection only, and an action's permissions follow its model's collection. Each file is an ordinary [Collection](#collection), [Card](#card), or [Action](#action), with these constraints:
+
+- **Every file** holds a single entity whose `serdes/meta` id is its `entity_id`, and no `entity_id` is defined by more than one file.
+- **`collection.yaml`** holds the collection the manifest names. It is a plain root collection: no `parent_id`, `namespace`, `type`, `authority_level`, or `personal_owner_id`, and not archived.
+- **Cards** have `collection_id` set to the app's collection, are a `question`, `model`, or `metric` with a `dataset_query`, and are not archived, not in a dashboard or document, and not public or embedded.
+- **Actions** are `implicit` or `query`, never `http`; their `model_id` is a model card in `resources/`; they carry exactly the one nested record their `type` uses; and they are not archived, not public, and take no parameter values from a card.
+- **References** outside `resources/` may point only at databases, tables, fields, snippets, segments, and measures, all of which must already exist on the instance. A card, collection, or dashboard outside the app cannot be referenced: a question or metric that reads another card must use the app's own copy of it.
+
+Metabase reloads the resources on every pull, so the repository owns them: a change made in Metabase to the app's collection, cards, or actions is put back, and a card or action whose file is removed is deleted. A pull that finds a resource breaking these rules refuses the app's resources and reports the file.
+
+### Example
+
+**`data_apps/order-desk/data_app.yaml`:**
+
+```yaml
+name: Order Desk
+description: Review orders and apply discounts
+version: 1
+path: ./dist/index.js
+collection: dApPcOlLeCtIoN0ExAmP1
+allowed_hosts:
+- https://api.example.com
+```
+
+**`resources/collection.yaml`:**
+
+```yaml
+name: "Data App: Order Desk"
+entity_id: dApPcOlLeCtIoN0ExAmP1
+serdes/meta:
+- id: dApPcOlLeCtIoN0ExAmP1
+  label: data_app_order_desk
+  model: Collection
+```
+
+**`resources/cards/open_orders.yaml`** — a saved question the app queries:
+
+```yaml
+name: Open orders
+entity_id: dApPqUeStIoN00ExAmP12
+collection_id: dApPcOlLeCtIoN0ExAmP1
+creator_id: admin@example.com
+type: question
+display: table
+dataset_query:
+  "lib/type": mbql/query
+  database: Sample Database
+  stages:
+  - "lib/type": mbql.stage/mbql
+    source-table:
+    - Sample Database
+    - PUBLIC
+    - ORDERS
+    limit: 100
+visualization_settings: {}
+serdes/meta:
+- id: dApPqUeStIoN00ExAmP12
+  label: open_orders
+  model: Card
+```
+
+**`resources/cards/orders_model.yaml`** — the app's copy of the model its action runs on:
+
+```yaml
+name: Orders model
+entity_id: dApPmOdElCoPy0ExAmP12
+collection_id: dApPcOlLeCtIoN0ExAmP1
+creator_id: admin@example.com
+type: model
+display: table
+dataset_query:
+  "lib/type": mbql/query
+  database: Sample Database
+  stages:
+  - "lib/type": mbql.stage/mbql
+    source-table:
+    - Sample Database
+    - PUBLIC
+    - ORDERS
+visualization_settings: {}
+serdes/meta:
+- id: dApPmOdElCoPy0ExAmP12
+  label: orders_model
+  model: Card
+```
+
+**`resources/actions/update_order.yaml`** — the app's copy of an action, on that model copy:
+
+```yaml
+name: Update order
+entity_id: dApPaCtIoNcOpYExAmP12
+creator_id: admin@example.com
+type: implicit
+model_id: dApPmOdElCoPy0ExAmP12
+implicit:
+- kind: row/update
+query: []
+http: []
+parameters: []
+parameter_mappings: []
+serdes/meta:
+- id: dApPaCtIoNcOpYExAmP12
+  label: update_order
+  model: Action
 ```
 
 ---
