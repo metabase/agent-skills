@@ -2,7 +2,7 @@
 
 Applies: final-layer tables exist with rows. Produces one starting object per table, the definitions with descriptions, verified, and the canonical set published or filed.
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 STATE.md` `2 starting objects` `3.<table> metadata` `4 Questions` `5 conformed dims` `6.<definition> define` `7 describe` `8 verify` `9 publish, owners` `reply`.
+Checklist: `1 STATE.md` `2 starting objects` `3.<table> metadata` `4 Questions` `5 conformed dims` `6.<definition> define` `7 describe` `8 verify` `9 publish, owners` `reply`.
 
 Read first: [`semantic-layer-design.md`](../references/semantic-layer-design.md), [`entities-and-time.md`](../references/entities-and-time.md), and the domain file STATE.md names.
 

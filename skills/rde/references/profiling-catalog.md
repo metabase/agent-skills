@@ -14,7 +14,7 @@ Read before any modeling decision: naming a grain, writing a cast, choosing a jo
 
 ## Tools and limits
 
-- Every probe runs through `q "<sql>"`, the helper in [state.md](state.md); it returns `status`, `error`, `cols`, and `rows`. Aggregate in the probe; never page rows through it.
+- Every probe runs through `./.scratch/q "<sql>"`, the helper in [state.md](state.md); it returns `status`, `error`, `cols`, and `rows`. Aggregate in the probe; never page rows through it.
 - Bare-row queries return at most 2000 rows and aggregated queries at most 10,000. Both are admin settings; `--max-bytes 0` does not lift them. For a full extract create a native card, run `mb card query <id> --export-format csv`, then archive the card.
 - `mb db get $DB --json` reports the engine. Write standard SQL and adapt to the warehouse dialect; on an engine that bills by scan, every probe carries a date predicate unless the decision needs the whole table.
 - Column list per table: `mb table get <table-id> --include fields --json`, or `information_schema.columns` filtered by schema. Distribution of one column: `mb field summary <field-id> --json`.

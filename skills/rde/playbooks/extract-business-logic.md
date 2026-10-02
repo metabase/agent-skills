@@ -2,13 +2,13 @@
 
 Applies: the rules exist in code, documents, another tool's project, a spreadsheet, or in definitions already in the instance. Produces either a mirror of the existing definitions (the light path) or a tagged reference plus a gap report per requested number (the migration path). No SQL is written.
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 path` `2 inventory` `3.<artifact> read` `4 tag` `5 live check` `6 gap report` `7 ratify` `reply`.
+Checklist: `1 path` `2 inventory` `3.<artifact> read` `4 tag` `5 live check` `6 gap report` `7 ratify` `reply`.
 
 Read first: [`extraction-and-gap-report.md`](../references/extraction-and-gap-report.md), [`profiling-catalog.md`](../references/profiling-catalog.md), and the domain file STATE.md names.
 
 ## Commands you will run
 
-Every line also takes `--profile $PROFILE --json`; `q()` is sourced from `./.scratch/probe.sh`.
+Every `mb` line also takes `--profile $PROFILE --json`; `./.scratch/q` is the probe from `references/state.md`.
 
 ```bash
 mb search "<number or term>" --models metric,measure,segment,card,dataset,transform --db-id $DB
@@ -16,7 +16,7 @@ mb card get <id> --fields name,description,dataset_query          # a definition
 mb transform list --fields id,name,description,target             # the five facts, if anyone wrote them
 mb table list --db-id $DB --fields id,name,schema                 # every cited table exists here, or it does not
 mb table get <table-id> --include fields
-q "SELECT <cited column>, count(*) AS n FROM <schema.table> GROUP BY 1 ORDER BY 2 DESC LIMIT 50"   # does the cited value still occur
+./.scratch/q "SELECT <cited column>, count(*) AS n FROM <schema.table> GROUP BY 1 ORDER BY 2 DESC LIMIT 50"   # does the cited value still occur
 ```
 
 ## 1. Pick the path

@@ -2,7 +2,7 @@
 
 Applies: raw data is synced into Metabase, or must be landed first, and nothing is modeled. Produces STATE.md with discovery and questions, a profile of every table on a named question's path, an inventory in the company's vocabulary, one decision memo, and the first slice started on defaults.
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 land` `2 intake` `3 discover` `4 helper, counts` `5.<table> profile` `6 inventory` `7 memo` `8 first slice` `reply`.
+Checklist: `1 land` `2 intake` `3 discover` `4 helper, counts` `5.<table> profile` `6 inventory` `7 memo` `8 first slice` `reply`.
 
 Read first: [`state.md`](../references/state.md), [`profiling-catalog.md`](../references/profiling-catalog.md), and the domain file STATE.md names.
 
@@ -16,9 +16,8 @@ mb db list --profile $PROFILE --json; mb db get $DB --include tables --profile $
 mb collection tree --profile $PROFILE --json; mb git-sync status --profile $PROFILE --json
 mb transform list --fields id,name,description,target --profile $PROFILE --json
 mb search --models dataset,metric,measure,segment --db-id $DB --limit 50 --profile $PROFILE --json
-source ./.scratch/probe.sh                        # q() written once from references/state.md; pass is .status == "completed"
 mb table list --db-id $DB --fields id,name,schema --profile $PROFILE --json | jq -r --arg q "'" '.data[] | "SELECT \($q)\(.schema).\(.name)\($q) AS t, count(*) AS n FROM \(.schema).\(.name)"' | sed '$!s/$/ UNION ALL/' > ./.scratch/counts.sql
-q "$(cat ./.scratch/counts.sql)"                  # all tables, one query
+./.scratch/q "$(cat ./.scratch/counts.sql)"       # all tables, one query; q: references/state.md, pass is .status == "completed"
 mb table get <table-id> --include fields --profile $PROFILE --json
 ```
 

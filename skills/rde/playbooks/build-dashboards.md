@@ -2,7 +2,7 @@
 
 Applies: the semantic layer exists and the user wants something to look at. Produces a content plan, a draft reviewed on screen, cards composing definitions by id, a plausibility pass, delivery per audience. No definitions yet: say so and offer [`build-semantic-layer.md`](build-semantic-layer.md).
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 STATE.md` `2 content plan` `3 draft` `4.<card> build` `5 page: text, filters, layout` `6 plausibility` `7 delivery` `8 final collection` `reply`.
+Checklist: `1 STATE.md` `2 content plan` `3 draft` `4.<card> build` `5 page: text, filters, layout` `6 plausibility` `7 delivery` `8 final collection` `reply`.
 
 Read first: [`dashboard-content-design.md`](../references/dashboard-content-design.md), [`state.md`](../references/state.md), and the domain file STATE.md names.
 

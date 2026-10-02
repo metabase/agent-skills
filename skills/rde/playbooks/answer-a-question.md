@@ -2,19 +2,19 @@
 
 Applies: the user wants a number or a finding, not a build ("how many", "which", "did it go up"). Produces the answer with its scope stated beside it, tagged `Official` or `Ad hoc`, three checks behind it, the next breakdown pre-empted, and an offer to save it.
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 scope` `2 find the definition` `3 probe` `4 compute` `5 three checks` `6 write` `7 deliver` `reply`.
+Checklist: `1 scope` `2 find the definition` `3 probe` `4 compute` `5 three checks` `6 write` `7 deliver` `reply`.
 
 Read first: [`state.md`](../references/state.md) and the domain file STATE.md names.
 
 ## Commands you will run
 
-Every line also takes `--profile $PROFILE --json`; `q()` is sourced from `./.scratch/probe.sh`.
+Every `mb` line also takes `--profile $PROFILE --json`; `./.scratch/q` is the probe from `references/state.md`.
 
 ```bash
 mb search "<the user's words>" --models metric,measure,segment,dataset --db-id $DB
 mb card get <id> --fields name,description,dataset_query          # what the definition already excludes
-q "SELECT count(*) AS n FROM <schema.table>"
-q "SELECT <column>, count(*) AS n FROM <schema.table> GROUP BY 1 ORDER BY 2 DESC LIMIT 50"
+./.scratch/q "SELECT count(*) AS n FROM <schema.table>"
+./.scratch/q "SELECT <column>, count(*) AS n FROM <schema.table> GROUP BY 1 ORDER BY 2 DESC LIMIT 50"
 cat > ./.scratch/a.json <<'JSON'
 {"lib/type":"mbql/query","database":<db-id>,"stages":[{"lib/type":"mbql.stage/mbql","source-table":<table-id>,
   "aggregation":[["metric",{},<metric-id>]],
@@ -22,7 +22,7 @@ cat > ./.scratch/a.json <<'JSON'
   "breakout":[["field",{},<breakout-field-id>]]}]}
 JSON
 mb query --file ./.scratch/a.json --dry-run; mb query --file ./.scratch/a.json --fields status,data.rows
-q "SELECT sum(n) FROM (<the breakdown query>) b"                  # reconstruction: breakdown sums to the total
+./.scratch/q "SELECT sum(n) FROM (<the breakdown query>) b"                  # reconstruction: breakdown sums to the total
 mb card create --file ./.scratch/saved.json                       # the offer to save, when accepted
 ```
 

@@ -2,7 +2,7 @@
 name: metabase-cli
 description: >
   Drive a Metabase instance from the terminal via the `mb` CLI: auth profiles, databases and schemas, schema sync and field-values rescan, tables, fields, cards (questions, models, metrics) run as JSON/CSV/XLSX, dashboards and dashcards, collections and their tree, snippets, segments, measures, transforms and transform-jobs, settings, search, git-sync. Use for any Metabase operation from the terminal: "log into metabase", "what profiles do I have", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "list collections", "what's in collection 4", "show the collection tree", "list snippets", "create a segment", "archive a measure", "search metabase for X", "import the latest changes", "add a directory to git sync", "set a setting", "what schemas are in this database", "trigger a sync", "rescan field values", or any `mb <verb>`. Whole data jobs go to `rde`.
-allowed-tools: Bash(mb:*), Read, Write, Edit, AskUserQuestion
+allowed-tools: Bash(mb:*), Read, Write, Edit
 ---
 
 # metabase-cli

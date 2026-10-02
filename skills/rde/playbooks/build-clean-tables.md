@@ -2,24 +2,22 @@
 
 Applies: an approved inventory, or one model added later (skip to step 3, add its Models row, tag it into the job), or one case a transform gets wrong (steps 4 and 5 on that model). Produces transforms, their rules pinned by transform tests, gated, hidden until final, scheduled.
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 pre-flight` `2 collections, tag, job` `3.<model> build` `4.<model> test` `5.<model> gate` `6.<table> metadata` `7 job` `8 change` `reply`.
+Checklist: `1 pre-flight` `2 collections, tag, job` `3.<model> build` `4.<model> test` `5.<model> gate` `6.<table> metadata` `7 job` `8 change` `reply`.
 
 Read first: [`layering-and-naming.md`](../references/layering-and-naming.md), [`transform-tests.md`](../references/transform-tests.md), [`data-quality-checks.md`](../references/data-quality-checks.md), and the domain file STATE.md names.
 
 ## Commands you will run
 
-Every line also takes `--profile $PROFILE --json`.
+Every `mb` line also takes `--profile $PROFILE --json`.
 
 ```bash
-source ./.scratch/probe.sh                                  # q(): references/state.md
 mb collection create --body '{"name":"stg_billing"}' --namespace transforms
 mb transform-tag create --body '{"name":"rde_billing"}'
 mb transform-job create --body '{"name":"rde_billing daily","schedule":"0 0 3 * * ?","tag_ids":['$TAG']}'
-q "SELECT * FROM (<model sql, slice predicate on>) t LIMIT 5" # pass: status completed
-src() { jq -n --rawfile s "$1" --argjson db $DB '{type:"query",query:{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$s}]}}'; }
-jq -n --argjson src "$(src ./.scratch/<m>.sql)" --rawfile d ./.scratch/<m>.desc --argjson db $DB '{name:"<m>",description:$d,collection_id:<layer-collection-id>,tag_ids:['$TAG'],source:$src,target:{type:"table",database:$db,schema:"<out_schema>",name:"<m>"}}' > ./.scratch/t.json
+./.scratch/q "SELECT * FROM (<model sql, slice predicate on>) t LIMIT 5" # q: references/state.md; pass: status completed
+jq -n --rawfile s ./.scratch/<m>.sql --rawfile d ./.scratch/<m>.desc --argjson db $DB '{name:"<m>",description:$d,collection_id:<layer-collection-id>,tag_ids:['$TAG'],source:{type:"query",query:{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$s}]}},target:{type:"table",database:$db,schema:"<out_schema>",name:"<m>"}}' > ./.scratch/t.json
 mb transform create --file ./.scratch/t.json | jq '{id,target}'
-jq -n --argjson src "$(src ./.scratch/<m>.sql)" '{source:$src}' > ./.scratch/patch.json
+jq -n --rawfile s ./.scratch/<m>.sql --argjson db $DB '{source:{type:"query",query:{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$s}]}}}' > ./.scratch/patch.json
 mb transform update <id> --file ./.scratch/patch.json       # source-only patch
 mb transform-test create --file ./.scratch/<m>.test.json | jq '{id,name}'   # body: references/transform-tests.md; v65+. Refuses a mis-declared input set here, before any run
 mb transform-test run <id> | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "row-counts", "missing-rows", "extra-rows", "cell-mismatches", sample, error}]}'   # exit 1 unless passed
@@ -39,13 +37,13 @@ Reuse what exists; else one collection per layer, one tag per chain, one job ove
 
 ## 3. Build loop, one model at a time
 
-SQL in `./.scratch/<m>.sql`; `<m>.desc` carries the five facts plus every constant per `layering-and-naming.md`, mirrored in the SQL header. Raw-table blocks: `staging-rules.md`; staging is a CTE unless shared or expensive. Validate on a slice (a bounded predicate on the driving table) through `q` until the shape and the step 5 checks pass; drop the predicate, create or patch; alias every source table and qualify columns by the alias (step 4 needs it). Then step 4; on green, `run --sync`, then hide the new table (`visibility_type: technical`) until its gate passes. `table: null`: `mb transform get <id> --fields target_table_id`. A failed run: fix the file, patch, run again; unreadable: `mb skills path transform`, Read "Iterating on a failing transform". MBQL source: `jq .source.query ./.scratch/t.json | mb query --file - --dry-run` replaces `q`.
+SQL in `./.scratch/<m>.sql`; `<m>.desc` carries the five facts plus every constant per `layering-and-naming.md`, mirrored in the SQL header. Raw-table blocks: `staging-rules.md`; staging is a CTE unless shared or expensive. Validate on a slice (a bounded predicate on the driving table) through `./.scratch/q` until the shape and the step 5 checks pass; drop the predicate, create or patch; alias every source table and qualify columns by the alias (step 4 needs it). Then step 4; on green, `run --sync`, then hide the new table (`visibility_type: technical`) until its gate passes. `table: null`: `mb transform get <id> --fields target_table_id`. A failed run: fix the file, patch, run again; unreadable: `mb skills path transform`, Read "Iterating on a failing transform". MBQL source: `jq .source.query ./.scratch/t.json | mb query --file - --dry-run` replaces `./.scratch/q`.
 
 A layer boundary (staging, intermediate, dimensions, facts, and every later chain the inventory names) is not a stop in itself. Stop at one only when the layer holds an unanswered material decision: irreversible, or with two readings further apart than the contract's materiality threshold. That checkpoint carries only the material decisions, recommendation first, and the next layer waits for the answer. Otherwise open the next layer in the same turn; the layer's other decisions are `[DECIDED, reversible]` Decisions rows, batched into the next hand-back's part three. A boundary stop with nothing material in it comes back "continue" and only costs a round. In Check with me, every boundary stops. A rule discovered mid-layer that changes a headline number is its own stop, taken where it was found, not saved for the boundary.
 
 ## 4. Test
 
-For a model that carries a rule (every intermediate and final-layer model; a staging block only when it deduplicates or converts): one test body in `./.scratch/<m>.test.json` per `transform-tests.md`, one input per table the SQL reads (`cfg_<domain>` included), one expectation per rule in the header's Definition and Caveats and per `[DECIDED, reversible]` on the model; the domain file's cases. `transform-test create`, then `run`: red is fixed in `<m>.sql`, patched, run again; the fixture changes only when it was wrong, and the hand-back says so. On green write `tests` in the Models row (`3 pass`) and go to step 5; the model does not materialise on red. A model with nothing to test writes `tests: none` with the reason. Only the three signals under "When tests cannot run" in `transform-tests.md` write `tests: unavailable` and take its `q()` fallback.
+For a model that carries a rule (every intermediate and final-layer model; a staging block only when it deduplicates or converts): one test body in `./.scratch/<m>.test.json` per `transform-tests.md`, one input per table the SQL reads (`cfg_<domain>` included), one expectation per rule in the header's Definition and Caveats and per `[DECIDED, reversible]` on the model; the domain file's cases. `transform-test create`, then `run`: red is fixed in `<m>.sql`, patched, run again; the fixture changes only when it was wrong, and the hand-back says so. On green write `tests` in the Models row (`3 pass`) and go to step 5; the model does not materialise on red. A model with nothing to test writes `tests: none` with the reason. Only the three signals under "When tests cannot run" in `transform-tests.md` write `tests: unavailable` and take its `./.scratch/q` fallback.
 
 ## 5. Gate
 

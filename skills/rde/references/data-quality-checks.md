@@ -4,7 +4,7 @@ Read for every build that materialises a table. The checks here run on the data 
 
 ## The eight checks, one query per model
 
-Substitute `<model>`, `<source>`, `<key>`, the required-column list, the cast-column list, the non-negative measure list, `<entity>`, and `<period>`; each branch is a `model|check` key and a text value; the `-- pass:` comment is the rule. Sort client-side; a trailing `ORDER BY` binds to the last branch in several dialects. Run it through `q()` ([state.md](state.md)).
+Substitute `<model>`, `<source>`, `<key>`, the required-column list, the cast-column list, the non-negative measure list, `<entity>`, and `<period>`; each branch is a `model|check` key and a text value; the `-- pass:` comment is the rule. Sort client-side; a trailing `ORDER BY` binds to the last branch in several dialects. Run it through `./.scratch/q` ([state.md](state.md)).
 
 ```sql
 SELECT '<model>|dup_key' AS k, cast(count(*) AS varchar) AS v   -- pass: 0

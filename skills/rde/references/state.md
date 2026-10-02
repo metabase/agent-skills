@@ -10,14 +10,14 @@ Every playbook reads and writes here.
 # STATE
 ```yaml
 profile: prod
-db_id: 3
+db_id: <db-id>
 engine: <from mb db get>
 raw_schema: raw_billing
 out_schema: analytics
 layers: stg, int, mart        # theirs, or the default
-collections: stg=41 int=42 mart=43 analytics=17 drafts=18
-library: data=12 metrics=13   # or: unavailable
-tag: rde_billing=7  job: 4
+collections: stg=<id> int=<id> mart=<id> analytics=<id> drafts=<id>
+library: data=<id> metrics=<id>   # or: unavailable
+tag: <tag>=<id>  job: <id>
 autonomy: balanced            # owner of definitions: the user, unless they name someone
 environment: production       # or: staging, branch <name>
 remote_sync: none             # or: <branch>, read-write | read-only; from mb git-sync status; none means never raise syncing
@@ -61,22 +61,28 @@ Nothing is written twice. Deployed means: filed per the company's convention (or
 
 ## Resume
 
-`cat ./.scratch/STATE.md` first. If it exists: use its profile, ids, environment, and autonomy without asking; `mb transform list --fields id,name,description,target --json` confirms its models; continue at `stage` and `next`; copy the playbook checklist into TodoWrite, ticking done steps. If not, create it once the profile is known, with `autonomy: balanced`.
+`cat ./.scratch/STATE.md` first. If it exists: use its profile, ids, environment, and autonomy without asking; `mb transform list --fields id,name,description,target --json` confirms its models; continue at `stage` and `next`, rebuilding the playbook checklist from them with done steps ticked. If not, create it once the profile is known, with `autonomy: balanced`.
 
 ## The probe helper
 
-Written once, sourced every session (`DB`, `PROFILE` from STATE.md):
+An executable, written once per job; it reads `profile` and `db_id` from STATE.md on every call, so no shell state carries over:
 
 ```bash
-cat > ./.scratch/probe.sh <<'SH'
-q() { jq -n --arg q "$1" --argjson db "$DB" '{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$q}]}' \
+cat > ./.scratch/q <<'SH'
+#!/usr/bin/env bash
+# ./.scratch/q "<sql>": one native query on STATE.md's profile and db_id
+s="$(dirname "$0")/STATE.md"
+v() { awk -v k="$1:" '$1 == k { print $2; exit }' "$s"; }
+PROFILE=$(v profile) DB=$(v db_id)
+case $DB in ''|*[!0-9]*) jq -nc --arg e "no numeric db_id in $s" '{status: "failed", error: $e}'; exit 1;; esac
+jq -n --arg q "$1" --argjson db "$DB" '{"lib/type":"mbql/query",database:$db,stages:[{"lib/type":"mbql.stage/native",native:$q}]}' \
   | mb query --file - --profile "$PROFILE" --json --max-bytes 0 2>&1 \
   | grep -v 'Could not parse the Metabase version' \
   | jq -cR '(fromjson? // {ok: false, error: {message: .}})
            | if .ok == false then {status: "failed", error: .error.message}
-             else {status, error, cols: [.data.cols[]?.name], rows: .data.rows} end'; }
+             else {status, error, cols: [.data.cols[]?.name], rows: .data.rows} end'
 SH
-source ./.scratch/probe.sh
+chmod +x ./.scratch/q
 ```
 
-`q "SELECT count(*) FROM raw.orders"` is one call. Pass: `status == "completed"`; else read `error`. A warehouse SQL error, an unreachable instance, and a bad profile or database id all reach `mb` as `{"ok": false, "error": {...}}` on stderr with empty stdout; `q` merges stderr and returns each as `status: "failed"`, and any other stray stderr line as its own `failed` line. Never add `2>/dev/null` to `q` or `mb query`: the only noise, the head-build version warning, is already dropped, and silencing stderr loses the error. `--max-bytes 0` lifts the CLI's 24 KB output cap; the instance's row limits still apply ([profiling-catalog.md](profiling-catalog.md)).
+`./.scratch/q "SELECT count(*) FROM raw.orders"` is one call. Pass: `status == "completed"`; else read `error`. A warehouse SQL error, an unreachable instance, and a bad profile or database id all reach `mb` as `{"ok": false, "error": {...}}` on stderr with empty stdout; `q` merges stderr and returns each as `status: "failed"`, and any other stray stderr line as its own `failed` line. A missing or placeholder `db_id` in STATE.md fails the same way. Never add `2>/dev/null` to `q` or `mb query`: the only noise, the head-build version warning, is already dropped, and silencing stderr loses the error. `--max-bytes 0` lifts the CLI's 24 KB output cap; the instance's row limits still apply ([profiling-catalog.md](profiling-catalog.md)).

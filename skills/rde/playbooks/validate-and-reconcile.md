@@ -2,7 +2,7 @@
 
 Applies: a built number must be proven against something outside itself, or two numbers disagree. Produces a declared validation mode, a row-level comparison at the narrowest shared grain, a gap with a cause per bucket, a fix or a ceiling per cause, and standing controls when the user asks for them.
 
-Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.md first): `1 reference, mode` `2 scope` `3 comparison` `4 buckets` `5.<rule> fix` `6 ceiling` `7 controls` `reply`.
+Checklist: `1 reference, mode` `2 scope` `3 comparison` `4 buckets` `5.<rule> fix` `6 ceiling` `7 controls` `reply`.
 
 Read first: [`diagnose-number-disagreements.md`](../references/diagnose-number-disagreements.md), [`reconciliation.md`](../references/reconciliation.md), [`state.md`](../references/state.md), and the domain file STATE.md names.
 
@@ -10,7 +10,7 @@ Read first: [`diagnose-number-disagreements.md`](../references/diagnose-number-d
 
 ## Commands you will run
 
-Every line also takes `--profile $PROFILE --json`; `q()` is sourced from `./.scratch/probe.sh`.
+Every `mb` line also takes `--profile $PROFILE --json`; `./.scratch/q` is the probe from `references/state.md`.
 
 ```bash
 mb search "<term>" --models table,card,metric --db-id $DB
@@ -18,7 +18,7 @@ mb card get <id> --fields name,dataset_query                # each side of a dis
 mb setting get uploads-settings | jq .value.db_id           # must equal $DB
 mb upload csv --file ./data/finance_mrr.csv --collection <id>
 # the comparison transform: the create body in build-clean-tables.md, SQL from the full-outer-join shape in reconciliation.md
-q "SELECT state, bucket, count(*) AS n, sum(gap) AS net, sum(abs(gap)) AS gross FROM <out_schema>.cmp_<number> GROUP BY 1, 2"   # state and bucket columns per reconciliation.md
+./.scratch/q "SELECT state, bucket, count(*) AS n, sum(gap) AS net, sum(abs(gap)) AS gross FROM <out_schema>.cmp_<number> GROUP BY 1, 2"   # state and bucket columns per reconciliation.md
 mb card query <cmp-card-id> --export-format csv > ./.scratch/cmp.csv   # rows past the ceiling
 mb card create --file ./.scratch/check.json; mb alert create --file ./.scratch/alert.json
 mb timeline create --body '{"name":"Definition changes","collection_id":<analytics collection id>}'
