@@ -1,6 +1,7 @@
 ---
 name: metabase-cli
-description: Drive a Metabase instance from the terminal via the `mb` CLI. Authenticate with named profiles; inspect databases, schemas, tables, and fields and trigger a sync or field-values rescan; list/get/create/update/archive cards (questions, models, metrics), dashboards and dashcards, collections and their tree, snippets, segments, and measures; run cards as JSON/CSV/XLSX; author, run, and schedule transforms; read/update settings; search content; git-sync collections to and from a remote. Use whenever the user wants a Metabase operation from the terminal — "log into metabase", "run card 42 as CSV", "move a dashcard", "what's in collection 4", "create a transform", "search metabase for X", "what schemas are in this database", "import the latest changes", or anything hitting `mb <verb>`. For a whole data job (raw data to clean tables, a semantic layer, dashboards, reconciling numbers) use `rde`.
+description: >
+  Drive a Metabase instance from the terminal via the `mb` CLI: auth profiles, databases and schemas, schema sync and field-values rescan, tables, fields, cards (questions, models, metrics) run as JSON/CSV/XLSX, dashboards and dashcards, collections and their tree, snippets, segments, measures, transforms and transform-jobs, settings, search, git-sync. Use for any Metabase operation from the terminal: "log into metabase", "what profiles do I have", "list cards", "run card 42 as CSV", "create a transform", "list dashboards", "move a dashcard", "list collections", "what's in collection 4", "show the collection tree", "list snippets", "create a segment", "archive a measure", "search metabase for X", "import the latest changes", "add a directory to git sync", "set a setting", "what schemas are in this database", "trigger a sync", "rescan field values", or any `mb <verb>`. Whole data jobs go to `rde`.
 allowed-tools: Bash(mb:*), Read, Write, Edit, AskUserQuestion
 ---
 
@@ -13,6 +14,8 @@ mb skills get core      # start here — auth, flag conventions, every command g
 mb skills list          # enumerate specialized skills bundled with this CLI version
 mb skills get <name>    # load a specialized skill (transform, semantic-layer, dashboard, git-sync, …)
 ```
+
+Command groups, in full: authenticate with named profiles; inspect databases (list, get, full metadata rollup, schemas, tables in a schema) and trigger a manual schema sync or field-values rescan; inspect tables and fields; list/get/create/update/archive cards (questions, models, metrics) and run them as JSON/CSV/XLSX; list/get/create/update dashboards and patch dashcards; list/get/create collections and traverse the hierarchy by id, entity_id, or "root"/"trash" (with items and recursive tree); list/get/create/update/archive native query snippets, segments, and measures; author/update/run transforms and schedule transform-jobs; read/update settings; search content (cards, dashboards, collections, transforms, metrics); git-sync to/from a git remote (status, dirty, import, export, branches, stash, add/remove a collection from sync).
 
 Don't drive Metabase by `curl`ing `/api/...` directly — the CLI handles auth profiles, retries, schema validation, and credential redaction.
 

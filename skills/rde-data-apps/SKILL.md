@@ -40,7 +40,7 @@ The bundle refers to Metabase objects by id and through the typed schema. An app
 
 - **What the app may read.** Library-published tables with their field metadata, measures, and segments; metrics filed in the Library's Metrics collection; models whose actions the app runs, in a synced collection. Nothing else.
 - **What "in the repository" means.** The Library collections carry `is_remote_synced: true` (`synced_collections` in `mb git-sync status --json`), the content has been exported, and `git pull` has brought it into the working tree: the files are there under `databases/…/tables/<table>/` and `collections/…`, checked, not assumed.
-- **Measures and segments need a published table.** They serialize only on a Library-published table whose Library collection is synced; a measure on an unpublished table never reaches the repository, and an empty `mb git-sync dirty` after writing one means the scope is wrong, not that nothing changed. Without the Library (`mb library get --json` fails), file metrics in a synced collection and say that measures and segments cannot be carried.
+- **Measures and segments need a published table** (the `rde` skill's `references/remote-sync.md`, "What belongs in git"). Without the Library (`mb library get --json` fails), file metrics in a synced collection and say that measures and segments cannot be carried.
 - **The app's own collection is synced too.** `npm run build` runs `sync-resources`, which saves each `queries/` definition as a question in `Data App: <slug>`. Flag that collection for sync with the app, and after every build that creates or changes questions, `mb git-sync dirty --json` lists them for export. If they never appear there, say so in the hand-back rather than working around it.
 - **Schema scope.** Generate `metabase.data.ts` from Library scopes only: `include-data-library=true`, `include-metric-library=true`, or `library-collections=<ids>`, plus `include-models=true` when the app runs actions. Never `database=<id>`: it reads tables straight off the instance, synced or not, and is how an app ends up built on content the repository does not have.
 - **A missing entity found mid-build** (a measure, a segment, a metric, a published table, an action) goes back to the `rde` skill: create it in the Library, pass its gate, sync it (sections 5 and 6), `git pull`, regenerate the schema, then continue. Never create it ad hoc to unblock the UI.
@@ -48,22 +48,17 @@ The bundle refers to Metabase objects by id and through the typed schema. An app
 
 ## 5. Syncing safely
 
-Remote sync merges nothing and resolves no conflicts. An import on a dirty instance is rejected, or with `--force` discards the instance's work; an export from an instance behind the remote pushes a stale state; a `git push` behind a Metabase export is rejected. Two writers push to the same remote, Metabase's export and the app's commits, so keep them in step:
+Remote sync merges nothing and resolves no conflicts. The instance side (what to check before every import or export, which goes first, never `--force` without the user's yes) and the staging hand-back: the `rde` skill's `references/remote-sync.md`, "Before each step" and "Staging". Here a `git push` behind a Metabase export is rejected too, and two writers push to the same remote, Metabase's export and the app's commits, so keep them in step:
 
-- **Instance side.** `mb git-sync status --json` and `mb git-sync has-remote-changes --json` before every import or export. Import first when the remote moved; export first when the instance is dirty. Never `--force` either way without the user's yes.
 - **Working-tree side.** The app's commits touch only `data_apps/<slug>/`; exported Metabase YAML is never edited by hand. Before pulling a Metabase export: `git stash --include-untracked`, `git pull --ff-only`, `git stash pop`. Before every `git push`: `git pull --ff-only` again. A pull that cannot fast-forward is a stop: report both histories, do not merge or force.
 - **Delivery order**, each step starting from a clean state: `npm run build` (may create app questions) → export the instance's dirty set (the app's questions and any new definition) → stash, pull, pop in the working tree → commit the app, `resources_metadata.json` included → pull, push → `mb git-sync import` → open `<url>/apps/<slug>`.
-- **Branch.** The instance tracks one branch (`mb git-sync status --json`, `branch`). Export or push to `main` or `master` only with an explicit yes; otherwise `mb git-sync create-branch agent/<slug>` and push the app to the same branch, so the content and the app travel together. On a staging instance, hand the branch back; importing into production is the reviewer's step.
-
-Mechanics: `mb skills path git-sync`.
+- **Branch.** The instance tracks one branch (`mb git-sync status --json`, `branch`). Export or push to `main` or `master` only with an explicit yes; otherwise `mb git-sync create-branch agent/<slug>` and push the app to the same branch, so the content and the app travel together.
 
 ## 6. Ask before anything touches sync
 
-Every sync step publishes to a shared repository, so the user approves it first: flagging a collection for sync, switching `remote-sync-type`, `export`, `create-branch`, `stash`, `import`, and every `git push` to the synced remote. One checkpoint per sync point (the `rde` skill's `references/collaboration-contract.md`), not per command, saying plainly what will move and where: the objects from `mb git-sync dirty --json` by kind and name, the collections being flagged, the branch, the commit message, and what will change in Metabase for the people using it. Recommendation first; "not now" is always an option. Record the answer in STATE.md. "Yes for the rest of this job" is recorded and not asked again; anything less is asked again at the next sync point.
+Every sync step, every `git push` to the synced remote included, is approved first, one checkpoint per sync point: the `rde` skill's `references/remote-sync.md`, "Ask before every sync step". "Yes for the rest of this job" is recorded and not asked again; anything less is asked again at the next sync point.
 
 "Not now" before the build leaves one path: a dev preview only, labelled as working on this instance alone and breaking wherever the repository is imported. Nothing is pushed to the synced branch until the content it reads is synced.
-
-Beyond the app: when a set of definitions reaches a good state (described, trust-labelled, verified, past its gate), ask whether to sync it now rather than waiting for an app to need it. Clean up drafts before the first export: once exported, a mistake stays in the git history.
 
 ## 7. Hand off
 

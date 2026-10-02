@@ -6,7 +6,7 @@ Checklist (copy into TodoWrite; a resumed session reads the todo list and STATE.
 
 Read first: [`diagnose-number-disagreements.md`](../references/diagnose-number-disagreements.md), [`reconciliation.md`](../references/reconciliation.md), [`state.md`](../references/state.md), and the domain file STATE.md names.
 
-**Diagnostic first.** If the ask is only to explain or verify a disagreement (read-only), run [`diagnose-number-disagreements.md`](../references/diagnose-number-disagreements.md): resolve the definition, rebuild the target from the base ingested tables to isolate the faulty layer (ingestion vs transform vs query), attribute, reply. Stand up the comparison transform and the standing controls below only when the number must be reconciled on a cadence or a fix must ship — not to answer "why are these two different".
+**Diagnostic first.** If the ask is only to explain or verify a disagreement (read-only), run [`diagnose-number-disagreements.md`](../references/diagnose-number-disagreements.md) and reply. Stand up the comparison transform and the standing controls below only when the number must be reconciled on a cadence or a fix must ship — not to answer "why are these two different".
 
 ## Commands you will run
 
