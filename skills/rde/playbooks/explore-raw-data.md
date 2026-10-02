@@ -54,7 +54,7 @@ One memo in the contract's shape, grouped by who answers; ask for changes only. 
 
 Take the first question, its tables only, through [`build-clean-tables.md`](build-clean-tables.md) on the defaults, labelled Draft; widen after the hand-back.
 
-Finished example, a checkpoint led by one record, as the `AskUserQuestion` it becomes (nothing printed before it but the finding in prose):
+Finished example, a checkpoint led by one record, as the question it becomes (nothing printed before it but the finding in prose):
 
 ```
 question: Subscription sub_4471 was cancelled on 30 July but paid through 31 August. 214 of 3,912 cancelled subscriptions (5.5%) look like it, a median of 31 days apart. Does sub_4471 count as churned in August or in July?
