@@ -19,7 +19,7 @@ Don't drive Metabase by `curl`ing `/api/...` directly — the CLI handles auth p
 **Doing a whole job, not one command?** Higher-level data-engineering workflows — raw data to clean tables, the semantic layer, dashboards — live in the `rde` skill, which drives this CLI:
 
 ```bash
-npx skills add metabase/agent-skills --skill rde -a claude-code
+npx skills add metabase/agent-skills --skill rde
 ```
 
 When it is installed, follow it; it loads the bundled skills it needs.

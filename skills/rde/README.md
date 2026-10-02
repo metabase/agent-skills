@@ -15,8 +15,10 @@ npm i -g @metabase/cli
 ## Install
 
 ```bash
-npx skills add metabase/agent-skills --skill rde -a claude-code
+npx skills add metabase/agent-skills --skill rde
 ```
+
+The installer detects which agents are installed (Claude Code, Codex, OpenCode, and others) and asks where to put the skill; `-a <agent>` picks one, `-a '*'` installs for all.
 
 ## Where the work lands
 
