@@ -24,7 +24,7 @@ Remote sync merges per entity but resolves no conflicts. Run `mb git-sync status
 
 Renaming a collection moves every file inside it, so editing any of those entities on the other side is a conflict. Never `--force` without the user's yes.
 
-After a task that ends in `conflict`, do not retry, and do not trust `has-remote-changes` or `export-preflight`: some servers then count the remote as synced, so both report nothing pending, a retry (`--merge` included) silently drops the remote's changes, and `force_push_casualties` comes back empty. Take the user's call between `create-branch <name>` then `export`, `import --force`, and `export --force`, saying plainly what each discards.
+After a task that ends in `conflict`, do not retry, and do not trust `has-remote-changes` or `export-preflight`: some servers then count the remote as synced, so both report nothing pending, a retry (`--merge` included) silently drops the remote's changes, and `force_push_casualties` comes back empty. Take the user's call between `create-branch <name>`, `export`, then `import --force` (keeps both: the instance's side lands on a new branch, the reload makes the instance match it, and a PR merges that branch into the tracked one), `import --force` alone (the remote's side), and `export --force` (the instance's side), saying plainly what each discards.
 
 ## Staging
 
