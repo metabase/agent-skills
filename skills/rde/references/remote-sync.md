@@ -14,8 +14,18 @@ Every sync step publishes to a shared repository, so the user approves it first:
 
 ## Before each step
 
-Remote sync merges nothing and resolves no conflicts. An import on a dirty instance is rejected, or with `--force` discards the instance's work; an export from an instance behind the remote pushes a stale state. Run `mb git-sync status --json` and `mb git-sync has-remote-changes --json` before each step, every import and export included. Import first when the remote moved; export first when the instance is dirty. Never `--force` either way without the user's yes.
+Remote sync merges per entity but resolves no conflicts. Run `mb git-sync status --json` and `mb git-sync has-remote-changes --force-refresh --json` before each step, every import and export included; without `--force-refresh` the answer can be a minute old.
+
+- **Only the remote moved:** import. A plain import on a dirty instance is rejected; `import --merge` keeps the instance's work and folds the remote's in.
+- **Only the instance is dirty:** export.
+- **Both moved:** read `mb git-sync export-preflight --json` before exporting. With `clean: true`, `mb git-sync export --merge -m "<what and why>"` folds the remote's changes in and pushes both in one commit. With `clean: false`, `conflicts` names the entities changed on both sides, and the user chooses: `create-branch <name>` then `export` puts the instance's side on a new branch; `import --force` takes the remote's side; `export --force` takes the instance's side and discards what `force_push_casualties` lists.
+
+`export-preflight` and `--merge` need Metabase 63 or later; `mb` refuses them on an older server. There, when both moved, the user chooses between the same three moves without a preview.
+
+Renaming a collection moves every file inside it, so editing any of those entities on the other side is a conflict. Never `--force` without the user's yes.
+
+After a task that ends in `conflict`, do not retry, and do not trust `has-remote-changes` or `export-preflight`: some servers then count the remote as synced, so both report nothing pending, a retry (`--merge` included) silently drops the remote's changes, and `force_push_casualties` comes back empty. Take the user's call between `create-branch <name>` then `export`, `import --force`, and `export --force`, saying plainly what each discards.
 
 ## Staging
 
-In staging (STATE.md `environment`): build freely, then export the work to a job branch with `mb git-sync export --branch <job-branch> -m "<what and why>"`, never to the main branch without confirmation, and hand back the branch for review; importing into production is the reviewer's step.
+In staging (STATE.md `environment`): build freely, then export the work to a job branch with `mb git-sync create-branch <job-branch>` then `mb git-sync export -m "<what and why>"` (on Metabase 63 and later, `export --branch` accepts only the tracked branch), never to the main branch without confirmation, and hand back the branch for review; importing into production is the reviewer's step.
