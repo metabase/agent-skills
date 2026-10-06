@@ -1,7 +1,7 @@
 ---
 name: rde
 description: >
-  Expert data engineering with Metabase at the center of any company's stack: explore and profile raw warehouse tables, build clean tables as Metabase transforms pinned by transform tests, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, reconcile against a reference, change delivered definitions safely. Use for data work, not one `mb` command (`metabase-cli`): "make sense of my data", "model this raw schema", "set up analytics for X", "build a data model", "define MRR / active customers officially", "build a semantic layer", "go from raw tables to a dashboard", "does this number match finance", "our numbers look wrong", "two cards disagree", "test this transform", "why does this transform get case X wrong", "make Metabot answer questions about X", "explain this table", "change this definition", "build a data app", "donor retention", "event attendance", "quarterly board report", "be my data engineer / analyst".
+  Data engineering with Metabase at the center of any company's stack: profile raw warehouse tables, plan the build, build clean tables as Metabase transforms pinned by transform tests, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, reconcile against a reference, change delivered definitions safely. Use for data work, not one `mb` command (`metabase-cli`): "make sense of my data", "model this raw schema", "build a data model", "set up analytics for X", "plan the build", "connect a new database", "migrate from dbt / LookML", "define MRR / active customers officially", "build a semantic layer", "go from raw tables to a dashboard", "does this number match finance", "our numbers look wrong", "two cards disagree", "test this transform", "make Metabot answer questions about X", "explain this table", "change this definition", "build a data app", "donor retention", "event attendance", "be my data engineer / analyst".
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebFetch
 ---
 
@@ -11,7 +11,7 @@ You are the data engineer. Load one playbook, read what its `Read first` line na
 
 ## Before any work
 
-1. `cat ./.scratch/STATE.md`. If it exists, resume per `references/state.md` and never re-ask what it holds. If not, create it from that schema as soon as the profile is known and write every id, decision, and question into it the moment it is known.
+1. `cat ./.scratch/STATE.md`. If it exists, resume per `references/state.md` and never re-ask what it holds. If not, `ls ./plans/`: a build plan there (a teammate's) is resumed per `references/state.md`. Otherwise create STATE.md from that schema as soon as the profile is known and write every id, decision, and question into it the moment it is known; decisions go into the build plan when STATE.md names one (`references/plan-file.md`).
 2. `mb --version`. If it fails, say the Metabase CLI is required and propose `npm i -g @metabase/cli`; run it once the user agrees. `mb auth list --json`: one profile, use it; several, ask which is the working instance; none, ask the user to run `mb auth login`.
 3. Read `references/collaboration-contract.md` once per job (its outputs, the owner and the autonomy mode, live in STATE.md).
 
@@ -23,7 +23,7 @@ One checkpoint (`references/collaboration-contract.md`), before the first `mb tr
 2. **Freshness** — `max(<event time>)` per source table and the `last_complete_period` it implies. Pinned to the extract, or to `current_date`?
 3. **The memo** — printed in chat as a numbered list in the same response, right before the question: each open decision shown on one real record it changes, with its default and where it came from, and the alternative reading's effect on the headline number. The question refers to the list by number ("Accept 1–5 as listed?"); never ask about definitions the user cannot see above it.
 
-Nothing is created in `out_schema` until this returns. If no answer arrives, 1–2 go `PROVISIONAL` and are named in the first hand-back; the gate itself is not skippable. Drop item 1 when `mb transform list` is empty, never the others. Who owns definitions is not asked: the person in the session does, and the memo carries the definition questions themselves.
+Nothing is created in `out_schema` until this returns. If no answer arrives, 1–2 go `PROVISIONAL` and are named in the first hand-back; the gate itself is not skippable. Drop item 1 when `mb transform list` is empty, never the others. Who owns definitions is not asked: the person in the session does, and the memo carries the definition questions themselves. With a build plan, the gate is `playbooks/plan-the-build.md` step 8: its memo is the plan's open entries, items 1–2 carry ids in chat since the plan holds none, and it is asked once; skipping the plan never skips the gate.
 
 ## mb conventions
 
@@ -39,21 +39,21 @@ Ask once, record in STATE.md as `environment`: **production** (one instance; the
 
 An explicit ask for an app ("build me an app for X", "a data app", "add a page to my app") goes to the `rde-data-apps` skill before any route below; a dashboard is not an app.
 
-1. STATE.md exists: continue at its `stage`.
-2. The ask names a reference, a mismatch, or two numbers that disagree: `playbooks/validate-and-reconcile.md`; read-only ("why is X", "which is right", "is this number correct", no standing check asked) starts at its front end `references/diagnose-number-disagreements.md` and stops there unless a fix or a recurring control is wanted.
-3. It names code, documents, a spreadsheet, or another tool's project as the source of rules: `playbooks/extract-business-logic.md`.
+1. STATE.md exists: continue at its `stage`. A build plan or answers to one arriving with the ask, or an ask to plan or re-plan, first runs `playbooks/plan-the-build.md` (a returned plan at its step 9).
+2. The ask names a reference, a mismatch, or two numbers that disagree: `playbooks/validate-and-reconcile.md`; read-only ("why is X", "which is right", "is this number correct", no standing check asked) starts at its front end `references/diagnose-number-disagreements.md` and stops there unless a fix or a recurring control is wanted. A build or migration that must match a reference is route 9, the reference its baseline.
+3. It names code, documents, a spreadsheet, or another tool's project as the source of rules: `playbooks/extract-business-logic.md`; asked to rebuild that project in Metabase (a migration), route 9.
 4. It asks what one existing table or object is: no playbook. Read `mb table get <id> --include fields --json`, the transform's description, and `mb search "<name>" --json` for consumers; answer in plain language; offer to write the description into Metabase.
 5. It asks to change, add, or dispute a delivered definition or number: no playbook; the change flow in `references/semantic-layer-design.md`, "Own, file, change, retire", and for a transform also `playbooks/build-clean-tables.md`, step 8.
 6. It asks to test a transform, or says a transform gets one case wrong: `playbooks/build-clean-tables.md`, steps 4 and 5 on that model only; the case becomes a fixture row before the SQL is touched.
 7. It asks for a dashboard: `playbooks/build-dashboards.md`, unless the database has no transforms and no metrics (`mb transform list`, `mb card list --fields id,type`), then say so and start the pipeline at step 9.
 8. It asks for a definition, a metric, a segment, a measure, a model, or for Metabot or AI to answer well: `playbooks/build-semantic-layer.md`, same test.
-9. It asks for clean tables, or names a goal later than the data's state ("set up analytics for X", "load this and build a dashboard"): the pipeline, thin slice first (below), starting at `playbooks/explore-raw-data.md`.
+9. It asks for clean tables, to plan or migrate a build, or names a goal later than the data's state ("set up analytics for X", "load this and build a dashboard"): the pipeline, thin slice first (below). It starts at `playbooks/plan-the-build.md` when asked to plan, or when the job is a new instance with a new database, a new source in an instance that already has modeled data, or a migration from another tool, unless it is one question over a few tables with no money and no personal data; otherwise, or when the user says to skip the plan, at `playbooks/explore-raw-data.md`.
 10. It asks for a number, a list, or a finding: `playbooks/answer-a-question.md`.
 11. Otherwise: `playbooks/explore-raw-data.md`.
 
 ## Thin slice first
 
-The first pass of any pipeline delivers one headline number end to end: the number the user named first, through explore, build, define, and chart for only the tables it touches, reconciled to any reference the user already quotes, handed back in the first session labelled `Draft`. Widen to the next number only after that hand-back, and without asking which: take the next STATE.md Questions row in the order the user gave (the recommended one when they gave none), name it in the hand-back's "What comes next", and let the user redirect by exception. Scope from the questions backward: a table on no path from a named question to a number is listed with its row count and left raw, not profiled, staged, or checkpointed.
+The first pass of any pipeline delivers one headline number end to end: the number the user named first, through explore, build, define, and chart for only the tables it touches, reconciled to any reference the user already quotes, handed back in the first session labelled `Draft`. Widen to the next number only after that hand-back, and without asking which: take the next STATE.md Questions row in the order the user gave (the recommended one when they gave none), name it in the hand-back's "What comes next", and let the user redirect by exception. Scope from the questions backward: a table on no path from a named question to a number is listed with its row count and left raw, not profiled, staged, or checkpointed. A build plan covers every table on a named question's path, and its walk-through asks first what the first question needs; it decides for the whole dataset, and the build still delivers one number first.
 
 ## Domain references
 

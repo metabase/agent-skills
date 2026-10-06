@@ -14,13 +14,24 @@ Invariants: every model in every layer declares the five header facts below; the
 
 Conventions, the company's: layer prefixes and name grammar; number of layers, and whether a cleaning layer exists; collection layout and output schema; where SQL files live; transforms in Metabase or in the company's tool; a staging block materialized or a CTE.
 
-## Layers, and the flat default
+## Layers
 
 Default, to confirm, when no convention exists: staging, one block per source table (rename, cast, convert units, choose a key; no joins), owing a safe-to-read source table ([staging-rules.md](staging-rules.md)); intermediate (joins, enrichment, classification, attribution, recognition), owing each piece of shared business logic computed once; final layer (mart), the output grains people read, owing the measures for its grain on the row.
 
 A staging block is a CTE inside its only consumer; it becomes its own materialized transform when two or more models read it or when it deduplicates a large appended sync. A final-layer table exists only if it rolls up, conforms an entity across sources, or adds measures that only make sense at the output grain; a `SELECT * FROM <model below>` is not built.
 
-Flat under deadline: a small source, one decision maker, and a deadline get one wide table per real-world thing (`customers`, `orders`) or two layers (cleaned tables, then the tables people read), linking ids kept on every table; say so plainly. Return to layers when the same logic is about to be written into two outputs, or an output feeds another: promote the shared piece into an intermediate model.
+## Choosing the shape
+
+The final layer's shape is a decision taken from the profile and from what the numbers are for: a build plan entry carrying what the alternative would cost ([plan-file.md](plan-file.md)), or a `[DECIDED, reversible]` line. Say it by what people will see; use a textbook name only after the user does.
+
+| Shape | What people see | Choose when |
+|---|---|---|
+| Entities, events, rollups (a star schema; the default) | one table per business event at its finest row, one per thing those events are about (customer, plan, account), rollups at the grain most questions ask, all linked by ids | several named questions slice the same events by the same things; a semantic layer, Metabot, or self-serve readers sit on top |
+| One wide table per real-world thing (one big table) | `customers`, `orders`, each carrying the labels people filter by, linking ids kept on every table; or two layers, cleaned tables then the tables people read | a small source, one decision maker, and a deadline; readers who only use the query builder; an embedded feed where every row carries the tenant key |
+| Wide tables per audience (denormalised marts) | a finance table, a product table, each shaped for one family of dashboards | many readers and few shared questions; built only on shared intermediate models, never re-deriving a rule, never carrying a measure another table also carries |
+| A hierarchy in its own tables (a snowflake schema) | an extra hop to filter by product line or category | only a large hierarchy shared by several entity tables that changes on its own; otherwise flatten its labels onto each entity table people filter by, since a breakout crosses one foreign key ([semantic-layer-design.md](semantic-layer-design.md)) |
+
+Evidence: how many named questions share an event or a thing (sharing means the default); volume (tens of millions of rows and more favour pre-joined rollups for dashboards); who reads it and how; embedding for customers (the tenant key on every table people read); history needs (validity windows join entity tables, [entities-and-time.md](entities-and-time.md)). Say a wide table plainly. Return from it to layers when the same logic is about to be written into two outputs, or an output feeds another: promote the shared piece into an intermediate model.
 
 ## Naming
 
@@ -38,7 +49,7 @@ The transform description is the canonical header; the SQL comment at the top of
 -- Caveats:     <exclusions, constants and values, deviations, provisional decisions by id>
 ```
 
-Constants live in one transform, `cfg_<domain>` (`SELECT 1 AS gap_months, 'D7' AS gap_months_note, 0.05 AS materiality, 'D2' AS materiality_note`): one row, one column per constant plus a `<constant>_note` column naming the STATE.md decision id. Every model that reads a constant cross-joins it (`CROSS JOIN analytics.cfg_billing c`, then `c.gap_months`); changing one is a `mb transform update` on `cfg_<domain>`, the domain's transform tests run (each declares `cfg_<domain>` as an input, so the alternative value is rehearsed on fixtures first; [transform-tests.md](transform-tests.md)), then one run of the domain's job.
+Constants live in one transform, `cfg_<domain>` (`SELECT 1 AS gap_months, 'D7' AS gap_months_note, 0.05 AS materiality, 'D2' AS materiality_note`): one row, one column per constant plus a `<constant>_note` column naming the decision id. Every model that reads a constant cross-joins it (`CROSS JOIN analytics.cfg_billing c`, then `c.gap_months`); changing one is a `mb transform update` on `cfg_<domain>`, the domain's transform tests run (each declares `cfg_<domain>` as an input, so the alternative value is rehearsed on fixtures first; [transform-tests.md](transform-tests.md)), then one run of the domain's job.
 
 ## Declare grain and key before building
 
