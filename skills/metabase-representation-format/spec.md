@@ -94,7 +94,7 @@ Collections are organized by namespace. The `main` namespace holds regular conte
 ```
 export-root/
 ├── settings.yaml
-├── actions/                                # Actions, each on a model card
+├── actions/                                # Read on import only: older exports kept actions here
 │   └── {slug}.yaml
 ├── data_apps/                              # Data apps (see Data App)
 │   └── {app_slug}/
@@ -106,7 +106,7 @@ export-root/
 │   │   ├── {slug}.yaml                     # Entities in root collection
 │   │   ├── {collection_slug}.yaml          # Collection definition (sibling of its folder)
 │   │   └── {collection_slug}/              # Collection contents
-│   │       ├── {card_slug}.yaml            # Cards, dashboards, documents, etc.
+│   │       ├── {card_slug}.yaml            # Cards, dashboards, documents, actions, etc.
 │   │       ├── {dashboard_slug}.yaml       #   — all flat in the same folder
 │   │       ├── {child_slug}.yaml           # Child collection definition
 │   │       └── {child_slug}/              # Child collection contents
@@ -2317,9 +2317,9 @@ serdes/meta:
 
 ## Action
 
-An action writes to a database through a model card. An **implicit** action creates, updates, or deletes a row of the model's table; a **query** action runs native SQL; an **HTTP** action calls a URL. Its permissions follow its model, so an action is always attached to one (`model_id`).
+An action writes to a database. A **query** action runs parameterized native SQL; it lives in a collection like a card (`collection_id`), and its permissions follow that collection. An **implicit** action creates, updates, or deletes a row of a model card's table. Implicit actions, and attaching any action to a model (`model_id`), are **deprecated**: they remain only for actions made before actions had their own collection. Author query actions without a `model_id`.
 
-Actions are stored under the top-level `actions/` directory. Exactly one of the nested `implicit`, `query`, and `http` arrays holds the action's definition, the one its `type` names; the other two are empty.
+Actions are exported with their collection, like cards: `collections/main/{collection path}/{slug}.yaml`, or `collections/main/{slug}.yaml` in the root collection. Older exports kept them under a top-level `actions/` directory, which import still reads. Exactly one of the nested `implicit` and `query` arrays holds the action's definition, the one its `type` names; the other is empty.
 
 ### Schema
 
@@ -2327,18 +2327,19 @@ Actions are stored under the top-level `actions/` directory. Exactly one of the 
 |-------|------|----------|-------------|
 | `name` | string | Yes | Action name |
 | `entity_id` | string | Yes | NanoID identifier |
-| `type` | string | Yes | `"implicit"`, `"query"`, or `"http"` |
-| `model_id` | string | Yes | Card FK (entity_id) of the model the action belongs to |
+| `type` | string | Yes | `"query"`, or `"implicit"` (deprecated) |
 | `serdes/meta` | array | Yes | Identity path with `model: Action` |
-| `implicit` | array | No | `[{kind}]` when `type` is `implicit`, otherwise `[]`. `kind`: `row/create`, `row/update`, `row/delete`, `bulk/create`, `bulk/update`, `bulk/delete` |
+| `collection_id` | string | No | Collection FK (entity_id); `null` for the root collection. An action with a model is always in its model's collection |
+| `model_id` | string | No | **Deprecated.** Card FK (entity_id) of the model the action is attached to. Omit it, or leave it `null`, for a query action; an implicit action requires one |
 | `query` | array | No | `[{database_id, dataset_query}]` when `type` is `query`, otherwise `[]`. `database_id` is a Database FK; `dataset_query` is a [Native Query](#native-query) whose template tags the parameters target |
-| `http` | array | No | `[{template, response_handle, error_handle}]` when `type` is `http`, otherwise `[]` |
+| `implicit` | array | No | `[{kind}]` when `type` is `implicit`, otherwise `[]`. `kind`: `row/create`, `row/update`, `row/delete`, `bulk/create`, `bulk/update`, `bulk/delete` |
 | `parameters` | array | No | The action's inputs: `id`, `type`, and for a query action a `target` on one of its template tags (see [Parameter Targets](#parameter-targets)), plus optional `name`, `slug`, `required`. An implicit action's parameters are computed from the model's fields, so they are stored empty `[]` |
 | `parameter_mappings` | array | No | Unused, usually empty `[]` |
 | `visualization_settings` | map | No | The action's form (see below) |
 | `creator_id` | string | No | User FK (email) |
 | `description` | string | No | Description |
 | `archived` | boolean | No | Whether archived (default: `false`) |
+| `archived_directly` | boolean | No | Archived directly vs. inherited |
 | `public_uuid` | string | No | Public sharing UUID |
 | `made_public_by_id` | string | No | User FK (email) |
 | `created_at` | string | No | ISO 8601 timestamp |
@@ -2356,42 +2357,14 @@ The rest (`title`, `description`, `placeholder`, `order`, `required`, `inputType
 
 ### Example
 
-**Implicit action:**
-
-```yaml
-name: Create order
-entity_id: XgqYIEGPfvCklZUxOLp9m
-creator_id: admin@example.com
-type: implicit
-model_id: 4eroqa4ZYl4WkNjP8XTvu
-implicit:
-- kind: row/create
-query: []
-http: []
-parameters: []
-parameter_mappings: []
-visualization_settings:
-  fields:
-    DISCOUNT:
-      id: DISCOUNT
-      hidden: true
-    QUANTITY:
-      id: QUANTITY
-      defaultValue: 1
-serdes/meta:
-- id: XgqYIEGPfvCklZUxOLp9m
-  label: create_order
-  model: Action
-```
-
-**Query action:**
+**Query action** (`collections/main/queries/apply_discount.yaml`):
 
 ```yaml
 name: Apply discount
 entity_id: NJksetfXk2oh530o3RD_5
 creator_id: admin@example.com
 type: query
-model_id: 4eroqa4ZYl4WkNjP8XTvu
+collection_id: cOlQuErIeS0ExAmPlE2x1
 implicit: []
 query:
 - database_id: Sample Database
@@ -2412,7 +2385,6 @@ query:
             name: order_id
             id: 7d2f1c3e-9b8a-4e6d-8c5b-1a2b3c4d5e6f
             display-name: Order ID
-http: []
 parameters:
 - id: discount
   name: Discount
@@ -2435,6 +2407,34 @@ parameter_mappings: []
 serdes/meta:
 - id: NJksetfXk2oh530o3RD_5
   label: apply_discount
+  model: Action
+```
+
+**Implicit action** (deprecated; `collections/main/queries/create_order.yaml`):
+
+```yaml
+name: Create order
+entity_id: XgqYIEGPfvCklZUxOLp9m
+creator_id: admin@example.com
+type: implicit
+collection_id: cOlQuErIeS0ExAmPlE2x1
+model_id: 4eroqa4ZYl4WkNjP8XTvu
+implicit:
+- kind: row/create
+query: []
+parameters: []
+parameter_mappings: []
+visualization_settings:
+  fields:
+    DISCOUNT:
+      id: DISCOUNT
+      hidden: true
+    QUANTITY:
+      id: QUANTITY
+      defaultValue: 1
+serdes/meta:
+- id: XgqYIEGPfvCklZUxOLp9m
+  label: create_order
   model: Action
 ```
 
@@ -3102,9 +3102,9 @@ data_apps/
     └── resources/
         ├── collection.yaml     # The app's collection
         ├── cards/
-        │   └── {slug}.yaml     # Saved questions, and copies of the models and metrics they use
+        │   └── {slug}.yaml     # Saved questions, and copies of the metrics they use
         └── actions/
-            └── {slug}.yaml     # Copies of the actions the app runs, on the copies of their models
+            └── {slug}.yaml     # Copies of the query actions the app runs
 ```
 
 `{app_slug}` — the directory's name — is the app's slug, the manifest's `slug`, used verbatim as its URL: lowercase letters and numbers separated by single dashes (`sales-dashboard`), and neither `repo-status` nor `sandbox-host`, which collide with Metabase's own routes.
@@ -3129,12 +3129,12 @@ Files under `resources/` are recognized by their location: `collection.yaml`, `c
 
 ### Resources
 
-The app's resources are what it reads and runs: a saved question for each query it makes, and copies of the models, metrics, and actions those use. They are copies because the app's viewers are granted access to the app's collection only. Each file is an ordinary [Collection](#collection), [Card](#card), or [Action](#action), loaded like any other entity file in the repository, with these constraints, which a pull checks before it loads anything:
+The app's resources are what it reads and runs: a saved question for each query it makes, and copies of the metrics and query actions those use. They are copies because the app's viewers are granted access to the app's collection only. Each file is an ordinary [Collection](#collection), [Card](#card), or [Action](#action), loaded like any other entity file in the repository, with these constraints, which a pull checks before it loads anything:
 
 - **Every file** holds a single entity whose `serdes/meta` id is its `entity_id`, and no `entity_id` is defined by more than one file. An `entity_id` that already belongs to a collection, card, or action outside the app can't be used: a load would take that entity over.
 - **`collection.yaml`** holds the collection the manifest names. It is a plain root collection: no `parent_id`, `namespace`, `type`, `authority_level`, or `personal_owner_id`, and not archived.
 - **Cards** have `collection_id` set to the app's collection, name their `creator_id`, are a `question`, `model`, or `metric` with a `dataset_query`, and are not archived, not in a dashboard or document, and not public or embedded.
-- **Actions** have `collection_id` set to the app's collection and name their `creator_id`; are `implicit` or `query`; their `model_id`, when they have one, is a model card in `resources/`, and an implicit action always has one; they carry exactly the one nested record their `type` uses; and they are not archived, not public, and take no parameter values from a card.
+- **Actions** have `collection_id` set to the app's collection and name their `creator_id`; are `query` actions without a `model_id` (a deprecated `implicit` action, or an action with a `model_id`, still loads when its model is a model card in `resources/`); they carry exactly the one nested record their `type` uses; and they are not archived, not public, and take no parameter values from a card.
 - **References** outside `resources/` may point only at databases, tables, fields, snippets, segments, and measures, all of which must already exist on the instance. A card, collection, or dashboard outside the app cannot be referenced: a question or metric that reads another card must use the app's own copy of it.
 
 The app's collection is remote-synced content like the rest of the repository: a pull loads the files that changed, deletes a card or action whose file is gone, and puts back what was changed in Metabase; an export writes the collection and what it holds under `resources/`, beside the app, rather than under `collections/`. A file that breaks these rules fails the pull, naming the file, as any other invalid entity file does.
@@ -3196,44 +3196,52 @@ serdes/meta:
   model: Card
 ```
 
-**`resources/cards/orders_model.yaml`** — the app's copy of the model its action runs on:
-
-```yaml
-name: Orders model
-entity_id: dApPmOdElCoPy0ExAmP12
-collection_id: dApPcOlLeCtIoN0ExAmP1
-creator_id: admin@example.com
-type: model
-display: table
-dataset_query:
-  "lib/type": mbql/query
-  database: Sample Database
-  stages:
-  - "lib/type": mbql.stage/mbql
-    source-table:
-    - Sample Database
-    - PUBLIC
-    - ORDERS
-visualization_settings: {}
-serdes/meta:
-- id: dApPmOdElCoPy0ExAmP12
-  label: orders_model
-  model: Card
-```
-
-**`resources/actions/update_order.yaml`** — the app's copy of an action, on that model copy:
+**`resources/actions/update_order.yaml`** — the app's copy of a query action it runs:
 
 ```yaml
 name: Update order
 entity_id: dApPaCtIoNcOpYExAmP12
 collection_id: dApPcOlLeCtIoN0ExAmP1
 creator_id: admin@example.com
-type: implicit
-model_id: dApPmOdElCoPy0ExAmP12
-implicit:
-- kind: row/update
-query: []
-parameters: []
+type: query
+implicit: []
+query:
+- database_id: Sample Database
+  dataset_query:
+    "lib/type": mbql/query
+    database: Sample Database
+    stages:
+      - "lib/type": mbql.stage/native
+        native: "UPDATE ORDERS SET DISCOUNT = {{discount}} WHERE ID = {{order_id}}"
+        template-tags:
+          discount:
+            type: number
+            name: discount
+            id: 3c1e6f0a-2b4d-4e8a-9f1c-5d6e7f8a9b0c
+            display-name: Discount
+          order_id:
+            type: number
+            name: order_id
+            id: 8a9b0c1d-2e3f-4a5b-8c6d-7e8f9a0b1c2d
+            display-name: Order ID
+parameters:
+- id: discount
+  name: Discount
+  slug: discount
+  type: number/=
+  target:
+  - variable
+  - - template-tag
+    - discount
+- id: order_id
+  name: Order ID
+  slug: order_id
+  type: number/=
+  required: true
+  target:
+  - variable
+  - - template-tag
+    - order_id
 parameter_mappings: []
 serdes/meta:
 - id: dApPaCtIoNcOpYExAmP12
