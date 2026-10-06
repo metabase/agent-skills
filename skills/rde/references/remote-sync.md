@@ -16,6 +16,7 @@ Every sync step publishes to a shared repository, so the user approves it first:
 
 Remote sync merges per entity but resolves no conflicts. Run `mb git-sync status --json` (`is_dirty`, `branch`) and `mb git-sync has-remote-changes --force-refresh --json` before each step, every import and export included; without `--force-refresh` the answer can be a minute old.
 
+- **Neither moved:** nothing to sync.
 - **Only the remote moved** (`is_dirty: false`): `mb git-sync import`.
 - **Only the instance is dirty:** `mb git-sync export -m "<what and why>"`.
 - **Both moved:** read `mb git-sync export-preflight --json` before exporting.
@@ -30,18 +31,14 @@ Renaming a collection moves every file inside it, so editing any of those entiti
 
 ### After a `conflict` task
 
-Do not retry, and do not decide from `has-remote-changes`, `export-preflight` or `force_push_casualties`. Some servers then count the remote as synced: all three report nothing pending, and a retry (`--merge` included) succeeds without bringing the remote's changes into the instance, which stays silently out of date until a later edit or forced export overwrites them. Offer the user three choices, saying what each discards:
+A conflict changes nothing: Metabase keeps its last sync point, and the remote keeps the teammate's work. Read why it stopped, then:
 
-- **The remote's side:** `mb git-sync import --force`. Discards the instance's un-exported work.
-- **The instance's side:** `mb git-sync export --force`. Overwrites the remote; its casualties can't be previewed here, so show the user the remote's commits since the last export in git first.
-- **Both, through a reviewed PR:**
-  1. Record the tracked branch from `mb git-sync status --json` (`branch`) in STATE.md: this is `<original>`.
-  2. `mb git-sync create-branch <name>`
-  3. `mb git-sync export -m "<what and why>"`
-  4. `mb git-sync import --force`, which reloads the instance from `<name>`.
-  5. Open a PR from `<name>` into `<original>` and review its diff with the user before it merges. On a server that counted the conflict as synced, `<name>` starts at the remote's tip, so the PR can undo the remote's edits to the conflicting entities without a git conflict: restore any such edit in the PR.
-  6. Wait for the user to confirm the PR merged, then run `mb git-sync import --branch <original>` to track it again and load the merged result.
+- **Nothing named in `conflicts`** (the task's `outcome.kind` is `remote-changed`: the remote moved on): run `mb git-sync export-preflight --json`; with `clean: true`, `mb git-sync export --merge -m "<what and why>"`.
+- **Entities named in `conflicts`, or `clean: false`:** both sides changed them. Show the user which, and let them pick: the remote's side (`import --force`), the instance's side (`export --force`, which overwrites what `force_push_casualties` lists), or both through a reviewed branch (`create-branch <name>`, `export`, a PR, then `import --branch <tracked>` once it merges).
+- **`history-rewritten`:** there is nothing to merge against. Only a `--force` either way, and only with the user's yes.
+
+Running the preflight again, or the merge, is always safe. Only the `--force` moves discard work, and only the user chooses them.
 
 ## Staging
 
-In staging (STATE.md `environment`), build freely. Then export the work to a job branch: `mb git-sync create-branch <job-branch>`, then `mb git-sync export -m "<what and why>"`. Don't use `export --branch <job-branch>`: on Metabase 63 and later it accepts only the tracked branch. The instance now tracks `<job-branch>`; record that in STATE.md. Never export to the main branch without confirmation. Hand back the branch for review; importing into production is the reviewer's step.
+In staging (STATE.md `environment`), build freely. Then export the work to a job branch: `mb git-sync create-branch <job-branch>`, then `mb git-sync export -m "<what and why>"`. Don't use `export --branch <job-branch>`: on Metabase 63 and later it accepts only the tracked branch. The instance now tracks `<job-branch>`; record that in STATE.md. At the start of the next job, once the review has merged, run `mb git-sync import --branch <main>` so the new job branches from the reviewed work, not from the previous job branch. Never export to the main branch without confirmation. Hand back the branch for review; importing into production is the reviewer's step.

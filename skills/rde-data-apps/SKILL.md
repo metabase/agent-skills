@@ -48,7 +48,7 @@ The bundle refers to Metabase objects by id and through the typed schema. An app
 
 ## 5. Syncing safely
 
-Remote sync merges nothing and resolves no conflicts. The instance side (what to check before every import or export, which goes first, never `--force` without the user's yes) and the staging hand-back: the `rde` skill's `references/remote-sync.md`, "Before each step" and "Staging". Here a `git push` behind a Metabase export is rejected too, and two writers push to the same remote, Metabase's export and the app's commits, so keep them in step:
+Remote sync merges per entity but resolves no conflicts. The instance side (what to check before every import or export, which goes first, never `--force` without the user's yes) and the staging hand-back: the `rde` skill's `references/remote-sync.md`, "Before each step" and "Staging". Here a `git push` behind a Metabase export is rejected too, and two writers push to the same remote, Metabase's export and the app's commits, so keep them in step:
 
 - **Working-tree side.** The app's commits touch only `data_apps/<slug>/`; exported Metabase YAML is never edited by hand. Before pulling a Metabase export: `git stash --include-untracked`, `git pull --ff-only`, `git stash pop`. Before every `git push`: `git pull --ff-only` again. A pull that cannot fast-forward is a stop: report both histories, do not merge or force.
 - **Delivery order**, each step starting from a clean state: `npm run build` (may create app questions) → export the instance's dirty set (the app's questions and any new definition) → stash, pull, pop in the working tree → commit the app, `resources_metadata.json` included → pull, push → `mb git-sync import` → open `<url>/apps/<slug>`.
