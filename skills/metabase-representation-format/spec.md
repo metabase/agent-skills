@@ -2271,7 +2271,7 @@ A card represents a Question, Model, or Metric in Metabase. Cards are the primar
 | `result_metadata` | array | No | Query result column metadata |
 | `enable_embedding` | boolean | No | Embedding enabled |
 | `embedding_params` | map | No | Embedding parameter config |
-| `embedding_type` | string | No | `null`, `"sdk"`, `"standalone"` |
+| `embedding_type` | string | No | `null`, `"static-legacy"`, `"guest-embed"` |
 | `public_uuid` | string | No | Public sharing UUID |
 | `made_public_by_id` | string | No | User FK (email) |
 | `metabase_version` | string | No | Metabase version that created the card |
@@ -2462,7 +2462,7 @@ A dashboard is a collection of cards arranged in a grid layout. Dashboards conta
 | `width` | string | No | `"fixed"` or `"full"` |
 | `enable_embedding` | boolean | No | Embedding enabled |
 | `embedding_params` | map | No | Embedding parameter config |
-| `embedding_type` | string | No | `null`, `"sdk"`, `"standalone"` |
+| `embedding_type` | string | No | `null`, `"static-legacy"`, `"guest-embed"` |
 | `public_uuid` | string | No | Public sharing UUID |
 | `made_public_by_id` | string | No | User FK (email) |
 | `show_in_getting_started` | boolean | No | Show in getting started (default: `false`) |
