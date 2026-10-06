@@ -28,8 +28,8 @@ The format defines 13 entity types.
 | **TransformTag** | `TransformTag` | Label for categorizing transforms. Built-in types: `"hourly"`, `"daily"`, `"weekly"`, `"monthly"`, or `null` for custom. |
 | **TransformJob** | `TransformJob` | Scheduled job (cron) that executes transforms matching specific tags. |
 | **PythonLibrary** | `PythonLibrary` | Shared Python source file available to Python-based transforms. |
-| **Action** | `Action` | Writes to a database through a model: **implicit** (creates, updates, or deletes a row of the model's table), **query** (native SQL), or **HTTP** (calls a URL). Attached to its model via `model_id`; exactly one of `implicit`, `query`, `http` holds the definition its `type` names. |
-| **Data App** | — | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (no `serdes/meta`; the directory names the app), a built bundle, and a `resources/` directory of the Collection, Cards, and Actions it owns. |
+| **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL) or `"implicit"` (creates, updates, or deletes a row of a model's table; needs `model_id`). Lives in a collection via `collection_id`, like a card. A query action may belong to a model via `model_id` or to none; data apps run only query actions without one. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
+| **Data App** | `DataApp` | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (with `serdes/meta` `[{model: DataApp, id: <entity_id>, label: <slug>}]`, and `slug` equal to the directory name), a built bundle, and a `resources/` directory of the Collection, Cards, and Actions it owns. |
 
 ## Ownership and hierarchy
 
@@ -47,12 +47,12 @@ On disk, cards nested under a dashboard or document live in a subfolder next to 
 
 Metabase only imports YAML from these top-level directories; anything outside is ignored:
 
-- `collections/` — all user content (cards, dashboards, documents, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`.
+- `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`.
 - `databases/` — **only** the `segments/` and `measures/` subdirectories under each table are imported.
 - `python_libraries/` (also accepted as `python-libraries/`).
 - `transforms/` — contains `transform_jobs/` and `transform_tags/`.
-- `actions/` — actions.
-- `data_apps/<slug>/resources/` — a data app's resources: its collection (`collection.yaml`), cards (`cards/`), and actions (`actions/`). Loaded when Metabase pulls the repository through git sync, together with the app's `data_app.yaml`.
+- `actions/` — legacy location for actions, still read on import. New exports write an action in its collection's directory under `collections/main/`, beside that collection's cards (not in an `actions/` subdirectory; only a data app's `resources/` has one).
+- `data_apps/<slug>/resources/` — a data app's resources: its collection (`collection.yaml`), cards (`cards/`), and actions (`actions/`). Loaded when Metabase pulls the repository through remote sync, together with the app's `data_app.yaml`.
 
 ## `serdes/meta`
 
