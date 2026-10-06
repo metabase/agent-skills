@@ -1,11 +1,27 @@
 # Extraction and gap report
 
-Read by `extract-business-logic` only: lifting rules from code, documents, and existing definitions, and the gap report it delivers.
+Read by `extract-business-logic`, and by `plan-the-build` for the files people bring: lifting rules from code, documents, and existing definitions, and the gap report it delivers.
 
 ## Two paths
 
 - Reuse what we have: the company wants its existing definitions mirrored, not migrated. Read each existing definition (`mb card get <id> --fields name,dataset_query --json`, and the company's tool); write every definition as a row in STATE.md's Questions table ([state.md](state.md)): home table, time column, definitional filter, breakouts. No claim tagging, no gap report. Two existing definitions of one number reconcile under `source_parity` ([reconciliation.md](reconciliation.md)) and become one.
 - Migration: the rules live in code or documents the instance does not hold. Run the extraction below and stop on the gap report before any SQL.
+
+## Reading what people bring
+
+Classify each input once, then read it with the extraction rules below; the method never branches on the input type, and arriving with nothing is the same method with more profiling. An input arrives as a path, a file dropped into chat, through a connector to a document space, or as an export the user makes on request; a file holding personal data is read where it is and never copied into `plans/`.
+
+| Input | Read | Settles | Proposes only |
+| --- | --- | --- | --- |
+| dbt project, or `target/manifest.json` with `catalog.json` | each model's `compiled_code`, `depends_on` walked up from the outputs in use, tests, `exposures`, `seeds/`, `snapshots/` | grain and keys from `unique` and `not_null` tests, joins from `relationships`, what is in use from `exposures` | every definitional filter, unless the plan translates as it is |
+| LookML | views (`sql_table_name`, dimensions, measures), explores (joins and their `relationship`), derived tables, `access_filter` | join paths and their cardinality | measures, as measure and metric candidates |
+| Saved SQL, another BI tool's calculated fields | each query and field behind a number in use | the predicates that number applies | its definition |
+| Definitions documents (Notion, Confluence, Google Docs) | per the crawl stop rule | nothing alone | definitions, exclusions, owners' wording |
+| Mapping sheets as CSV, JSON, or a spreadsheet | every row, identifiers exactly | the mapping as people maintain it, once its keys are checked live | — |
+| A baseline export | grain, keys, periods covered | the reference ([reconciliation.md](reconciliation.md)) | — |
+| A previous plan | every entry | decided entries, with who and when | — |
+
+What an input settles is written into the plan with its source and ratified at the gate, not asked; what it proposes is an open entry with that default. When two inputs disagree and nobody is asked: code that runs in production and that live data agrees with settles mechanics (keys, joins, grain), and settles definitions too when the plan translates as it is; otherwise code proposes them. Documents and prose propose. Profiling lists the options and never decides. On a fact about the data, the data wins. A `snapshots/` folder or a history table is said loudly: that history cannot be recomputed from current state ([entities-and-time.md](entities-and-time.md)).
 
 ## Extraction rules
 
@@ -22,7 +38,7 @@ Read by `extract-business-logic` only: lifting rules from code, documents, and e
 
 ## The gap report
 
-The gate between profiling and any SQL on the migration path; produce it, then stop for review.
+The gate between profiling and any SQL on the migration path; produce it, then stop for review. Under a build plan, the report is the plan's Migration section and the review is the plan's gate.
 
 | Verdict | Meaning |
 | --- | --- |
@@ -39,7 +55,7 @@ The gate between profiling and any SQL on the migration path; produce it, then s
 
 ## The specification
 
-One document with labelled sections, never a second file:
+Under a build plan, the plan is this document ([plan-file.md](plan-file.md)). Otherwise one document with labelled sections, never a second file:
 
 - Rules: definitions, taxonomy, states, checks, definition of done, each non-obvious rule tagged with its provenance (profiled, user-stated, lifted from code, defaulted). Environment values live in STATE.md and are cited, never restated.
 - Build notes: build order, checkpoints, validation procedure, stop conditions, citing rule sections by number. Where notes and rules disagree, the rules win.

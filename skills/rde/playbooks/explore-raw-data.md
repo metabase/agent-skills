@@ -4,7 +4,7 @@ Applies: raw data is synced into Metabase, or must be landed first, and nothing 
 
 Checklist: `1 land` `2 intake` `3 discover` `4 helper, counts` `5.<table> profile` `6 inventory` `7 memo` `8 first slice` `reply`.
 
-Read first: [`state.md`](../references/state.md), [`profiling-catalog.md`](../references/profiling-catalog.md), and the domain file STATE.md names.
+Read first: [`state.md`](../references/state.md), [`profiling-catalog.md`](../references/profiling-catalog.md), and the domain file STATE.md names. When STATE.md names a build plan, steps 2, 6, and 7 are the plan's ([`plan-the-build.md`](plan-the-build.md)): read its Questions, Shape, and entries instead of asking again.
 
 ## Commands you will run
 
@@ -31,7 +31,7 @@ Ask in one message, in their words: which questions this must answer, in the ord
 
 ## 3. Discover once
 
-Run the discovery commands once; write `db_id`, `engine`, schemas, layer vocabulary, collection ids, existing models and metrics (Questions rows marked `exists`), the environment mode, and the domain file the router's test fired into STATE.md; no later playbook re-discovers. Match what exists; a convention proposed because nothing exists is `[DECIDED, reversible]` on the `layering-and-naming.md` default, which also holds the outside-Metabase note.
+Run the discovery commands once; write `db_id`, `engine`, schemas, layer vocabulary, collection ids, existing models and metrics (Questions rows marked `exists`), the environment mode, and the domain file the router's test fired into STATE.md; no later playbook re-discovers. Match what exists; a convention proposed because nothing exists is `[DECIDED, reversible]` on the `layering-and-naming.md` default, which also holds the outside-Metabase note. Discovery showing a planning situation the router missed (a new instance with a new database, a new source in an instance that already has modeled data, another tool's project): switch to [`plan-the-build.md`](plan-the-build.md) at its step 2 before step 5, unless the user said to skip the plan.
 
 ## 4. Helper and counts
 
@@ -43,7 +43,7 @@ Per table on a question path: read its columns, classify meaning versus loader p
 
 ## 6. Inventory
 
-Fill the grain-and-key inventory in `layering-and-naming.md` in the company's vocabulary: layer, name, one row per, key, sources, decision ids read. Small company, close deadline: the flat default there, decided, shown. Two sources describing one entity: the conformed-entity procedure in `entities-and-time.md`. Check: every table on a question path feeds a model; the rest are listed with a row count and left raw.
+Fill the grain-and-key inventory in `layering-and-naming.md` in the company's vocabulary: layer, name, one row per, key, sources, decision ids read. The shape per "Choosing the shape" there; small company, close deadline: one wide table per real-world thing, decided, shown. Two sources describing one entity: the conformed-entity procedure in `entities-and-time.md`. Check: every table on a question path feeds a model; the rest are listed with a row count and left raw.
 
 ## 7. Decision memo
 
@@ -64,7 +64,7 @@ options:
 
 ## Done when
 
-STATE.md holds the discovery, every question verbatim, and every open decision; every table on a question path is counted, profiled, and inventoried; the memo is sent; the first slice is started.
+STATE.md holds the discovery, every question verbatim, and every open decision (in the build plan when STATE.md names one); every table on a question path is counted, profiled, and inventoried; the memo is sent; the first slice is started.
 
 ## Reply
 

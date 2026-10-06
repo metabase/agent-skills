@@ -1,6 +1,6 @@
 # rde
 
-A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`.
+A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`. Before a new instance, a new source in an existing instance, or a migration from another tool is built, the agent writes a build plan to `./plans/<dataset>-plan.md`: the decisions people across the company read, answer, and keep.
 
 The skill owns judgment and method, matched to the conventions the company already has. Metabase mechanics come from the CLI's bundled skills, read one section at a time when a step names one.
 
@@ -26,6 +26,7 @@ Two environment modes, detected with `mb git-sync status`: a single production i
 
 ## Playbooks
 
+- `playbooks/plan-the-build.md`: read what people bring (dbt or LookML projects, definitions documents, mapping sheets, baseline exports), profile, recommend a shape, and write the build plan, each decision with its severity, what it affects, and who usually answers it; approved at the pre-create gate, then the first slice.
 - `playbooks/explore-raw-data.md`: land data if needed, discover once, profile what a question touches, propose an inventory, send the decision memo, start the first slice.
 - `playbooks/build-clean-tables.md`: build the models as transforms, pin each model's rules with transform tests before it materialises, gate it on the landed data, hide the plumbing, schedule the chain.
 - `playbooks/build-semantic-layer.md`: one starting object per table, measures, metrics, segments, descriptions, verification, the canonical set published.
