@@ -75,8 +75,6 @@ Beyond the per-entity shapes summarized in this SKILL, `spec.md` also covers: MB
 
 **Read on demand, not eagerly.** Open `spec.md` only when you are about to read or modify content files for the entities listed above — e.g. the user asks to edit a card, add a dashcard, tweak a transform, or similar work that implies YAML edits. Do not open it at session start or for tasks unrelated to representation YAML.
 
-**Native query shape.** Some `spec.md` examples disagree with the schema `validate-schema` enforces. Follow the schema: a native stage's `native` is a plain SQL string (never a `{query, template-tags}` map), and `template-tags` is a list of tags as a sibling of `native` in the stage. The map-keyed-by-tag-name form in the Action and Data App examples is a legacy form that is still accepted — don't author new content with it.
-
 If the bundled copy looks out of date with the upstream package, the skill's own `README.md` documents how to refresh it with `extract-spec`.
 
 ## Validating
