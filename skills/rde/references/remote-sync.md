@@ -28,7 +28,7 @@ Every sync step publishes to a shared repository, so the user approves it first:
 
 ## Before each step
 
-Remote sync merges nothing and resolves no conflicts. An import on a dirty instance is rejected, or with `--force` discards the instance's work; an export from an instance behind the remote pushes a stale state. Run `mb git-sync status --json` and `mb git-sync has-remote-changes --json` before each step, every import and export included. Import first when the remote moved; export first when the instance is dirty. An import that stops on a transform deletion conflict means a local transform was never exported: export first. Never `--force` either way without the user's yes.
+Remote sync merges nothing and resolves no conflicts. An import on a dirty instance is rejected, or with `--force` discards the instance's work; an export from an instance behind the remote pushes a stale state. Run `mb git-sync status --json` and `mb git-sync has-remote-changes --json` before each step, every import and export included. Import first when the remote moved; export first when the instance is dirty. An import that stops on a transform deletion conflict means a local transform was never exported: export first. Before an export, check every metric in `mb git-sync dirty` that uses a measure or segment: its table must read `"is_published": true` (`SKILL.md`, "Filing with a `synced_root`"); otherwise publish the table or rewrite the metric inline first, since the export carries the metric without what it uses. Never `--force` either way without the user's yes.
 
 ## Staging
 
