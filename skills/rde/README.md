@@ -22,7 +22,7 @@ The installer detects which agents are installed (Claude Code, Codex, OpenCode, 
 
 ## Where the work lands
 
-Two environment modes, detected with `mb git-sync status`: a single production instance, where the build lands directly, hidden until it passes its checks and drafted until reviewed; or a staging instance with remote sync, where the deliverable is an exported branch for review, never the main branch without confirmation.
+Two environment modes, detected with `mb git-sync status`: a single production instance, where the build lands directly, hidden until it passes its checks and drafted until reviewed; or a staging instance with remote sync, where the deliverable is an exported branch for review, never the main branch without confirmation. With remote sync, everything the job builds is filed under the synced top-level collection and the Library that `rde init` marks for sync, so it reaches git on export; nothing finished is left at the root of the instance.
 
 ## Playbooks
 

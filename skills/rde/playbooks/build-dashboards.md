@@ -17,6 +17,7 @@ mb dashboard create --file ./.scratch/dash.json
 mb dashboard cards <dash-id>                                       # a row's id is the dashboard_card_id; card_id is the card
 mb setting get 'email-configured?' | jq .value                     # false: stop
 mb subscription create --file ./.scratch/sub.json
+mb card update <card-id> --body '{"collection_id":<final collection id>}'
 mb dashboard update <dash-id> --body '{"collection_id":<final collection id>}'
 ```
 
@@ -69,7 +70,7 @@ Readers who do not open Metabase: a subscription on the cadence (channel configu
 
 ## 8. Final collection
 
-Move the dashboard after the pass and pin it to the top of its collection in the same call: `mb dashboard update <dash-id> --body '{"collection_id":<final collection id>,"collection_position":1}'`; the `How to use <area> numbers` document goes beside it at position 2 (`mb document update`). Record it in the STATE.md Questions rows. Then `mb collection items <drafts>`: if a `Drafts` collection you created is empty, `mb collection archive <drafts>` and remove it from STATE.md `collections`; never leave an empty one behind.
+The final collection is the domain collection, under STATE.md `synced_root` when it has one (`SKILL.md`, "Filing with a `synced_root`"). Move leaf first, after the pass. For each `card_id` from `mb dashboard cards <dash-id>`, read `mb card get <id> --json --fields id,name,collection_id,dashboard_id,document_id` (the `dashboard_id` from `mb dashboard cards` is the dashcard's, so it never shows a dashboard question) and file it by the first matching rule in `references/remote-sync.md`, "Filing": `dashboard_id` or `document_id` set, skip it; `collection_id` equal to STATE.md `drafts`, move it (`mb card update <id> --body '{"collection_id":<final collection id>}'`); anything else is not the job's, so leave it. Then the dashboard, pinned to the top of its collection in the same call: `mb dashboard update <dash-id> --body '{"collection_id":<final collection id>,"collection_position":1}'`; its dashboard questions move with it. When Metabase refuses it with `Uses content that is not remote synced.`, take the `[CHECKPOINT]` in that section, then try again. Then the `How to use <area> numbers` document beside it at position 2 (`mb document update`). Record it in the STATE.md Questions rows. Then `mb collection items <drafts>`: if a `Drafts` collection you created is empty, `mb collection archive <drafts>` and remove it from STATE.md `collections`; never leave an empty one behind.
 
 ## Done when
 

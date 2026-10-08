@@ -47,7 +47,7 @@ Fill the grain-and-key inventory in `layering-and-naming.md` in the company's vo
 
 ## 7. Decision memo
 
-One memo in the contract's shape, grouped by who answers; ask for changes only. Print it as a numbered list, then ask item 3 of the pre-create gate in `SKILL.md` about it by number, and the turn ends there — step 8 begins in the response after the gate returns. Each item is a STATE.md Decisions row with `affects`: `open` until built on its default, then `PROVISIONAL`; an irreversible one is a `[CHECKPOINT]`.
+One memo in the contract's shape, grouped by who answers; ask for changes only. It goes, as a numbered list, into the question that asks item 3 of the pre-create gate in `SKILL.md` (contract, "The decision memo"), and the turn ends there — step 8 begins in the response after the gate returns. Each item is a STATE.md Decisions row with `affects`: `open` until built on its default, then `PROVISIONAL`; an irreversible one is a `[CHECKPOINT]`.
 
 ## 8. First slice
 

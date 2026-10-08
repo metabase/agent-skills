@@ -21,6 +21,7 @@ tag: <tag>=<id>  job: <id>
 autonomy: balanced            # owner of definitions: the user, unless they name someone
 environment: production       # or: staging, branch <name>
 remote_sync: none             # or: <branch>, read-write | read-only; from mb git-sync status; none means never raise syncing
+synced_root: none             # or: <id> <name>, the synced top-level collection content files under (SKILL.md, Remote sync)
 domain: subscription-revenue  # or none, or two when a table genuinely straddles domains
 stage: build-clean-tables
 next: model 8 of 15, blocked on D7
