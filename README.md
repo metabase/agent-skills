@@ -78,6 +78,12 @@ Helps migrate from Metabase Full App / Interactive (iframe-based) embedding to M
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-full-app-to-modular-embedding-upgrade-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-full-app-to-modular-embedding-upgrade)
 
+### Learn Metabase with your own data
+
+[metabase-learning](./skills/metabase-learning/SKILL.md)
+
+Learn the ins and outs of Metabase, with quizzes and optionally your own data (through the Metabase MCP server).
+
 ### Modular embedding to modular embedding SDK upgrade
 
 [metabase-modular-embedding-to-modular-embedding-sdk-upgrade](./skills/metabase-modular-embedding-to-modular-embedding-sdk-upgrade/SKILL.md)
