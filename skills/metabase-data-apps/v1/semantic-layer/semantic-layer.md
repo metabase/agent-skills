@@ -264,7 +264,7 @@ const { data } = useMetabaseQuery(RevenueByMonthAndCategory, {
 });
 ```
 
-If a control must switch a segment on and off, that is a choice between static queries, not a dynamic clause: define one query per state and pick the query, or express the same condition as a filter on a result column.
+If a control must switch a segment on and off, that is a choice between static queries, not a dynamic clause: define one query per state and pick the query, or express the same condition as a filter on a result column. A segment can't be negated; to exclude its rows, filter on the field it tests. A static `limit` runs before the dynamic filters, so a filtered top-N puts its `orderBys` and `limit` in the dynamic part.
 
 Do not remove `savedQuestionEntityId` if you find it on a query object, or `copiedActionEntityId` on an action definition. Each names the definition's file in the app's collection — see *Write every query and action into the app's collection*.
 
@@ -339,7 +339,7 @@ export const TaxByPeriod = defineQuery({
 // Rows: { created_month, created_year, total_amount, total_tax }
 ```
 
-In a query with aggregations, a `{ type: "column", name }` order-by must name one of its breakout or aggregation columns.
+In a query with aggregations, a `{ type: "column", name }` order-by must name one of its breakout or aggregation columns. A `fields` list can't name its columns: two fields of one name come back as `NAME` and `NAME_2`, so render such a list with an SDK question, whose headers name each field's table, instead of reading its rows. There is no conditional count or ratio: count each subset with its own filtered query and divide in React.
 
 ## metric aggregation recipes
 
@@ -356,7 +356,7 @@ export const Revenue = defineQuery({
 });
 ```
 
-Use generated metric dimensions for filters and breakouts in queries that aggregate the owning metric. Dimensions from the metric's source table work directly. Dimensions from related tables also work when the generated field includes `sourceFieldId`; prefer those related-table dimensions for readable labels instead of grouping by raw foreign key IDs. A metric's dimensions are the only way to a related table's field: a table's `fields` hold its own columns. If the metric lacks the dimension, ask the user to add it to the metric's dimensions, then regenerate the schema; never assemble a related-table field reference by hand:
+Use generated metric dimensions for filters and breakouts in queries that aggregate the owning metric. Dimensions from the metric's source table work directly. Dimensions from related tables also work when the generated field includes `sourceFieldId`; prefer those related-table dimensions for readable labels instead of grouping by raw foreign key IDs. A metric's dimensions are the only way to a related table's field: a table's `fields` hold its own columns. If the metric lacks the dimension, ask the user to add it to the metric's dimensions, then regenerate the schema; never assemble a related-table field reference by hand. A table reached through several foreign keys has one dimension group per key, such as `usersViaCreatedBy` and `usersViaApprovedBy`. A row list's `fields` may list dimensions without their metric. For example:
 
 ```ts
 const revenueMonth = breakout(revenueMetric.dimensions.orders.createdAt, {
@@ -594,7 +594,7 @@ Filter operator rules:
 
 - string: `=`, `!=`, `contains`, `does-not-contain`, `starts-with`, `ends-with`, `is-empty`, `not-empty`, `is-null`, `not-null`
 - number: `=`, `!=`, `>`, `>=`, `<`, `<=`, `between`, `is-null`, `not-null`
-- date: `=`, `!=`, `>`, `>=`, `<`, `<=`, `between`, `time-interval`, `is-null`, `not-null`
+- date: `=`, `!=`, `>`, `>=`, `<`, `<=`, `between`, `time-interval`, `is-null`, `not-null`; `time-interval` takes `[amount, unit]` and is relative to when the query runs, so it belongs in the static query: `filter(orders.fields.createdAt, "time-interval", [-24, "month"])`
 - boolean: `=`, `is-null`, `not-null`
 
 Only date dimensions can use `unit`. Non-date dimensions can be used as breakouts without `unit`; numeric dimensions can use `binning`.
