@@ -1,30 +1,22 @@
----
-name: metabase-data-app-setup
-description: Scaffold a new Metabase data-app into the connected remote-sync repository's `data_apps/<app>/` directory from the `data-app-template`. Use when the user asks to start, create, scaffold, or set up a data-app from scratch, or to remove one.
-metadata:
-    version: v1
-    internal: true
----
-
 # Create a Metabase Data App
 
 A Metabase **data-app** is a single JS bundle that the host loads inside a Near Membrane sandbox and renders inside its own React tree. The scaffold is a Vite + React + TypeScript project: source under `src/`, a dev server that previews the app against a real Metabase **through the same Near Membrane sandbox + distortion rules Metabase uses in production** — so `npm run dev` behaves like production, including for third-party libraries the app bundles — and `npm run build` producing a single `dist/index.js`. (Because the sandbox runs a built bundle, a change rebuilds it and does a *soft reload* — re-evaluates the bundle in the sandbox and remounts the app, keeping auth/SDK loaded — rather than hot-swapping modules; component state resets, but there's no full browser refresh.) The dev preview also shows a corner **⚠ Diagnostics** toolbar that captures runtime errors — including the sandbox's otherwise-opaque blocked-API messages — so failures surface instead of being swallowed. The same data is served as JSON at `http://localhost:5174/__data-app/diagnostics`, which is how *you* read it (see "Reading the diagnostics feed" below) — you have a shell, not a browser, and these failures are invisible from the terminal otherwise.
 
 **Data apps are served from Git** (they can also be created and updated through `/api/apps`). A single repository is connected to Metabase via remote-sync (Admin → Settings → Remote sync). Each app lives in its own directory `data_apps/<slug>/` inside that repo — its source, a `data_app.yaml` (slug/name/path/collection), and the committed built bundle at the `path` its `data_app.yaml` declares (`dist/index.js` by default). Its collection, with its saved questions and the copies of the metrics and actions it uses, is YAML under the repo's `collections/data_apps/`, like every collection of the `data-apps` namespace. On each remote-sync import Metabase materializes each app and serves it at `/apps/<slug>`, where the slug is the `slug` its `data_app.yaml` declares. So this skill always scaffolds **into the connected repo's `data_apps/<slug>/` directory**, never as a standalone project.
 
-**The scaffold ships inside this skill at `./template/`** — a Vite + React + TypeScript project that was installed alongside the skill. Step 3 just copies it into the app directory; the skill then guides you through the customization + first-app-content steps — it never generates project files from scratch. If you find yourself writing `package.json`, `vite.config.ts`, `tsconfig.json`, or `src/index.tsx` by hand, stop — copy the template instead.
+**The scaffold ships inside this skill at `setup/template/`** — a Vite + React + TypeScript project installed with the skill. Step 3 just copies it into the app directory; this guide then walks you through the customization + first-app-content steps — it never generates project files from scratch. If you find yourself writing `package.json`, `vite.config.ts`, `tsconfig.json`, or `src/index.tsx` by hand, stop — copy the template instead.
 
-## When to invoke this skill
+## When to use this guide
 
 - "scaffold a new data app" / "create a Metabase data app" / "set up a data-app project"
 - "I want to build a data app" / any vague intent to author a data app
 - Starting a fresh agent task that will produce a data-app bundle.
 - "remove the <slug> data app" / "delete a data app" — only *Removing an app* below applies.
-- Do **not** use this skill for an existing data-app project when the task is to
+- Do **not** use this guide for an existing data-app project when the task is to
   build screens, use Metabase data, generate or refresh schema files, wire saved
   questions / tables / metrics / actions, add filters, or author data hooks.
-  Treat those as existing-data-app editing tasks and use the agent's normal
-  skill-discovery flow from the user's wording.
+  Treat those as existing-data-app editing tasks and read the part `SKILL.md`
+  lists for them.
 
 ## Step 1 — Locate the remote-sync repository
 
@@ -57,19 +49,19 @@ If `<repo>/data_apps/<slug>/` already holds a project, verify it matches the cur
 
 **All checks pass** → template-shaped. Ask: "Extend this app, or scaffold a new one under a different slug?" If extend → skip the copy step, edit `src/`. If new → pick a different slug and restart at Step 2.
 
-**Any check fails** → not template-shaped (older scaffold or drift). **Stop.** Tell the user the structure differs from the current template, extending it risks breaking the bundle contract, and ask whether to (1) migrate it (a separate task; use skill discovery for migrating an outdated data app), (2) scaffold fresh under a new slug and port the code over, or (3) proceed anyway at their risk. Wait for the answer.
+**Any check fails**: not template-shaped (older scaffold or drift). **Stop.** Tell the user the structure differs from the current template, extending it risks breaking the bundle contract, and ask whether to (1) migrate it (a separate task, in `migrate/migrate.md`), (2) scaffold fresh under a new slug and port the code over, or (3) proceed anyway at their risk. Wait for the answer.
 
 Never overwrite existing files without explicit confirmation.
 
 ## Step 3 — Copy the template into the app directory
 
-The template ships **inside this skill** at `./template/` and is installed with it. Copy it into the app directory:
+The template ships **inside this skill** at `setup/template/` and is installed with it. Copy it into the app directory:
 
 ```bash
 APP_DIR="<repo>/data_apps/<slug>"
-# `<skill-dir>` = the directory this SKILL.md was loaded from
-# (e.g. `.claude/skills/metabase-data-app-setup`); the template is its `template/` subfolder.
-cp -R "<skill-dir>/template/." "$APP_DIR/"
+# `<skill-dir>` = the directory holding this skill's SKILL.md
+# (e.g. `.claude/skills/metabase-data-apps`).
+cp -R "<skill-dir>/setup/template/." "$APP_DIR/"
 ```
 
 A data app is a *subdirectory* of the remote-sync repo, not its own repository — so this is a plain copy, never a nested `git clone` / `git init`. Everything below runs **inside `$APP_DIR`**.
@@ -147,7 +139,7 @@ Once the template is in `<repo>/data_apps/<slug>/` (run everything below from th
    the admin list, hidden from every other user, and refuses to open until it
    is migrated to the current contract, its `version` raised to match, rebuilt,
    and synced. That migration is a separate, instructed procedure, one version
-   at a time; reach it through skill discovery and never do it ad hoc.
+   at a time, in `migrate/migrate.md`; never do it ad hoc.
 
    **`allowed_hosts`** — only needed if the app calls an **external** API directly
    with `fetch`/`XHR`. The sandbox blocks all network egress by default; listing an
@@ -184,7 +176,7 @@ An app's YAML is written in this order, and each step needs the one before it:
    the manifest names one whose file exists.
 
 Scaffolding ends after the first. The second is part of building the app's
-data layer; use skill discovery for that.
+data layer, in `semantic-layer/semantic-layer.md`.
 
 ## Step 5 — Verify the starter app
 
@@ -216,9 +208,9 @@ Stop here if the user only asked to create, scaffold, or set up a data app.
 If the next task is to build or iterate on the actual app UI — especially if it
 mentions an existing data app, Metabase data, generated schema files, saved
 questions, tables, metrics, actions, filters, semantic-layer entities, or data
-hooks — treat it as a separate existing-data-app editing task. Use the agent's
-normal skill-discovery flow from those terms. Do not expand this scaffold skill
-with data-layer authoring rules.
+hooks — treat it as a separate existing-data-app editing task, and read the
+part `SKILL.md` lists for it. Do not expand this scaffold guide with data-layer
+authoring rules.
 
 **Do not modify `src/index.tsx` or `tsconfig.json` unless the change is genuinely required.** The whole build/dev setup lives in the SDK behind `dataAppConfig()` (which also serves the dev HTML shell — there's no `index.html` to edit), so `vite.config.ts` is just:
 
@@ -328,7 +320,7 @@ src/
 ├── index.tsx          (template — the factory; don't edit)
 ├── App.tsx            (routing + composition only)
 ├── theme.ts
-├── metabase.data.ts   (generated schema — use skill discovery for the data-app semantic layer)
+├── metabase.data.ts   (generated schema — see semantic-layer/semantic-layer.md)
 ├── pages/             (one file per screen)
 │   ├── Overview.tsx
 │   └── CustomerDetail.tsx
@@ -350,7 +342,7 @@ Vite bundles everything reachable from `src/index.tsx` into a single `dist/index
 const [active, setActive] = useState(TABS[0].id); // default = leftmost tab
 ```
 
-If the tabs are instead backed by URL routes (multiple pages), the same rule applies via the router — use skill discovery for data-app routing to make the base path `/` resolve to the default tab. Either way, verify by loading the app fresh: the leftmost tab's content is visible immediately and reads as selected.
+If the tabs are instead backed by URL routes (multiple pages), the same rule applies via the router — `routing/routing.md` makes the base path `/` resolve to the default tab. Either way, verify by loading the app fresh: the leftmost tab's content is visible immediately and reads as selected.
 
 **The build output is one self-contained `.js` file — nothing else.** The backend serves a single bundle, so there are no sidecar files: CSS is inlined into the JS, and every imported asset (images, fonts, SVGs-as-URLs) is base64-inlined as a data URI. So `import logo from "./logo.png"` / `import iconUrl from "./icon.svg"` give you a ready-to-use data-URI string, and SVGs can also be imported as React components with the **`?react`** suffix (built-in `svgr`): `import Icon from "./icon.svg?react"`. Everything gets baked into `dist/index.js` — just keep large binaries out, since inlining inflates the bundle. (If your editor doesn't recognize a `?react` import, add `declare module "*.svg?react";` to a `.d.ts` in `src/`.)
 
@@ -459,12 +451,12 @@ The bundle imports React hooks/JSX, SDK components from `@metabase/embedding-sdk
 | `React` (from `"react"`) | Hooks (`useState`, `useEffect`, etc.), JSX runtime. Externalized to the host's React via `react: "React"`. |
 | `StaticQuestion` | Non-drillable question. Props include `questionId`, `card`, `withChartTypeSelector`, `height`, `width`. |
 | `InteractiveQuestion` | Drillable question. Same props as StaticQuestion plus drill behaviors. Use `card={{ query }}` for ad hoc SDK-rendered questions. See *Rendering a chart: Metabase first* for choosing between the two and for `visualization` / `visualizationSettings`. |
-| `MetabaseCard` | Type-only import from `@metabase/embedding-sdk-react` for ad hoc SDK-rendered cards with `visualization` or `visualizationSettings`; use skill discovery for the full generated-query card contract before authoring data-layer code. |
+| `MetabaseCard` | Type-only import from `@metabase/embedding-sdk-react` for ad hoc SDK-rendered cards with `visualization` or `visualizationSettings`; read `semantic-layer/semantic-layer.md` for the full generated-query card contract before authoring data-layer code. |
 | `CreateQuestion`, `MetabotQuestion` | More question variants. |
 | `StaticDashboard`, `InteractiveDashboard`, `EditableDashboard` | Dashboard variants. |
 | `CreateDashboardModal` | Modal for new-dashboard flow. |
 | `CollectionBrowser` | Collection picker. |
-| `@metabase/embedding-sdk-react/data-app` exports | Data-app-only helpers for routing, schema-backed data reads, actions, clipboard, and sandbox-safe integration. Treat schema-backed queries, generated schema files, filters, metrics, actions, and other data-layer behavior as existing-data-app editing work; use skill discovery before authoring that code. |
+| `@metabase/embedding-sdk-react/data-app` exports | Data-app-only helpers for routing, schema-backed data reads, actions, clipboard, and sandbox-safe integration. Treat schema-backed queries, generated schema files, filters, metrics, actions, and other data-layer behavior as existing-data-app editing work; read the part `SKILL.md` lists for it before authoring that code. |
 | `DateRangePopover`, `DateRangeCalendar`, `useDateFormatter` (from `@metabase/embedding-sdk-react/data-app`) | Date range selection for filter bars. `DateRangePopover` wraps the app's own trigger element and opens a Metabase-styled range calendar under it; `DateRangeCalendar` is that calendar inline. `value`/`onChange` are `[start, end]` pairs of `YYYY-MM-DD` strings, `null` on either end while half-picked. `useDateFormatter().formatDateRange(value)` makes the trigger's label in the instance's locale, without the UTC-parsing bug of `new Date("YYYY-MM-DD")`. Use these instead of `<input type="date">` or a third-party picker — no dependency, no CSS import. |
 
 ### Blocked APIs
@@ -502,7 +494,7 @@ A built-in visualization carries the instance's theming, accessibility, tooltips
 
 **Always render a spinner (or skeleton) while `isLoading` is `true`** — never an empty slot or stale value, which causes layout shift when the data arrives. Same rule for lifted / derived queries (pass `isLoading` down) and for `useAction`'s `isExecuting` (spinner in the button + `disabled={isExecuting}`).
 
-For the hook contract itself — generics, table sources, segments, measures, breakouts, sorting, and debugging — use skill discovery before authoring schema-backed data-layer code.
+For the hook contract itself — generics, table sources, segments, measures, breakouts, sorting, and debugging — read `semantic-layer/semantic-layer.md` before authoring schema-backed data-layer code.
 
 ## App layout — fill the frame height
 

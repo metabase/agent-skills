@@ -1,11 +1,3 @@
----
-name: metabase-data-app-routing
-description: Add client-side routing (multiple pages) to an existing Metabase data-app project using the host-provided `DataAppRouter`, `DataAppLink`, and `useDataAppLocation` primitives. Use when the user has an existing data-app project and wants more than one page.
-metadata:
-  version: v1
-  internal: true
----
-
 # Add routing to a data-app
 
 A Metabase data-app bundle doesn't bundle a router library — it imports three small primitives from `@metabase/embedding-sdk-react/data-app`:
@@ -18,11 +10,11 @@ A Metabase data-app bundle doesn't bundle a router library — it imports three 
 
 That's the entire surface. **No `react-router` of any version, no `<BrowserRouter>`, no `<HashRouter>`.** The API is deliberately decoupled from any router library so a future Metabase version can swap the underlying implementation without touching bundle code.
 
-## When to use this skill
+## When to use this guide
 
 - The user has a working data-app project — scaffolded from the data-app template, so a one-liner `vite.config.ts` (`dataAppConfig()`) and an `src/index.tsx` that exports a factory already exist. The dev preview has no in-project entry: the SDK's dev preset serves it.
 - The user wants the bundle to render different content at different URLs (`/overview`, `/customers/:id`).
-- **Do not use this skill** to scaffold a project from scratch — it only patches an existing data-app project. If there is no project yet, stop and tell the user to start with a new data-app scaffold before adding routing.
+- **Do not use this guide** to scaffold a project from scratch — it only patches an existing data-app project. If there is no project yet, scaffold one with `setup/setup.md` before adding routing.
 
 `dataAppConfig()` already externalizes `@metabase/embedding-sdk-react/data-app`. You do NOT need to edit `vite.config.ts` to add routing — just edit `src/App.tsx` (and add more component files as needed) per the step below.
 
