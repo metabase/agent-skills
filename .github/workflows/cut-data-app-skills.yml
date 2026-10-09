@@ -20,6 +20,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      pull-requests: write
     env:
       VERSION: ${{ inputs.version }}
       CUT_BRANCH: cut-data-app-skills-${{ inputs.version }}
@@ -38,6 +39,7 @@ jobs:
         run: node scripts/cut-data-app-skills.mjs "$VERSION"
 
       - name: Commit the copy
+        id: commit
         run: |
           # A leftover branch means an earlier cut of this version was never
           # merged. Say so, rather than pushing a duplicate alongside it.
@@ -50,6 +52,7 @@ jobs:
           git add "skills/data-apps/$VERSION"
           git commit -m "Add data app skills for Metabase $VERSION"
           git push origin HEAD
+          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Open the PR (using GitHub Metabase Automation account)
         id: open-pr
@@ -57,16 +60,14 @@ jobs:
           GH_TOKEN: ${{ secrets.METABASE_AUTOMATION_USER_TOKEN }}
           SENDER: ${{ github.event.sender.login }}
         run: |
-          # --reviewer needs the automation PAT: GITHUB_TOKEN cannot resolve an
-          # org team. main requires an approving review, so the review is what
-          # auto-merge waits for.
+          # --reviewer needs the automation PAT: GITHUB_TOKEN cannot resolve an org team.
           pr_url=$(gh pr create --base main \
                        --reviewer metabase/embedding \
                        --title "Add data app skills for Metabase $VERSION" \
                        --body "$(cat <<BODY
           Copies \`skills/data-apps/master\` to \`skills/data-apps/$VERSION\` for Metabase's \`release-x.$VERSION.x\` branch, and sets each skill's \`metadata.version\` to \`"$VERSION"\`.
 
-          It merges automatically once approved.
+          It's approved and merged automatically once checks pass.
 
           _Opened by the [Cut data app skills workflow](../actions/workflows/cut-data-app-skills.yml), triggered by @$SENDER._
           BODY
@@ -74,11 +75,18 @@ jobs:
 
           echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
 
+      - name: Approve the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+        run: gh pr review --approve "$PR_URL"
+
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ secrets.METABASE_AUTOMATION_USER_TOKEN }}
           PR_URL: ${{ steps.open-pr.outputs.pr_url }}
-        run: gh pr merge "$PR_URL" --auto --squash
+          HEAD_SHA: ${{ steps.commit.outputs.head }}
+        run: gh pr merge "$PR_URL" --auto --squash --match-head-commit "$HEAD_SHA"
 
       - name: Append the PR link to the workflow summary
         if: ${{ !cancelled() && steps.open-pr.outputs.pr_url != '' }}
