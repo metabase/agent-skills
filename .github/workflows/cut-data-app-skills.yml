@@ -1,0 +1,88 @@
+name: Cut data app skills
+run-name: Cut data app skills for v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Major Metabase version whose release branch was cut, e.g. 65
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    name: Copy the master skills and open a PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ inputs.version }}
+      CUT_BRANCH: cut-data-app-skills-${{ inputs.version }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.METABASE_AUTOMATION_USER_TOKEN }}
+
+      - name: Setup git user
+        run: |
+          git config --global user.email "github-automation@metabase.com"
+          git config --global user.name "Metabase Automation"
+
+      - name: Copy master to skills/data-apps/${{ inputs.version }}
+        run: node scripts/cut-data-app-skills.mjs "$VERSION"
+
+      - name: Commit the copy
+        run: |
+          # A leftover branch means an earlier cut of this version was never
+          # merged. Say so, rather than pushing a duplicate alongside it.
+          if git ls-remote --exit-code --heads origin "$CUT_BRANCH" >/dev/null 2>&1; then
+            echo "::error::'$CUT_BRANCH' already exists on origin - an earlier cut of this version was never merged. Close its PR, delete the branch, then re-run."
+            exit 1
+          fi
+
+          git checkout -b "$CUT_BRANCH"
+          git add "skills/data-apps/$VERSION"
+          git commit -m "Add data app skills for Metabase $VERSION"
+          git push origin HEAD
+
+      - name: Open the PR (using GitHub Metabase Automation account)
+        id: open-pr
+        env:
+          GH_TOKEN: ${{ secrets.METABASE_AUTOMATION_USER_TOKEN }}
+          SENDER: ${{ github.event.sender.login }}
+        run: |
+          # --reviewer needs the automation PAT: GITHUB_TOKEN cannot resolve an
+          # org team. main requires an approving review, so the review is what
+          # auto-merge waits for.
+          pr_url=$(gh pr create --base main \
+                       --reviewer metabase/embedding \
+                       --title "Add data app skills for Metabase $VERSION" \
+                       --body "$(cat <<BODY
+          Copies \`skills/data-apps/master\` to \`skills/data-apps/$VERSION\` for Metabase's \`release-x.$VERSION.x\` branch, and sets each skill's \`metadata.version\` to \`"$VERSION"\`.
+
+          It merges automatically once approved.
+
+          _Opened by the [Cut data app skills workflow](../actions/workflows/cut-data-app-skills.yml), triggered by @$SENDER._
+          BODY
+          )")
+
+          echo "pr_url=$pr_url" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.METABASE_AUTOMATION_USER_TOKEN }}
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+        run: gh pr merge "$PR_URL" --auto --squash
+
+      - name: Append the PR link to the workflow summary
+        if: ${{ !cancelled() && steps.open-pr.outputs.pr_url != '' }}
+        env:
+          PR_URL: ${{ steps.open-pr.outputs.pr_url }}
+        run: |
+          printf '**Data app skills for Metabase %s:** %s\n' "$VERSION" "$PR_URL" >> "$GITHUB_STEP_SUMMARY"
