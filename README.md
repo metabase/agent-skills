@@ -44,6 +44,12 @@ Drives a Metabase instance from the terminal via the official `mb` CLI — every
 
 This skill is a thin discovery stub; the workflow content lives in [`@metabase/cli`](https://www.npmjs.com/package/@metabase/cli) and is served at runtime by `mb skills get`. Install the CLI (`npm i -g @metabase/cli`) and the skill resolves the rest. The same skill is also available as a Claude Code plugin direct from the CLI repo (`/plugin marketplace add metabase/mb-cli` + `/plugin install metabase-cli@metabase`); one install path is enough.
 
+### Data apps
+
+[skills/data-apps](./skills/data-apps/)
+
+Build Metabase data apps: scaffold one, add routing and actions, query tables and metrics through the semantic layer, and migrate an app to a newer contract version. There's one folder per Metabase version, and `master` holds the skills for the unreleased version. A plain install skips them; install them with the command on the **Data apps** page of your Metabase's admin settings, which picks the folder matching your Metabase version.
+
 ### Data engineering router
 
 [rde](./skills/rde/SKILL.md)
@@ -52,7 +58,7 @@ An expert data-engineering workflow with Metabase at the center of whatever stac
 
 [rde-data-apps](./skills/rde-data-apps/SKILL.md)
 
-The data-app branch of the rde router, loaded only when an app is asked for: finds the remote-sync repository, the Metabase URL, and the API key an rde machine already holds, fills the data app's `.env.local` without the key entering the conversation, and hands the build to the `metabase-data-app-*` skills from `metabase/metabase/skills`. `rde init` installs it with `rde` and those skills.
+The data-app branch of the rde router, loaded only when an app is asked for: finds the remote-sync repository, the Metabase URL, and the API key an rde machine already holds, fills the data app's `.env.local` without the key entering the conversation, and hands the build to the `metabase-data-app-*` skills in [`skills/data-apps`](./skills/data-apps/). `rde init` installs it with `rde` and those skills.
 
 ### Database metadata
 
