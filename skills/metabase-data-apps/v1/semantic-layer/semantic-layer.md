@@ -30,7 +30,7 @@ Keep the semantic layer and presentation layer separate.
 - Render charts with `InteractiveQuestion`/`StaticQuestion`. When a custom visualization is allowed instead, and which of the two to use, is decided by *Rendering a chart: Metabase first* in `setup/setup.md`.
 - `useMetabaseQueryObject(...)` returns `{ query, error, isLoading }`. Pass only the `query` property as `card={{ query }}` to `InteractiveQuestion` or `StaticQuestion`; never pass the whole hook result as `card.query`.
 - `useMetabaseQuery().rows` are keyed objects, not tuple arrays. Never read `row[0]` / `row[1]`, and never silence this with `as unknown as [string, number][]`, `DisplayRow`, or another tuple cast. If TypeScript says property `0` does not exist, it is catching a real bug. For typed `data.rows`, use literal keys such as `row.count` or generated field names such as `row[ordersTable.fields.createdAt.name]`. Use `data.columns` with `rawRows` or after explicitly narrowing a key; do not index typed rows with arbitrary `string` values from `data.columns`.
-- Do not cast query objects to `Parameters<typeof useMetabaseQuery>[0]` or to `DefinedQuery`. That erases the generated table/metric validation and the definition contract. Validate table ownership at the definition with `defineQuery<typeof table>(...)`; the hooks take the export with no generics.
+- Do not cast query objects to `Parameters<typeof useMetabaseQuery>[0]` or to `DefinedQuery`. That erases the generated table/metric validation and the definition contract. Write no generics on `defineQuery` or the hooks.
 - Do not build shared filter arrays with `ReturnType<typeof filter>[]` or `push(...)`; this can collapse overload inference. Pass raw filter state between components and build each query's `filters: [...]` inline with spreads.
 - Keep runtime state out of the base query in `queries/`. A clause whose value comes from a control — a selected plan, a date range, a search box — belongs in the second argument to `useMetabaseQuery`/`useMetabaseQueryObject`, not in the query. See "Static and dynamic query parts".
 - Do not include `fields` in queries with `aggregations` and `breakouts`; breakouts determine grouped result columns. Use `fields` only for row-selection queries.
@@ -168,6 +168,7 @@ import {
 import schema from "../src/metabase.data";
 
 const ordersTable = schema.tables.orders;
+const createdMonth = breakout(ordersTable.fields.createdAt, { unit: "month" });
 
 export const PaidRevenueByMonth = defineQuery({
   source: ordersTable,
@@ -176,8 +177,8 @@ export const PaidRevenueByMonth = defineQuery({
     filter(ordersTable.fields.status, "=", "paid"),
   ],
   aggregations: [aggregations.sum(ordersTable.fields.amount)],
-  breakouts: [breakout(ordersTable.fields.createdAt, { unit: "month" })],
-  orderBys: [orderBy(ordersTable.fields.createdAt, "desc", { unit: "month" })],
+  breakouts: [createdMonth],
+  orderBys: [orderBy(createdMonth, "desc")],
   limit: 100,
 });
 ```
@@ -190,7 +191,7 @@ import { PaidRevenueByMonth } from "../../queries/orders.query";
 const { data, isLoading, error } = useMetabaseQuery(PaidRevenueByMonth);
 ```
 
-`useMetabaseQuery(...)` infers typed row data from the definition, so write no generics on the hook. To check table ownership of fields, segments, and measures, put the generic on the definition: `defineQuery<typeof ordersTable>({ ... })`. Leave it off selected-field queries when you need precise row keys from `data.rows`. The recipes below show the object passed to `defineQuery`; each one is an export in `queries/`, never an argument written at the hook.
+`useMetabaseQuery(...)` infers typed row data from the definition. Write no generics on the hook or on `defineQuery`: an explicit type argument switches inference off, and rows lose their keys. The recipes below show the object passed to `defineQuery`; each one is an export in `queries/`, never an argument written at the hook.
 
 **Call each schema entry at most once per render tree.** Multiple `useMetabaseQuery` calls on the same `questionId` (or same `tableId` + identical filters/measures/breakouts) mount independent subscriptions, fire duplicate queries, and let consumers disagree mid-load. Lift the call to the highest component that needs the data; pass `data` / `isLoading` / `error` down as props. Different ids — or the same id with different filters / breakouts — are different data sources; call them separately.
 
@@ -250,6 +251,18 @@ const { data } = useMetabaseQuery(CompletedOrders, {
 });
 ```
 
+`{ type: "column", name }` refers to a static result column by name, typed from that column: an unknown name or an operator the column's type does not take is a compile error. Use a named breakout's or aggregation's own name.
+
+The dynamic part can also aggregate and group the result columns, for example to fold away a breakout added only so a control can filter on it:
+
+```ts
+const { data } = useMetabaseQuery(RevenueByMonthAndCategory, {
+  filters: categoryFilters,
+  aggregations: [aggregations.sum({ type: "column", name: "revenue" }, { name: "revenue" })],
+  breakouts: [{ type: "column", name: "month" }],
+});
+```
+
 If a control must switch a segment on and off, that is a choice between static queries, not a dynamic clause: define one query per state and pick the query, or express the same condition as a filter on a result column.
 
 Do not remove `savedQuestionEntityId` if you find it on a query object, or `copiedActionEntityId` on an action definition. Each names the definition's file in the app's collection — see *Write every query and action into the app's collection*.
@@ -271,6 +284,8 @@ export const RecordStatuses = defineQuery({
 For grouped table summaries, include at least one aggregation:
 
 ```ts
+const recordMonth = breakout(recordsTable.fields.createdAt, { unit: "month" });
+
 export const ActiveAmountByMonth = defineQuery({
   source: recordsTable,
   filters: [
@@ -278,8 +293,8 @@ export const ActiveAmountByMonth = defineQuery({
     filter(recordsTable.fields.amount, ">", 100),
   ],
   aggregations: [recordsTable.measures.totalAmount],
-  breakouts: [breakout(recordsTable.fields.createdAt, { unit: "month" })],
-  orderBys: [orderBy(recordsTable.fields.createdAt, "desc", { unit: "month" })],
+  breakouts: [recordMonth],
+  orderBys: [orderBy(recordMonth, "desc")],
 });
 ```
 
@@ -296,26 +311,34 @@ export const AmountByCategory = defineQuery({
 });
 ```
 
-When a query uses the same helper more than once, give each one a `name`. The name becomes the result column's name and the row key, it is typed, and it is how `orderBy(...)` and runtime clauses refer to that aggregation. Without names, the columns come back as `sum`, `sum_2`, and so on, and sorting or filtering by one of them fails:
+Table fields, segments, measures, filters, breakouts, and orderBys must come from the queried table.
+
+### Result column names
+
+Each breakout and aggregation needs a distinct result column name; otherwise `npm run write-resources` and the runtime refuse the query (`Breakouts and aggregations need unique column names: …`). Defaults: a breakout takes its field's name (`CREATED_AT`), an aggregation its operator's (`sum`, `avg`; `count` for `count()` and `distinct(...)`). Name colliding ones with `{ name }`. The name is the row key and what `orderBy(...)` and dynamic clauses use, not a display label; never rely on generated names like `sum_2` or `ID_2`.
+
+| Collision | Fix |
+| --- | --- |
+| Same helper twice, or `count()` with `distinct(...)` | `aggregations.sum(field, { name })` |
+| Measure or metric sharing a name with another aggregation | `aggregations.measure(m, { name })`, `aggregations.metric(m, { name })` |
+| One field broken out twice, or same-named fields of two tables | `breakout(field, { unit, name })` |
 
 ```ts
-const totalAmount = aggregations.sum(recordsTable.fields.amount, {
-  name: "total_amount",
-});
-const totalTax = aggregations.sum(recordsTable.fields.tax, {
-  name: "total_tax",
-});
+const totalAmount = aggregations.sum(recordsTable.fields.amount, { name: "total_amount" });
+const totalTax = aggregations.sum(recordsTable.fields.tax, { name: "total_tax" });
+const createdMonth = breakout(recordsTable.fields.createdAt, { unit: "month", name: "created_month" });
+const createdYear = breakout(recordsTable.fields.createdAt, { unit: "year", name: "created_year" });
 
-export const TaxByCategory = defineQuery({
+export const TaxByPeriod = defineQuery({
   source: recordsTable,
   aggregations: [totalAmount, totalTax],
-  breakouts: [breakout(recordsTable.fields.category)],
-  orderBys: [orderBy(totalTax, "desc")],
+  breakouts: [createdMonth, createdYear],
+  orderBys: [orderBy(createdYear, "desc"), orderBy(totalTax, "desc")],
 });
-// Rows are keyed `total_amount` and `total_tax`.
+// Rows: { created_month, created_year, total_amount, total_tax }
 ```
 
-Table fields, segments, measures, filters, breakouts, and orderBys must come from the queried table. Use `defineQuery<RecordsTable>({ ... })` when you want TypeScript to validate that ownership at the definition.
+In a query with aggregations, a `{ type: "column", name }` order-by must name one of its breakout or aggregation columns.
 
 ## metric aggregation recipes
 
@@ -335,19 +358,16 @@ export const Revenue = defineQuery({
 Use generated metric dimensions for filters and breakouts in queries that aggregate the owning metric. Dimensions from the metric's source table work directly. Dimensions from related tables also work when the generated field includes `sourceFieldId`; prefer those related-table dimensions for readable labels instead of grouping by raw foreign key IDs:
 
 ```ts
+const revenueMonth = breakout(revenueMetric.dimensions.orders.createdAt, {
+  unit: "month",
+});
+
 export const PaidRevenueByMonthAndFranchise = defineQuery({
   source: ordersTable,
   aggregations: [revenueMetric],
   filters: [filter(revenueMetric.dimensions.orders.status, "=", "paid")],
-  breakouts: [
-    breakout(revenueMetric.dimensions.orders.createdAt, { unit: "month" }),
-    breakout(revenueMetric.dimensions.franchises.name),
-  ],
-  orderBys: [
-    orderBy(revenueMetric.dimensions.orders.createdAt, "desc", {
-      unit: "month",
-    }),
-  ],
+  breakouts: [revenueMonth, breakout(revenueMetric.dimensions.franchises.name)],
+  orderBys: [orderBy(revenueMonth, "desc")],
 });
 
 // Prefer readable related-table dimensions when available.
@@ -372,12 +392,11 @@ export const CompletedRevenueByStatus = defineQuery({
 });
 ```
 
-A metric aggregation must belong to the table source. Do not use source-card metrics in table-source queries. Generated metric dimensions are scoped to their owning metric: if a query uses `revenueMetric.dimensions.*` in filters, helper aggregations, breakouts, or orderBys, it must also include `revenueMetric` in `aggregations`. Do not use metric dimensions as standalone table fields for unrelated `count()` or table-measure queries. Generated metric dimensions must also resolve to the table source. Use `defineQuery<typeof ordersTable>({ ... })` when you want TypeScript to validate that at the definition.
+A metric aggregation must belong to the table source. Do not use source-card metrics in table-source queries. Generated metric dimensions are scoped to their owning metric: if a query uses `revenueMetric.dimensions.*` in filters, helper aggregations, breakouts, or orderBys, it must also include `revenueMetric` in `aggregations`. Do not use metric dimensions as standalone table fields for unrelated `count()` or table-measure queries. Generated metric dimensions must also resolve to the table source.
 
 ## SDK-rendered views
 
 Table fields, segments, measure aggregations, and metric aggregations must come from the queried table. Generated metric dimensions used in filters, helper aggregations, breakouts, and orderBys must resolve to the queried table and belong to a metric included in the same query's `aggregations`.
-When table queries use `fields`, `segments`, `aggregations`, `breakouts`, or `orderBys`, let `defineQuery` infer the shape, or write `defineQuery<typeof recordsTable>` when ownership validation matters more than precise result-row keys.
 
 ## Interactive Metabase Views
 
@@ -387,7 +406,7 @@ Whether an element is an SDK question at all — and whether it is `StaticQuesti
 
 The examples under *Rendering With SDK Components* use `return null` for minimal loading and error handling. In a real app, render the app's existing loading or error UI there. Passing `card={{ query }}` is safe while `query` is `null`; do not pass the full `{ query, error, isLoading }` hook result as `card.query`.
 
-When wrapping `useMetabaseQueryObject` in a reusable chart/card component, destructure and render `error`; do not read only `{ query }`, because query-construction failures otherwise look like endless loading. Calling the hook inside that child component is valid React. Do not call hooks directly inside loops, conditions, or callbacks in the parent component.
+When wrapping `useMetabaseQueryObject` in a reusable chart/card component, destructure and render `error`; do not read only `{ query }`, because query-construction failures otherwise look like endless loading. Calling the hook inside that child component is valid React; type its definition prop as `typeof SomeQuery` (a union for several), never `DefinedQuery`. Do not call hooks directly inside loops, conditions, or callbacks in the parent component.
 
 Wrong/right pattern:
 
@@ -402,7 +421,7 @@ const { query: trendQuery } = useMetabaseQueryObject(TrendQuery);
 Hook typing:
 
 - Both hooks take a `defineQuery` export imported from `queries/` and nothing else; an inline object is a compile error. Write no generics on the hooks.
-- `useMetabaseQuery(...)` infers typed row data from the definition. Put `defineQuery<typeof table>` on the definition when ownership validation matters.
+- `useMetabaseQuery(...)` infers typed row data from the definition; `defineQuery` takes no generic either.
 - `useMetabaseQueryObject(...)` returns `{ query, error, isLoading }`. Pass the `query` property to `card={{ query }}`.
 - Do not use `as Parameters<typeof useMetabaseQuery>[0]` or `as DefinedQuery` to quiet query typing errors. The first hides invalid table fields, metric aggregations, and breakouts; the second hides a query without a saved question, which fails in production.
 
@@ -518,11 +537,13 @@ breakout(ordersTable.fields.amount, {
   binning: { strategy: "num-bins", numBins: 10 },
 });
 breakout(ordersTable.fields.state);
+breakout(ordersTable.fields.createdAt, { unit: "year", name: "created_year" });
 
-orderBy(ordersTable.fields.createdAt, "desc", { unit: "month" });
+const createdMonth = breakout(ordersTable.fields.createdAt, { unit: "month" });
+orderBy(createdMonth, "desc");
 ```
 
-Do not hand-write `orderBys` object literals such as `{ field, direction }` or `{ fieldId, direction }`; use `orderBy(...)`. When ordering the same date field used by a date breakout, pass the same `unit` to both `breakout(...)` and `orderBy(...)`.
+Do not hand-write `orderBys` object literals such as `{ field, direction }` or `{ fieldId, direction }`; use `orderBy(...)`. To order by a bucketed or binned breakout, pass the same breakout constant to `breakouts` and `orderBy(...)`; `orderBy` takes no `unit` or `binning`.
 
 For top-N grouped summaries, order by the aggregation result, not the raw source field. Store the aggregation helper in a local constant and pass that same constant to both `aggregations` and `orderBy(...)`:
 
@@ -651,7 +672,7 @@ const orderFilters = useMemo(
 - Treat row values as nullable. Guard before calling number/string methods such as `toFixed`, `toLocaleString`, or string transforms.
 - Use `rawRows` only for known positional shapes.
 - Aggregation columns may be named `count`, `sum`, or `avg`; match metadata when needed.
-- If a query has several helper aggregations of the same kind, such as multiple `aggregations.sum(...)` calls, name each one (`{ name: "..." }`) and read the rows by those names. Never depend on generated names like `sum_2`.
+- Read named breakouts and aggregations by their names (see *Result column names*).
 - Grouped queries can include a `null` breakout bucket. Render it as `"Unknown"` or filter it out deliberately.
 - Time-series charts need multiple ordered buckets. Do not fake sparklines for scalar or one-point results.
 - Multi-series charts with different units or magnitudes need separate axes or normalization.
@@ -687,9 +708,10 @@ If no curated schema entry supports the intended UI, leave the section out or as
 ## Final Checks
 
 - Run `npm run typecheck`. `Property 'definedWithDefineQuery' is missing` or `Property 'definedWithDefineAction' is missing` means a hook received something other than a `queries/` or `actions/` export; move the object there and import it.
-- Search touched files for `useMetabaseQuery(`, `useMetabaseQueryObject(`, and `useAction(`. The first argument must be an identifier imported from `queries/` or `actions/`; a `{`, a `defineQuery(`, a `defineAction(`, or a spread there is wrong even when it compiles. The second argument of the query hooks is the dynamic object and is written inline.
+- Search touched files for `useMetabaseQuery(`, `useMetabaseQueryObject(`, and `useAction(`. The first argument must be an identifier imported from `queries/` or `actions/`; a `{`, a `defineQuery(`, a `defineAction(`, or a spread there is wrong even when it compiles. The second argument of the query hooks is the dynamic object, written at the call or memoized (`as const` keeps a memoized `aggregations` a non-empty tuple).
 - Confirm `queries/` and `actions/` sit beside `package.json`, not under `src/`, and that every definition the app renders lives there.
 - Confirm every definition has its entity ID, and run `npm run write-resources`, then `npm run check-resources` and `npm run build`; both fail when the app's collection files no longer back the definitions.
+- Query errors reach only a hook's `error`, never the diagnostics feed: render `error` in every panel and look at each panel once before calling the app done.
 - Keep TypeScript diagnostics compact in the chat or handoff. Use the full output locally to fix the app, but report grouped root causes and only a few representative diagnostics instead of pasting the entire `tsc` output.
 - Verify every rendered value can be traced to a returned row property, schema field, measure, or deterministic transform.
 - Search touched files for `row[0]`, `row[1]`, `row.orderedAt`, `row.orderDate`, `as unknown as`, `DisplayRow`, `<select`, `margin`, `rate`, `score`, `percent`, `%`, `* 100`, and `.toFixed`; fix positional rows, result-key guesses, entity `<select>` filters, and unsupported business-field interpretations.
@@ -713,6 +735,8 @@ If no curated schema entry supports the intended UI, leave the section out or as
 - Inventing SDK component prop names instead of using `query` for generated table queries.
 - Mixing fields, segments, or measures from unrelated tables.
 - Passing a segment or measure to the dynamic second argument, where only result columns resolve.
+- Passing `{ unit }` or `{ binning }` to `orderBy(...)` instead of the breakout constant.
+- Leaving colliding breakout or aggregation names unnamed, or referring to a named one by its field or operator name.
 - Adding a filter UI that sends empty values instead of omitting the filter.
 - Hardcoding categorical filter values instead of querying the runtime values from Metabase.
 - Displaying entity names but filtering by those names when a stable ID is available.
