@@ -69,6 +69,7 @@ Rules:
 - Pass the export itself to the hook. Never spread or copy it.
 - Each definition carries `savedQuestionEntityId`, the entity ID of its saved
   question in the app's collection, under the repo's `collections/data_apps/`.
+  Generate a new one with `npx representations generate-entity-id`.
   After adding or changing a definition, run `npm run write-resources` to
   write that card. A metric it aggregates is copied into the app's collection
   too, by the same command. Then run `npm run check-resources`, and commit the definitions and

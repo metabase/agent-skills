@@ -224,7 +224,7 @@ export default dataAppConfig();
 
 There is intentionally **no escape hatch** for extra Vite plugins, aliases, or `define`s — `port` is the only knob. If you think you need more, you almost certainly don't; solve it in `src/` instead.
 
-**After every meaningful round of edits, run `npm run typecheck`.** It runs `tsc --noEmit` over `src/` and `vite.config.ts` — catches wrong prop shapes against the SDK types, broken refactors, missing imports, etc. The Vite dev server does NOT typecheck (it only transpiles), so errors that would fail a production CI run can sit invisibly in a passing `npm run dev` session. Run it before declaring a task complete.
+**After every meaningful round of edits, run `npm run typecheck`.** It runs `tsc --noEmit` over `src/`, `queries/`, `actions/` and `vite.config.ts` — catches wrong prop shapes against the SDK types, broken refactors, missing imports, etc. The Vite dev server does NOT typecheck (it only transpiles), so errors that would fail a production CI run can sit invisibly in a passing `npm run dev` session. Run it before declaring a task complete.
 
 **Before handoff, re-check package hygiene.** `@metabase/embedding-sdk-react` should use the expected data-app SDK source/tag for the target environment. No date picker dependency should be installed when the app only needs date ranges — not `react-datepicker`, `react-day-picker`, `flatpickr`, or a UI suite's picker (`@mui/x-date-pickers`, `antd`, `rsuite`, …); that is `DateRangePopover` from `@metabase/embedding-sdk-react/data-app`. `@types/react-datepicker` should not be installed unless the chosen `react-datepicker` version actually needs it.
 

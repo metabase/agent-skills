@@ -229,7 +229,7 @@ const { data } = useMetabaseQuery(RevenueQuery, {
 });
 ```
 
-Split them this way even when nothing appears to depend on it: the first argument must be identical on every render, and only the second may vary with runtime state.
+Split them this way even when nothing appears to depend on it: the first argument is always a `queries/` export, never built at render (picking between exports, `largeOnly ? LargeOrders : Orders`, is fine), and only the second may vary with runtime state.
 
 The dynamic clauses run as their own stage, so they see the **result columns** of the static query, not its source table. That is why `plan` is a breakout above: a control that filters on a source column only works if that column survives into the result. If it does not, add it as a breakout, or leave the static query unaggregated. Likewise, filter an aggregated static query on `count`/`sum`, not on the fields behind them.
 
@@ -260,6 +260,7 @@ const { data } = useMetabaseQuery(RevenueByMonthAndCategory, {
   filters: categoryFilters,
   aggregations: [aggregations.sum({ type: "column", name: "revenue" }, { name: "revenue" })],
   breakouts: [{ type: "column", name: "month" }],
+  orderBys: [orderBy({ type: "column", name: "month" }, "desc")],
 });
 ```
 
@@ -485,6 +486,8 @@ return (
 );
 ```
 
+A `table` of two breakouts and one aggregation renders as a pivot; pass `visualizationSettings: { "table.pivot": false }` for one row per group.
+
 Configured SDK visualization:
 
 ```tsx
@@ -578,7 +581,7 @@ const { data } = useMetabaseQuery(Scorecard, {
 });
 ```
 
-`Scorecard` is the unaggregated `defineQuery({ source: scorecardTable })` export in `queries/`; its source fields survive into the result, so the dynamic stage can order by them.
+`Scorecard` is the unaggregated `defineQuery({ source: scorecardTable })` export in `queries/`; its source fields survive into the result, so the dynamic stage can order by them. To sort an aggregated query by a user-picked aggregation, order by its name: `orderBy({ type: "column", name: sortKey }, "desc")`, with `sortKey` a union of the aggregation names.
 
 For metric queries, pass generated metric dimensions to `filter(...)` and `breakout(...)`:
 
@@ -708,10 +711,10 @@ If no curated schema entry supports the intended UI, leave the section out or as
 ## Final Checks
 
 - Run `npm run typecheck`. `Property 'definedWithDefineQuery' is missing` or `Property 'definedWithDefineAction' is missing` means a hook received something other than a `queries/` or `actions/` export; move the object there and import it.
-- Search touched files for `useMetabaseQuery(`, `useMetabaseQueryObject(`, and `useAction(`. The first argument must be an identifier imported from `queries/` or `actions/`; a `{`, a `defineQuery(`, a `defineAction(`, or a spread there is wrong even when it compiles. The second argument of the query hooks is the dynamic object, written at the call or memoized (`as const` keeps a memoized `aggregations` a non-empty tuple).
+- Search touched files for `useMetabaseQuery(`, `useMetabaseQueryObject(`, and `useAction(`. The first argument must be an identifier imported from `queries/` or `actions/`, or a choice between such identifiers; a `{`, a `defineQuery(`, a `defineAction(`, or a spread there is wrong even when it compiles. The second argument of the query hooks is the dynamic object, written at the call or memoized (`as const` keeps a memoized `aggregations` a non-empty tuple).
 - Confirm `queries/` and `actions/` sit beside `package.json`, not under `src/`, and that every definition the app renders lives there.
 - Confirm every definition has its entity ID, and run `npm run write-resources`, then `npm run check-resources` and `npm run build`; both fail when the app's collection files no longer back the definitions.
-- Query errors reach only a hook's `error`, never the diagnostics feed: render `error` in every panel and look at each panel once before calling the app done.
+- Render each hook's `error` in its panel. In `npm run dev` a query error is also a `console.error` entry in the diagnostics feed, so open the preview and read the feed with every panel mounted.
 - Keep TypeScript diagnostics compact in the chat or handoff. Use the full output locally to fix the app, but report grouped root causes and only a few representative diagnostics instead of pasting the entire `tsc` output.
 - Verify every rendered value can be traced to a returned row property, schema field, measure, or deterministic transform.
 - Search touched files for `row[0]`, `row[1]`, `row.orderedAt`, `row.orderDate`, `as unknown as`, `DisplayRow`, `<select`, `margin`, `rate`, `score`, `percent`, `%`, `* 100`, and `.toFixed`; fix positional rows, result-key guesses, entity `<select>` filters, and unsupported business-field interpretations.
