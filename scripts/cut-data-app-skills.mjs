@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 // Copies skills/data-apps/master to skills/data-apps/<version> and sets each
-// copied skill's `metadata.version` to <version>. Run when Metabase cuts its
-// release-x.<version>.x branch:
-//
-//   node scripts/cut-data-app-skills.mjs 65
+// copied skill's `metadata.version` to <version>. Run when Metabase cuts its release-x.<version>.x branch
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
