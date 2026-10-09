@@ -54,26 +54,6 @@ If `<repo>/data_apps/<slug>/` already holds a project, verify it matches the cur
 2. `src/index.tsx` default-exports a `DataAppFactory` (type from
    `@metabase/embedding-sdk-react/data-app`) returning `{ component, providerProps? }`
    (no args).
-3. `data_app.yaml` declares the `version:` Metabase serves (a manifest without
-   the line is version 1). Print the version Metabase serves without writing
-   anything (never reuse the Step 4 snippet here: it writes files):
-
-   ```bash
-   ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-   (
-     source "$ROOT/.env.local" 2>/dev/null
-     curl -sS -X POST \
-       -H "x-api-key: $DATA_APP_MB_API_KEY" \
-       -H "Content-Type: application/json" \
-       -d '{"name": "Version check"}' \
-       "$DATA_APP_MB_URL/api/apps/generate/app" |
-     node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{const r=JSON.parse(s);if(!r.files){console.error(s);process.exit(1)}console.log(r.files[0].yaml.match(/^version: (\d+)/m)[1])})'
-   )
-   ```
-
-   A lower version is not drift but an outdated app: **Stop.** Migrating it is a
-   separate task; use the agent's normal skill-discovery flow for migrating an
-   outdated data app before extending it.
 
 **All checks pass** → template-shaped. Ask: "Extend this app, or scaffold a new one under a different slug?" If extend → skip the copy step, edit `src/`. If new → pick a different slug and restart at Step 2.
 
@@ -146,20 +126,9 @@ Once the template is in `<repo>/data_apps/<slug>/` (run everything below from th
    If it prints `MISSING`, **ask the user to fill `DATA_APP_MB_URL` (the running Metabase instance) and `DATA_APP_MB_API_KEY` (Admin → Authentication → API keys, a key in the Administrators group, since the typed schema answers only an admin) in `<repo>/.env.local` themselves** — up front, before anything needs the key.
 
    > **Never ask the user to paste the API key into the chat, and never `cat` / `echo` / print `.env.local` or its variables.** It's git-ignored and may hold *other* secrets — the file's contents and the key must never enter the conversation or your context. Every command that needs the key `source`s the file (as above) so the shell uses the value directly; you only ever see the `creds present` / `MISSING` signal, never the secret itself. (`creds present` only means both vars are filled and not the default `mb_replace_me` placeholder — not that the URL or key are valid; a bad key surfaces later when a request fails.)
-5. **Generate `data_app.yaml` and the app's collection.** Metabase writes both, with new entity IDs: `POST /api/apps/generate/app` answers the app's `data_app.yaml` (at `data_apps/<slug>/data_app.yaml`) and its collection's file under `collections/data_apps/`, each at its path from the repo root. Run it from the repo, with the app's display name, its `/apps/<slug>` slug, and an optional one-line description:
+5. **Generate `data_app.yaml` and the app's collection.** Metabase writes both, with new entity IDs. Call `POST /api/apps/generate/app` with the app's display name, its `/apps/<slug>` slug, and an optional one-line description: `{"name": "Sales App", "slug": "sales-app", "description": "Pipeline health and quota attainment by region"}`. Authenticate with the API key as the `x-api-key` header, sourced from `.env.local` as above.
 
-   ```bash
-   ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-   (
-     source "$ROOT/.env.local" 2>/dev/null
-     curl -sS -X POST \
-       -H "x-api-key: $DATA_APP_MB_API_KEY" \
-       -H "Content-Type: application/json" \
-       -d '{"name": "Sales App", "slug": "sales-app", "description": "Pipeline health and quota attainment by region"}' \
-       "$DATA_APP_MB_URL/api/apps/generate/app" |
-     node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>{const r=JSON.parse(s);if(!r.files){console.error(s);process.exit(1)}for(const f of r.files){const p=require("path").join(process.argv[1],f.path);require("fs").mkdirSync(require("path").dirname(p),{recursive:true});require("fs").writeFileSync(p,f.yaml);console.log("Wrote "+f.path)}})' "$ROOT"
-   )
-   ```
+   It answers `{"files": [{"path": "...", "yaml": "..."}]}`: the app's `data_app.yaml` (at `data_apps/<slug>/data_app.yaml`) and its collection's file under `collections/data_apps/`. Write each `yaml` unchanged to its `path`, which is relative to the repo root. Any other answer is an error: show it to the user and stop.
 
    Run it once per app: a second run writes a new collection with new entity IDs. Never copy `data_app.yaml` or its `collection:` line from another app. Edit the generated `data_app.yaml` only to add `allowed_hosts` (below).
 
