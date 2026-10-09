@@ -355,7 +355,7 @@ export const Revenue = defineQuery({
 });
 ```
 
-Use generated metric dimensions for filters and breakouts in queries that aggregate the owning metric. Dimensions from the metric's source table work directly. Dimensions from related tables also work when the generated field includes `sourceFieldId`; prefer those related-table dimensions for readable labels instead of grouping by raw foreign key IDs:
+Use generated metric dimensions for filters and breakouts in queries that aggregate the owning metric. Dimensions from the metric's source table work directly. Dimensions from related tables also work when the generated field includes `sourceFieldId`; prefer those related-table dimensions for readable labels instead of grouping by raw foreign key IDs. A metric's dimensions are the only way to a related table's field: a table's `fields` hold its own columns. If the metric lacks the dimension, ask the user to add it to the metric's dimensions, then regenerate the schema; never assemble a related-table field reference by hand:
 
 ```ts
 const revenueMonth = breakout(revenueMetric.dimensions.orders.createdAt, {
