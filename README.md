@@ -46,9 +46,9 @@ This skill is a thin discovery stub; the workflow content lives in [`@metabase/c
 
 ### Data apps
 
-[skills/data-apps](./skills/data-apps/)
+[metabase-data-apps](./skills/metabase-data-apps/v1/SKILL.md)
 
-Build Metabase data apps: scaffold one, add routing and actions, query tables and metrics through the semantic layer, and migrate an app to a newer contract version. There's one folder per Metabase version, and `master` holds the skills for the unreleased version. A plain install skips them; install them with the command on the **Data apps** page of your Metabase's admin settings, which picks the folder matching your Metabase version.
+Build Metabase data apps: scaffold one, add routing and actions, query tables and metrics through the semantic layer, and migrate an app to a newer contract version. It's one skill with a guide per task, and an agent reads only the guides its task needs. Each breaking change gets a new version folder (`v1`, `v2`, ...). A plain install skips it; install it with the command on the **Data apps** page of your Metabase's admin settings, which names the version your Metabase needs.
 
 ### Data engineering router
 
@@ -58,7 +58,7 @@ An expert data-engineering workflow with Metabase at the center of whatever stac
 
 [rde-data-apps](./skills/rde-data-apps/SKILL.md)
 
-The data-app branch of the rde router, loaded only when an app is asked for: finds the remote-sync repository, the Metabase URL, and the API key an rde machine already holds, fills the data app's `.env.local` without the key entering the conversation, and hands the build to the `metabase-data-app-*` skills in [`skills/data-apps`](./skills/data-apps/). `rde init` installs it with `rde` and those skills.
+The data-app branch of the rde router, loaded only when an app is asked for: finds the remote-sync repository, the Metabase URL, and the API key an rde machine already holds, fills the data app's `.env.local` without the key entering the conversation, and hands the build to the [`metabase-data-apps`](./skills/metabase-data-apps/v1/SKILL.md) skill. `rde init` installs it with `rde` and that skill.
 
 ### Database metadata
 

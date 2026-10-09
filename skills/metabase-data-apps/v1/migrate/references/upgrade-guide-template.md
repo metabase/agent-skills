@@ -36,7 +36,7 @@ grep -q 'DataAppFactory' src/index.tsx && echo ok
 <upgrade-specific precondition, if any>
 ```
 
-If one fails, stop: the app is not template-shaped at v<N>. See SKILL.md, Step 1.
+If one fails, stop: the app is not template-shaped at v<N>. See `migrate/migrate.md`, Step 1.
 
 ## Removed and renamed symbols
 

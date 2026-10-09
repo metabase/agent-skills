@@ -1,11 +1,3 @@
----
-name: metabase-data-app-migrate
-description: Migrate an existing Metabase data app that Metabase marks Outdated (its `data_app.yaml` `version` is below the data-app contract version the installed skills and SDK target) to the current version, one upgrade at a time, with a resumable procedure. Use when Metabase shows an app as Outdated, `npm run typecheck` or `npm run build` fails after an SDK upgrade, or an existing app's `version` is behind the one the installed skills target. Not for creating an app.
-metadata:
-  version: v1
-  internal: true
----
-
 # Migrate a data app to the current contract version
 
 A data app declares the contract version its code targets in `data_app.yaml`
@@ -17,7 +9,7 @@ an older version is marked _Outdated_ in the admin list, hidden from every other
 user, and refuses to open until it is migrated.
 
 Migration is a walk over **upgrades**: `N -> N+1 -> ... -> M`, one upgrade at a time,
-each described by a guide in `references/upgrades/`. Nothing is skipped and nothing
+each described by a guide in `migrate/references/upgrades/`. Nothing is skipped and nothing
 is remembered between sessions: the app's own files and git history carry all
 the state.
 
@@ -37,8 +29,8 @@ Every step below follows from these. Never break them.
    by you. The files of the app's collection under `collections/data_apps/`
    and the entity IDs its definitions name (`savedQuestionEntityId`,
    `copiedActionEntityId`) change only where an upgrade guide says so,
-   following the data-app guidance on writing the files of an app's
-   collection (use skill discovery).
+   following _Write every query and action into the app's collection_ in
+   `semantic-layer/semantic-layer.md`.
 
 ## Step 0 - Locate the app and read its state
 
@@ -62,10 +54,10 @@ git show HEAD:data_apps/<slug>/data_app.yaml | grep -E '^version:' || echo "vers
 # version in the working tree
 grep -E '^version:' data_app.yaml || echo "version: 1"
 # target: the highest upgrade guide shipped with this skill (no guides means 1)
-ls <skill-dir>/references/upgrades/ | sed -nE 's/^v[0-9]+-to-v([0-9]+)\.md$/\1/p' | sort -n | tail -1 | grep . || echo 1
+ls <skill-dir>/migrate/references/upgrades/ | sed -nE 's/^v[0-9]+-to-v([0-9]+)\.md$/\1/p' | sort -n | tail -1 | grep . || echo 1
 ```
 
-`<skill-dir>` is the directory this SKILL.md was loaded from.
+`<skill-dir>` is the directory holding this skill's `SKILL.md`.
 
 Then decide:
 
@@ -86,7 +78,7 @@ Then decide:
    is the one-liner `export default dataAppConfig()` and `src/index.tsx`
    default-exports a `DataAppFactory`. If not, **Stop**: this is not a version
    migration but structural drift. Offer to scaffold a fresh app under the same
-   slug (a separate task: use skill discovery for creating a data app) and port
+   slug (a separate task, in `setup/setup.md`) and port
    `src/`, `queries/`, and `actions/` over, or to proceed at the user's risk.
    Wait for the answer.
 3. Read every upgrade guide from the current version to the target before editing
@@ -96,7 +88,7 @@ Then decide:
 
 For each `N` from the HEAD version up to `target - 1`:
 
-1. Open `references/upgrades/v<N>-to-v<N+1>.md` and run its _Preconditions_.
+1. Open `migrate/references/upgrades/v<N>-to-v<N+1>.md` and run its _Preconditions_.
 2. Apply the guide's _Steps_ in order. Each step is mechanical and ends with a
    **Done when** command. Run the command first: if it already passes, skip the
    step; if not, apply the edit and run it again. A step's command is the only
@@ -185,8 +177,8 @@ few representative diagnostics rather than pasting it whole.
 
 ## Upgrade guides
 
-Guides live in `references/upgrades/`, one per upgrade, named `v<N>-to-v<N+1>.md`. They
+Guides live in `migrate/references/upgrades/`, one per upgrade, named `v<N>-to-v<N+1>.md`. They
 are written by Metabase when the contract version is bumped, from the template
-in `references/upgrade-guide-template.md`; `references/maintainer-checklist.md`
+in `migrate/references/upgrade-guide-template.md`; `migrate/references/maintainer-checklist.md`
 describes that process. A missing guide for an upgrade you need is a bug in the
 skill install, not something to improvise around.

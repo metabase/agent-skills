@@ -18,17 +18,17 @@ deletes the alias bumps the contract version and ships the upgrade.
 
 ## In the bump PRs
 
-Steps 2 and 4 go in `metabase/agent-skills`, under `skills/<skill>/<version>/`;
+Steps 2 and 4 go in `metabase/agent-skills`, under `skills/metabase-data-apps/<version>/`;
 the rest go in `metabase/metabase`. Merge the two PRs together.
 
 1. `enterprise/backend/src/metabase_enterprise/data_apps/config.clj`:
    `supported-app-version` to `N+1`. `initial-app-version` stays 1.
-2. Update `metabase-data-app-setup/template/` if the contract change touches it.
+2. Update `setup/template/` if the contract change touches it.
 3. Every e2e fixture manifest that declares a version
    (`e2e/support/assets/data-apps/*/data_app.yaml`,
    `e2e/support/assets/example_synced_data_apps/data_apps/*/data_app.yaml`,
    `e2e/embedding-sdk-host-apps/*/data_app.yaml`): `version: N+1`.
-4. `metabase-data-app-migrate/references/upgrades/v<N>-to-v<N+1>.md` from
+4. `migrate/references/upgrades/v<N>-to-v<N+1>.md` from
    `upgrade-guide-template.md`, every section filled. Build the symbol table from
    `git diff <previous-release-tag> -- resources/embedding-sdk/dist/data-app.d.ts`
    after regenerating the declarations (`bun run embedding-sdk:dts:generate`).
