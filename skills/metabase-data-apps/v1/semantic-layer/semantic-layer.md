@@ -25,7 +25,7 @@ Keep the semantic layer and presentation layer separate.
 - Date bars must include Custom last by default: duration presets, All time, then Custom. Omit Custom only when the user explicitly asks for fixed presets only or no date range control.
 - Never invent aggregation or measure objects such as `{ name: "count" }` or `{ name: "sum", field: ... }`. Use generated table measures or exported aggregation helpers.
 - Only render values returned by Metabase or deterministic transforms of returned values. Do not invent KPI values, trends, labels, statuses, ratings, timestamps, rankings, insights, segments, or chart series.
-- Do not custom-render ambiguous business fields such as `margin`, `rate`, `score`, `percent`, `health`, `risk`, or `efficiency`. Do not add `%`, multiply by 100, color-code, or render stars unless semantic-layer units explicitly support it; use an SDK table/chart, omit the field, or ask for curation.
+- Do not custom-render ambiguous business fields such as `margin`, `rate`, `score`, `percent`, `health`, `risk`, or `efficiency`. Do not add `%`, multiply by 100, color-code, or render stars unless semantic-layer units explicitly support it or the user asked for that share; use an SDK table/chart, omit the field, or ask for curation.
 - Visualization data must come from Metabase through `useMetabaseQuery` or `useMetabaseQueryObject` with `InteractiveQuestion`/`StaticQuestion`. Do not hardcode chart-ready arrays, sample data, demo values, or schema-shaped mock values.
 - Render charts with `InteractiveQuestion`/`StaticQuestion`. When a custom visualization is allowed instead, and which of the two to use, is decided by *Rendering a chart: Metabase first* in `setup/setup.md`.
 - `useMetabaseQueryObject(...)` returns `{ query, error, isLoading }`. Pass only the `query` property as `card={{ query }}` to `InteractiveQuestion` or `StaticQuestion`; never pass the whole hook result as `card.query`.
@@ -253,7 +253,7 @@ const { data } = useMetabaseQuery(CompletedOrders, {
 
 `{ type: "column", name }` refers to a static result column by name, typed from that column: an unknown name or an operator the column's type does not take is a compile error. Use a named breakout's or aggregation's own name.
 
-The dynamic part can also aggregate and group the result columns, for example to fold away a breakout added only so a control can filter on it:
+The dynamic part can also aggregate and group the result columns, for example to fold away a breakout added only so a control can filter on it. Fold only additive aggregations (sums, counts); a distinct count or an average can't be re-added:
 
 ```ts
 const { data } = useMetabaseQuery(RevenueByMonthAndCategory, {
@@ -393,7 +393,7 @@ export const CompletedRevenueByStatus = defineQuery({
 });
 ```
 
-A metric aggregation must belong to the table source. Do not use source-card metrics in table-source queries. Generated metric dimensions are scoped to their owning metric: if a query uses `revenueMetric.dimensions.*` in filters, helper aggregations, breakouts, or orderBys, it must also include `revenueMetric` in `aggregations`. Do not use metric dimensions as standalone table fields for unrelated `count()` or table-measure queries. Generated metric dimensions must also resolve to the table source.
+A metric aggregation must belong to the table source. Do not use source-card metrics in table-source queries. Generated metric dimensions are scoped to their owning metric: if a query uses `revenueMetric.dimensions.*` in filters, helper aggregations, breakouts, or orderBys, it must also include `revenueMetric` in `aggregations`. Do not use metric dimensions in a grouped query that lacks the metric, such as a `count()` or table-measure query. Generated metric dimensions must also resolve to the table source.
 
 ## SDK-rendered views
 
@@ -486,7 +486,7 @@ return (
 );
 ```
 
-A `table` of two breakouts and one aggregation renders as a pivot; pass `visualizationSettings: { "table.pivot": false }` for one row per group.
+A `table` of two breakouts and one aggregation renders as a pivot; pass `visualizationSettings: { "table.pivot": false }` for one row per group. Set a column's header with `column_settings: { '["name","approvers"]': { column_title: "Approvers" } }`, keyed by its result column name.
 
 Configured SDK visualization:
 
@@ -594,7 +594,7 @@ Filter operator rules:
 
 - string: `=`, `!=`, `contains`, `does-not-contain`, `starts-with`, `ends-with`, `is-empty`, `not-empty`, `is-null`, `not-null`
 - number: `=`, `!=`, `>`, `>=`, `<`, `<=`, `between`, `is-null`, `not-null`
-- date: `=`, `!=`, `>`, `>=`, `<`, `<=`, `between`, `time-interval`, `is-null`, `not-null`; `time-interval` takes `[amount, unit]` and is relative to when the query runs, so it belongs in the static query: `filter(orders.fields.createdAt, "time-interval", [-24, "month"])`
+- date: `=`, `!=`, `>`, `>=`, `<`, `<=`, `between`, `time-interval`, `is-null`, `not-null`; `time-interval` takes `[amount, unit]` (`[0, "year"]` is the current year) and is relative to when the query runs, so it belongs in the static query: `filter(orders.fields.createdAt, "time-interval", [-24, "month"])`
 - boolean: `=`, `is-null`, `not-null`
 
 Only date dimensions can use `unit`. Non-date dimensions can be used as breakouts without `unit`; numeric dimensions can use `binning`.
