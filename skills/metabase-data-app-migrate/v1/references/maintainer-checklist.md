@@ -18,13 +18,12 @@ deletes the alias bumps the contract version and ships the upgrade.
 
 ## In the bump PRs
 
-Steps 2 and 4 go in `metabase/agent-skills`, under `skills/data-apps/master/`;
+Steps 2 and 4 go in `metabase/agent-skills`, under `skills/<skill>/<version>/`;
 the rest go in `metabase/metabase`. Merge the two PRs together.
 
 1. `enterprise/backend/src/metabase_enterprise/data_apps/config.clj`:
    `supported-app-version` to `N+1`. `initial-app-version` stays 1.
-2. `metabase-data-app-setup/template/data_app.yaml`: `version: N+1`.
-   Update the template's source if the contract change touches it.
+2. Update `metabase-data-app-setup/template/` if the contract change touches it.
 3. Every e2e fixture manifest that declares a version
    (`e2e/support/assets/data-apps/*/data_app.yaml`,
    `e2e/support/assets/example_synced_data_apps/data_apps/*/data_app.yaml`,
@@ -41,6 +40,6 @@ the rest go in `metabase/metabase`. Merge the two PRs together.
    `sandbox.ts` fallback point; that removal is the breaking change.
 7. `enterprise/frontend/src/embedding-sdk-package/CHANGELOG.md`: a "Data apps
    contract v<N+1>" entry linking the upgrade guide.
-8. Check by hand that steps 1, 2, and 4 agree: the template declares the
-   supported version, and the upgrade guides cover every version from 1 up to it.
-   Nothing checks this across the two repositories.
+8. Check by hand that steps 1 and 4 agree: the upgrade guides must cover every
+   version from 1 up to the supported one. Nothing checks this across the two
+   repositories.
