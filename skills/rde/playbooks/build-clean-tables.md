@@ -22,7 +22,7 @@ mb transform update <id> --file ./.scratch/patch.json       # source-only patch
 mb transform-test create --file ./.scratch/<m>.test.json | jq '{id,name}'   # body: references/transform-tests.md; v65+. Refuses a mis-declared input set here, before any run
 mb transform-test run <id> | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "row-counts", "missing-rows", "extra-rows", "cell-mismatches", sample, error}]}'   # exit 1 unless passed
 mb transform-test update <id> --file ./.scratch/<m>.test.patch.json   # inputs and expectations replace whole, and re-validate
-mb transform-test list --transform <id> --fields id,name       # every test on a model
+mb transform-test list --transform-id <id> --fields id,name       # every test on a model
 mb transform run <id> --sync | jq '{status:.final.status, table:.target_table_id, msg:.final.message}'
 mb transform list --full | jq '[.data[] | select(.source.query.stages[0].native | test("<schema>.<name>")) | .id]'   # dependents
 ```
@@ -47,7 +47,7 @@ For a model that carries a rule (every intermediate and final-layer model; a sta
 
 ## 5. Gate
 
-The eight checks as one query per `data-quality-checks.md`, at its cadence. A FAIL stops the chain. Judgment calls (`modeling-decisions.md`) are `[DECIDED, reversible]` from the profile, `[CHECKPOINT]` when irreversible; a decision taken here gets its case added to the step 4 test. Write the Checks and Models rows. Then `mb table update <table-id> --body '{"visibility_type":"technical"}'` on every raw, staging, and intermediate table the model read or wrote.
+The eight checks as one query per `data-quality-checks.md`, at its cadence. A FAIL stops the chain. Judgment calls (`modeling-decisions.md`) are `[DECIDED, reversible]` from the profile, `[CHECKPOINT]` when irreversible; a decision taken here gets its case added to the step 4 test. Write the Checks and Models rows. Then `mb table update <table-id> --body '{"visibility_type":"technical"}'` on every raw, staging, and intermediate table the model read or wrote, except a table a data app reads or writes (now or planned in STATE.md; `semantic-layer-design.md`, metadata chain step 1).
 
 ## 6. Metadata on final-layer tables
 
@@ -59,7 +59,7 @@ Per table, unhide it (`"visibility_type":null`), then in the order `semantic-lay
 
 ## 8. Change a deployed model
 
-Copy the SQL to `<m>.prev.sql` (rollback is a patch with it). Run the model's tests as they stand (`transform-test list --transform <id>`, then `run` each): a green baseline, or a finding to report before touching anything. Add the case that motivated the change as a fixture row and its expectation, see it fail. Classify: logic only, patch and run; shape change, `mb transform delete-table <id> --yes` first; rename, re-point every definition and card on the old column, and every expectation that names it. Patch; run the tests; an expectation the changed rule moved is handled per `transform-tests.md`, Cadence. Then find dependents in stored SQL, run their tests, run the job, re-gate each rebuilt table, re-verify their definitions per `semantic-layer-design.md`, add the timeline event (body in `validate-and-reconcile.md`), restate per the contract.
+Copy the SQL to `<m>.prev.sql` (rollback is a patch with it). Run the model's tests as they stand (`transform-test list --transform-id <id>`, then `run` each): a green baseline, or a finding to report before touching anything. Add the case that motivated the change as a fixture row and its expectation, see it fail (a case that adds a source: `transform-tests.md`, Cadence). Classify: logic only, patch and run; added columns, patch and run, in place; dropping or retyping a column a published table, measure, or segment uses needs a plan agreed with the user first, since `delete-table` under a published table risks its Library entry, measures, and segments; rename, re-point every definition and card on the old column, and every expectation that names it. Patch; run the tests; an expectation the changed rule moved is handled per `transform-tests.md`, Cadence. Then find dependents in stored SQL, run their tests, run the job, re-gate each rebuilt table, re-verify their definitions per `semantic-layer-design.md`, add the timeline event (body in `validate-and-reconcile.md`), restate per the contract.
 
 Finished example, a transform description (the SQL header mirrors it):
 

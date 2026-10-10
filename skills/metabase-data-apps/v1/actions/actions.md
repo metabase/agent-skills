@@ -126,7 +126,7 @@ That whole string is `error.data.message`. Render it as-is.
 
 When an action succeeds, the data the user sees may be stale. Without an explicit refresh, the list still shows the old rows; the stat tile still shows the old count; the row the user just edited still shows its old values. The action worked, but the UI lies — and there is no warning.
 
-The rule is simple and absolute: **after an action resolves successfully, every piece of data on the screen that the action could have changed must be refreshed.**
+The rule is simple and absolute: **after an action resolves successfully, every piece of data on the screen that the action could have changed must be refreshed.** The refresh is the `refetch` that `useMetabaseQuery` returns beside `data`, `isLoading`, and `error` (`refetch: () => Promise<void>`): `await execute(...)`, then `await Promise.all([ordersQuery.refetch(), totalsQuery.refetch()])`.
 
 ## Mapping parameters
 

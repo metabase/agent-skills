@@ -67,7 +67,7 @@ Five parts, in this order, in every Reply:
 
 ## Trust labels and restatement
 
-The first line of every headline metric's description and every KPI card's description is its trust label: `Reconciled to <reference> on <date>, within <tolerance>` / `Self-consistent only, no external reference` / `Draft, provisional decisions: D3, D7`. The same label sits beside the number in every hand-back. A stakeholder's done is `Reconciled` or an explicit acceptance of `Self-consistent only`.
+The first line of every headline metric's description and every KPI card's description is its trust label: `Reconciled to <reference> on <date>, within <tolerance>` / `Self-consistent only, no external reference` / `Draft, provisional decisions: D3, D7`, each id followed by its one-line decision ([state.md](state.md)). The same label sits beside the number in every hand-back. A stakeholder's done is `Reconciled` or an explicit acceptance of `Self-consistent only`.
 
 When a shipped number was wrong: fix the definition in place (`update` on the same id; a segment or measure carries a `revision_message` naming the cause, a metric's description gains a dated change line), add a timeline event with direction and size, a dated text card on the dashboard for one period (old figure, new figure, cause, which past periods moved), and say the same in the hand-back. Never restate silently.
 

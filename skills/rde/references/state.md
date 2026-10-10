@@ -4,7 +4,7 @@ Every playbook reads and writes here.
 
 ## STATE.md
 
-`./.scratch/STATE.md`, this schema:
+`./.scratch/` is personal working state, kept out of git and never shared: a decision teammates need lives in the transform's or metric's description as its id plus its one line (`D7: churn after one month without revenue`), never the id alone. `./.scratch/STATE.md`, this schema:
 
 ````markdown
 # STATE
@@ -56,7 +56,7 @@ Status: `open`, `PROVISIONAL` (default in use), `decided`. Record each the momen
 - A fact about a number: the metric's or segment's description.
 - A definition change or data incident: a `mb timeline-event` in the affected questions' collection.
 - Decisions and check results: those tables; `open` or `PROVISIONAL` holds its `affects` at `Draft` ([collaboration-contract.md](collaboration-contract.md)).
-- An exclusion: a row in `dim_exclusion_rule` (predicate, entity, reason, source, source-enforced) plus a flagged column with a reason, never a `WHERE`.
+- An exclusion: a flagged column with a reason (a threshold as a `cfg_<domain>` constant), never a silent `WHERE`; a `dim_exclusion_rule` table (predicate, entity, reason, source, source-enforced) the models left-join only when several documented rules exist.
 
 Nothing is written twice. Deployed means: filed per the company's convention (or landed outside Metabase); its transform tests pass (`tests` is a pass count, or `none` with a reason, or `unavailable` when the instance, the token, or the driver cannot run tests; [transform-tests.md](transform-tests.md)); last run succeeded; rows above zero or a confirmed empty result; no FAIL in Checks.
 

@@ -35,10 +35,10 @@ The transform description is the canonical header; the SQL comment at the top of
 -- Key:         <column that identifies the row>
 -- Sources:     <upstream models or tables>
 -- Definition:  <one-line business definition>
--- Caveats:     <exclusions, constants and values, deviations, provisional decisions by id>
+-- Caveats:     <exclusions, constants and values, deviations, decisions as id plus one line>
 ```
 
-Constants live in one transform, `cfg_<domain>` (`SELECT 1 AS gap_months, 'D7' AS gap_months_note, 0.05 AS materiality, 'D2' AS materiality_note`): one row, one column per constant plus a `<constant>_note` column naming the STATE.md decision id. Every model that reads a constant cross-joins it (`CROSS JOIN analytics.cfg_billing c`, then `c.gap_months`); changing one is a `mb transform update` on `cfg_<domain>`, the domain's transform tests run (each declares `cfg_<domain>` as an input, so the alternative value is rehearsed on fixtures first; [transform-tests.md](transform-tests.md)), then one run of the domain's job.
+Constants live in one transform, `cfg_<domain>` (`SELECT 1 AS gap_months, 'D7: churn after one month without revenue' AS gap_months_note, 0.05 AS materiality, 'D2: 5% gap is material' AS materiality_note`): one row, one column per constant plus a `<constant>_note` column carrying the STATE.md decision id and its one line. Every model that reads a constant cross-joins it (`CROSS JOIN analytics.cfg_billing c`, then `c.gap_months`); changing one is a `mb transform update` on `cfg_<domain>`, the domain's transform tests run (each declares `cfg_<domain>` as an input, so the alternative value is rehearsed on fixtures first; [transform-tests.md](transform-tests.md)), then one run of the domain's job.
 
 ## Declare grain and key before building
 
@@ -68,7 +68,7 @@ Body shape: `mb transform create --help --json | jq .inputSchema`; mechanics: `m
 
 ## Physical layout
 
-Defaults to confirm: one collection per layer named for it (`mb collection create --body '{"name":"stg_acme"}' --namespace transforms`); every layer in one output schema separate from the landing schema; layer carried by prefix and collection, not by schema.
+Defaults to confirm: one collection per layer named for it (`mb collection create --body '{"name":"stg_acme"}' --namespace transforms`); every layer in one output schema separate from the landing schema; layer carried by prefix and collection, not by schema. A SQL transform reads one database and cannot join across them: a needed table in another database is a `[CHECKPOINT]` with A. the platform team replicates it into the warehouse (recommended); B. a Python transform, when a Python runner is configured; C. a small hand-kept `cfg_` copy, recorded as a decision with its staleness risk.
 
 ## Transformations that run outside Metabase
 
