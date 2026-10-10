@@ -193,7 +193,7 @@ const { data, isLoading, error } = useMetabaseQuery(PaidRevenueByMonth);
 
 `useMetabaseQuery(...)` infers typed row data from the definition. Write no generics on the hook or on `defineQuery`: an explicit type argument switches inference off, and rows lose their keys. The recipes below show the object passed to `defineQuery`; each one is an export in `queries/`, never an argument written at the hook.
 
-**Call each schema entry at most once per render tree.** Multiple `useMetabaseQuery` calls on the same `questionId` (or same `tableId` + identical filters/measures/breakouts) mount independent subscriptions, fire duplicate queries, and let consumers disagree mid-load. Lift the call to the highest component that needs the data; pass `data` / `isLoading` / `error` down as props. Different ids — or the same id with different filters / breakouts — are different data sources; call them separately.
+**Call each schema entry at most once per render tree.** Multiple `useMetabaseQuery` calls on the same `questionId` (or same `tableId` + identical filters/measures/breakouts) mount independent subscriptions, fire duplicate queries, and let consumers disagree mid-load. Lift the call to the highest component that needs the data; pass `data` / `isLoading` / `error` down as props. `error` is typed `unknown`: render it as `error instanceof Error ? error.message : String(error)`. Different ids — or the same id with different filters / breakouts — are different data sources; call them separately.
 
 Use keyed schema objects:
 
