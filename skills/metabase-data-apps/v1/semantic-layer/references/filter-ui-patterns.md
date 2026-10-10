@@ -40,7 +40,7 @@ const ordersTable = schema.tables.orders;
 const revenueMetric = schema.metrics.revenue;
 const franchiseDimension = revenueMetric.dimensions.orders.franchiseId;
 
-export const RevenueByFranchise = defineQuery<typeof ordersTable>({
+export const RevenueByFranchise = defineQuery({
   source: ordersTable,
   aggregations: [revenueMetric],
   breakouts: [breakout(franchiseDimension)],
