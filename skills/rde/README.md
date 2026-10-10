@@ -28,7 +28,7 @@ Two environment modes, detected with `mb git-sync status`: a single production i
 
 - `playbooks/explore-raw-data.md`: land data if needed, discover once, profile what a question touches, propose an inventory, send the decision memo, start the first slice.
 - `playbooks/build-clean-tables.md`: build the models as transforms, pin each model's rules with transform tests before it materialises, gate it on the landed data, hide the plumbing, schedule the chain.
-- `playbooks/build-semantic-layer.md`: one starting object per table, measures, metrics, segments, descriptions, verification, the canonical set published.
+- `playbooks/build-semantic-layer.md`: one starting object per table, measures, metrics, segments, descriptions, the canonical set published.
 - `playbooks/build-dashboards.md`: a content plan, a draft reviewed on screen, cards composed from definitions, a plausibility pass, delivery per audience.
 - `playbooks/answer-a-question.md`: a scoped, checked answer computed through the definition when one exists.
 - `playbooks/validate-and-reconcile.md`: a number proven against a reference, the gap decomposed, controls left running.
