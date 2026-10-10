@@ -55,7 +55,7 @@ Per table, unhide it (`"visibility_type":null`), then in the order `semantic-lay
 
 ## 7. Schedule, run once
 
-`mb transform-job transforms $JOB` lists every model; `mb transform-job run $JOB`, then `mb transform runs` until none is `started`: every member `succeeded`.
+`mb transform-job transforms $JOB` lists every model; `mb transform-job run $JOB`, then poll each member's `mb transform get <id> --full --json` until its `last_run` is newer than the job start and not `started` (a fresh run is not listed at once, so an empty `mb transform runs` proves nothing): every member `succeeded`.
 
 ## 8. Change a deployed model
 
