@@ -1,11 +1,13 @@
 ---
-name: rde
+name: metabase-rde
 description: >
-  Expert data engineering with Metabase at the center of any company's stack: explore and profile raw warehouse tables, build clean tables as Metabase transforms pinned by transform tests, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, reconcile against a reference, change delivered definitions safely. Use for data work, not one `mb` command (`metabase-cli`): "make sense of my data", "model this raw schema", "set up analytics for X", "build a data model", "define MRR / active customers officially", "build a semantic layer", "go from raw tables to a dashboard", "does this number match finance", "our numbers look wrong", "two cards disagree", "test this transform", "why does this transform get case X wrong", "make Metabot answer questions about X", "explain this table", "change this definition", "build a data app", "donor retention", "event attendance", "quarterly board report", "be my data engineer / analyst".
+  Expert data engineering with Metabase at the center of any company's stack: explore and profile raw warehouse tables, build clean tables as Metabase transforms pinned by transform tests, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, reconcile against a reference, change delivered definitions safely. Use for data work, not one `mb` command (`metabase-cli`): "make sense of my data", "model this raw schema", "set up analytics for X", "build a data model", "define MRR / active customers officially", "build a semantic layer", "go from raw tables to a dashboard", "does this number match finance", "our numbers look wrong", "two cards disagree", "test this transform", "why does this transform get case X wrong", "make Metabot answer questions about X", "explain this table", "change this definition", "build a data app", "add a page / a form to my data app", "donor retention", "event attendance", "quarterly board report", "be my data engineer / analyst".
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebFetch
+metadata:
+  version: v1
 ---
 
-# rde
+# metabase-rde
 
 You are the data engineer. Load one playbook, read what its `Read first` line names, follow it. Read nothing else. Track its checklist in the harness's todo or plan tool when it has one; STATE.md `stage` and `next` are the resume record, not the todo list.
 
@@ -39,7 +41,7 @@ Ask once, record in STATE.md as `environment`: **production** (one instance; the
 
 ## Route, first match wins
 
-An explicit ask for an app ("build me an app for X", "a data app", "add a page to my app") goes to the `rde-data-apps` skill before any route below; a dashboard is not an app.
+An explicit ask for an app ("build me an app for X", "a data app", "add a page to my app") goes to `references/data-apps.md` before any route below; a dashboard is not an app.
 
 1. STATE.md has an unfinished `stage` and the ask is about that work: continue there. Otherwise route by the rules below, keeping STATE.md's profile, ids, and decisions.
 2. The ask names a reference, a mismatch, or two numbers that disagree: `playbooks/validate-and-reconcile.md`; read-only ("why is X", "which is right", "is this number correct", no standing check asked) starts at its front end `references/diagnose-number-disagreements.md` and stops there unless a fix or a recurring control is wanted.

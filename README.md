@@ -52,13 +52,9 @@ Build Metabase data apps: scaffold one, add routing and actions, query tables an
 
 ### Data engineering router
 
-[rde](./skills/rde/SKILL.md)
+[metabase-rde](./skills/metabase-rde/v1/SKILL.md)
 
-An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic.
-
-[rde-data-apps](./skills/rde-data-apps/SKILL.md)
-
-The data-app branch of the rde router, loaded only when an app is asked for: finds the remote-sync repository, the Metabase URL, and the API key an rde machine already holds, fills the data app's `.env.local` without the key entering the conversation, and hands the build to the [`metabase-data-apps`](./skills/metabase-data-apps/v1/SKILL.md) skill. `rde init` installs it with `rde` and that skill.
+An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which finds the remote-sync repository, the Metabase URL, and the API key an rde machine already holds, then hands the build to the [`metabase-data-apps`](./skills/metabase-data-apps/v1/SKILL.md) skill. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic. `rde init` installs it with `metabase-data-apps`.
 
 ### Database metadata
 

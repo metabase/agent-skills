@@ -1,6 +1,6 @@
-# rde
+# metabase-rde
 
-A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`.
+A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`; a data app goes through `references/data-apps.md` to the `metabase-data-apps` skill.
 
 The skill owns judgment and method, matched to the conventions the company already has. Metabase mechanics come from the CLI's bundled skills, read one section at a time when a step names one.
 
@@ -15,7 +15,7 @@ npm i -g @metabase/cli
 ## Install
 
 ```bash
-npx skills add metabase/agent-skills --skill rde
+npx skills add metabase/agent-skills --skill metabase-rde
 ```
 
 The installer detects which agents are installed (Claude Code, Codex, OpenCode, and others) and asks where to put the skill; `-a <agent>` picks one, `-a '*'` installs for all.

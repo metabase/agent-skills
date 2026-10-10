@@ -1,13 +1,6 @@
----
-name: rde-data-apps
-description: >
-  Build or change a Metabase data app on an rde machine: settles what the `metabase-data-apps` skill needs from the local setup (the remote-sync repository, the Metabase URL, the API key rde stores, how the app reaches Metabase), makes sure everything the app reads is Library content already synced into that repository, confirms every sync step with the user, and hands the build to it. Use only when an app is asked for explicitly: "build me an app for X", "create a data app", "make an internal tool / portal in Metabase", "add a page / a form / a filter to my data app". A dashboard, a question, or a metric is not an app; those stay with the `rde` skill.
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep
----
+# Data apps
 
-# rde-data-apps
-
-A data app is a React bundle Metabase serves at `/apps/<slug>` from `data_apps/<slug>/` in the repository connected through remote sync. The `metabase-data-apps` skill builds it. This skill answers its questions from what rde already knows, so the user is asked only what rde cannot know, makes sure the content the app reads is in that repository before the app is built, then hands over. Sections 4 to 6 override the data-apps skill wherever they differ: the schema scope, the order of commits and pushes, and the confirmation before any sync.
+A data app is a React bundle Metabase serves at `/apps/<slug>` from `data_apps/<slug>/` in the repository connected through remote sync. The `metabase-data-apps` skill builds it. This reference answers its questions from what rde already knows, so the user is asked only what rde cannot know, makes sure the content the app reads is in that repository before the app is built, then hands over. Sections 4 to 6 override the data-apps skill wherever they differ: the schema scope, the order of commits and pushes, and the confirmation before any sync.
 
 ## 1. The instance
 
@@ -33,30 +26,30 @@ Never run `rde credentials --api-key` where its output comes back to you, and ne
 
 ## 4. The repository is the source of truth
 
-A data app exists only through remote sync, so here it is a requirement, not a suggestion: section 2 sets it up when it is missing, and that is the only place rde proposes remote sync unprompted, because the user asked for an app. Record it in STATE.md as `remote_sync`. Outside an app, the `rde` skill raises syncing only when remote sync is already configured.
+A data app exists only through remote sync, so here it is a requirement, not a suggestion: section 2 sets it up when it is missing, and that is the only place rde proposes remote sync unprompted, because the user asked for an app. Record it in STATE.md as `remote_sync`. Outside an app, syncing is raised only when remote sync is already configured.
 
 
 The bundle refers to Metabase objects by id and through the typed schema. An app built on content that lives only in the instance works there and nowhere else: importing the repository into another instance brings the app without the definitions it reads, and its queries fail. So everything the app reads is in the repository before the app is built, and everything the build creates goes there with the app.
 
 - **What the app may read.** Library-published tables with their field metadata, measures, and segments; metrics filed in the Library's Metrics collection; query actions without a model (Data Studio → Data actions). Nothing else.
 - **What "in the repository" means.** The Library collections carry `is_remote_synced: true` (`synced_collections` in `mb git-sync status --json`), the content has been exported, and `git pull` has brought it into the working tree: the files are there under `databases/…/tables/<table>/` and `collections/…`, checked, not assumed.
-- **Measures and segments need a published table** (the `rde` skill's `references/remote-sync.md`, "What belongs in git"). Without the Library (`mb library get --json` fails), stop: the app has nothing it may read; say so.
+- **Measures and segments need a published table** (`remote-sync.md`, "What belongs in git"). Without the Library (`mb library get --json` fails), stop: the app has nothing it may read; say so.
 - **The app's own files.** `npm run write-resources` writes the app's questions and copies of its actions as files under `collections/data_apps/` in the working tree; nothing changes in Metabase until the repository is imported. They are committed with the app (`data_apps/<slug>/`), in the same commit. They are copies: when a metric, measure, or action the app uses changes, run `npm run write-resources` again so the app's copy follows, and ship it with the change.
 - **Schema scope.** The schema always covers the Library's published tables and metrics and every query action without a model (`metabase-data-apps`, "Generate Schema"); nothing else reaches the app, so a table it needs is published first.
-- **A missing entity found mid-build** (a measure, a segment, a metric, a published table) goes back to the `rde` skill; a missing action follows `actions/actions.md`, "What's in the schema". Then sync it (sections 5 and 6), `git pull`, regenerate the schema, and continue. Never create it ad hoc to unblock the UI.
+- **A missing entity found mid-build** (a measure, a segment, a metric, a published table) goes back to this skill's pipeline (`../SKILL.md`, Route); a missing action follows `metabase-data-apps`' `actions/actions.md`, "What's in the schema". Then sync it (sections 5 and 6), `git pull`, regenerate the schema, and continue. Never create it ad hoc to unblock the UI.
 - **Before the first line of app code**, every entity the app needs is in the generated schema and its file is in the working tree. When one is missing, stop and go back to `rde`.
 
 ## 5. Syncing safely
 
-Remote sync merges nothing and resolves no conflicts. The instance side (what to check before every import or export, which goes first, never `--force` without the user's yes) and the staging hand-back: the `rde` skill's `references/remote-sync.md`, "Before each step" and "Staging". Here a `git push` behind a Metabase export is rejected too, and two writers push to the same remote, Metabase's export and the app's commits, so keep them in step:
+Remote sync merges nothing and resolves no conflicts. The instance side (what to check before every import or export, which goes first, never `--force` without the user's yes) and the staging hand-back: `remote-sync.md`, "Before each step" and "Staging". Here a `git push` behind a Metabase export is rejected too, and two writers push to the same remote, Metabase's export and the app's commits, so keep them in step:
 
 - **Working-tree side.** The app's commits touch only `data_apps/<slug>/` and the files `npm run write-resources` writes under `collections/data_apps/`; exported Metabase YAML is never edited by hand. Before pulling a Metabase export: `git stash --include-untracked`, `git pull --ff-only`, `git stash pop`. Before every `git push`: `git pull --ff-only` again. A pull that cannot fast-forward is a stop: report both histories, do not merge or force.
 - **Delivery order**, each step starting from a clean state: export the instance's dirty set to the job branch (**Branch**, below) → `git fetch` and switch the working tree to that branch (stash, pull, pop) → `npm run write-resources`, `npm run check-resources`, `npm run build` → commit `data_apps/<slug>/` with its `collections/data_apps/` files → pull, push → hand back the branch for review. After the merge, production imports it; the development instance follows with `mb git-sync import --branch <main>` (`references/remote-sync.md`, "Staging").
-- **Branch.** One job branch per change, created and exported per `references/remote-sync.md`, "Staging" (the `rde` skill); push the app to the same branch, so content and app travel together. Export or push to `main` or `master` only with an explicit yes.
+- **Branch.** One job branch per change, created and exported per `remote-sync.md`, "Staging"; push the app to the same branch, so content and app travel together. Export or push to `main` or `master` only with an explicit yes.
 
 ## 6. Ask before anything touches sync
 
-Every sync step, every `git push` to the synced remote included, is approved first, one checkpoint per sync point: the `rde` skill's `references/remote-sync.md`, "Ask before every sync step". "Yes for the rest of this job" is recorded and not asked again; anything less is asked again at the next sync point.
+Every sync step, every `git push` to the synced remote included, is approved first, one checkpoint per sync point: `remote-sync.md`, "Ask before every sync step". "Yes for the rest of this job" is recorded and not asked again; anything less is asked again at the next sync point.
 
 "Not now" before the build leaves one path: a dev preview only, labelled as working on this instance alone and breaking wherever the repository is imported. Nothing is pushed to the synced branch until the content it reads is synced.
 
@@ -73,7 +66,7 @@ The `metabase-data-apps` skill has one guide per step; follow it for the app's c
 
 ## 8. The data behind it
 
-The app reads what the semantic layer publishes to the Library. A number it shows with no metric or measure behind it yet goes back to the `rde` skill first (its semantic-layer playbook, clean tables before that when the source is raw), then through sections 4 to 6 into the repository, so the app queries the definition by id and never re-derives it in `queries/`. The agent never runs DDL. A new column or table in an operational database: the agent proposes it, the user's database admin adds it in every warehouse (staging and production), then it is synced into each Metabase (a column: `mb table sync-schema <table-id>`; a table: `mb db sync-schema <db-id>`; production: Admin → Databases → <database> → Sync database schema) and confirmed with `mb table fields <table-id> --json`, all before the app's PR merges: until a Metabase knows it, the app's queries fail there. A table the app writes to is published as it is, never through a transform (a transformed copy lags the app's writes). When the `rde` skill keeps `./.scratch/STATE.md`, record there the app's slug and the table ids it reads and writes (`apps`), and each sync decision.
+The app reads what the semantic layer publishes to the Library. A number it shows with no metric or measure behind it yet goes back to `../playbooks/build-semantic-layer.md` first (clean tables before that when the source is raw), then through sections 4 to 6 into the repository, so the app queries the definition by id and never re-derives it in `queries/`. The agent never runs DDL. A new column or table in an operational database: the agent proposes it, the user's database admin adds it in every warehouse (staging and production), then it is synced into each Metabase (a column: `mb table sync-schema <table-id>`; a table: `mb db sync-schema <db-id>`; production: Admin → Databases → <database> → Sync database schema) and confirmed with `mb table fields <table-id> --json`, all before the app's PR merges: until a Metabase knows it, the app's queries fail there. A table the app writes to is published as it is, never through a transform (a transformed copy lags the app's writes). When `./.scratch/STATE.md` exists, record there the app's slug and the table ids it reads and writes (`apps`), and each sync decision.
 
 ## 9. Delivery
 
