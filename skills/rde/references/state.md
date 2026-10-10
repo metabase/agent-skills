@@ -21,6 +21,7 @@ tag: <tag>=<id>  job: <id>
 autonomy: balanced            # owner of definitions: the user, unless they name someone
 environment: production       # or: staging, branch <name>
 remote_sync: none             # or: <branch>, read-write | read-only; from mb git-sync status; none means never raise syncing
+apps: none                    # or, per data app now or planned: <slug> reads <table ids>, writes <table ids>
 domain: subscription-revenue  # or none, or two when a table genuinely straddles domains
 stage: build-clean-tables
 next: model 8 of 15, blocked on D7
@@ -55,7 +56,7 @@ Status: `open`, `PROVISIONAL` (default in use), `decided`. Record each the momen
 - A fact about a number: the metric's or segment's description.
 - A definition change or data incident: a `mb timeline-event` in the affected questions' collection.
 - Decisions and check results: those tables; `open` or `PROVISIONAL` holds its `affects` at `Draft` ([collaboration-contract.md](collaboration-contract.md)).
-- An exclusion: a flagged column with a reason (a threshold as a `cfg_<domain>` constant), never a silent `WHERE`; a `dim_exclusion_rule` table (predicate, entity, reason, source, source-enforced) the models left-join only when several documented rules exist.
+- An exclusion: a flagged column with a reason (a threshold as a `cfg_<domain>` constant), never a silent `WHERE`; a `dim_exclusion_rule` table (predicate, entity, reason, source, source-enforced) the models left-join only when two or more documented rules exist.
 
 Nothing is written twice. Deployed means: filed per the company's convention (or landed outside Metabase); its transform tests pass (`tests` is a pass count, or `none` with a reason, or `unavailable` when the instance, the token, or the driver cannot run tests; [transform-tests.md](transform-tests.md)); last run succeeded; rows above zero or a confirmed empty result; no FAIL in Checks.
 

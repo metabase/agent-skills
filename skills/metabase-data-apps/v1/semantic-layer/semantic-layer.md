@@ -42,7 +42,7 @@ Keep the semantic layer and presentation layer separate.
 
 If the schema file already exists and covers what the app needs, use it. Otherwise generate it.
 
-The schema always covers the same content: the published tables of the `Library / Data` tree, the metrics of the `Library / Metrics` tree (with the tables they map), and every query action that belongs to no model, under `schema.actions`. There is no scope to choose. When the app needs a table, metric, or action the schema lacks, ask the user to publish the table to the Data library, move the metric into the Metrics library, or create the action as a query action without a model, then regenerate.
+The schema always covers the same content: the published tables of the `Library / Data` tree, the metrics of the `Library / Metrics` tree (with the tables they map), and every query action that belongs to no model, under `schema.actions`. There is no scope to choose. When the app needs a table, metric, or action the schema lacks, ask the user to publish the table to the Data library, move the metric into the Metrics library, then regenerate; a missing action is drafted per `actions/actions.md`, "What's in the schema".
 
 The Metabase URL and API key live in the **repo-root** `.env.local` as
 `DATA_APP_MB_URL` and `DATA_APP_MB_API_KEY` (one file per repo, usually two levels up

@@ -60,7 +60,7 @@ Emit the incomplete trailing period and mark it. Every model that materializes p
 
 - Point-in-time state (a balance, an active count, an ending run rate) is valid in the partial row and is the source of every "current" headline.
 - Rollups, rates, and period-over-period comparisons read complete periods only: filter `is_complete_period` before grouping.
-- Publish a `Complete periods` segment (`mb segment create`, filter `is_complete_period` is true) on every periodic table in the final layer, so a question excludes the partial periods with one click: the last period, and the first when the data starts mid-period; its description names them.
+- Publish a `Complete periods` segment (`mb segment create`, filter `is_complete_period` is true) on every periodic table in the final layer, so a question excludes the partial period with one click; its description names the partial period.
 - Assert in the first model that materializes periods that exactly one period per entity has `is_complete_period = false` and that it is the newest: the `period_flag` check in [data-quality-checks.md](data-quality-checks.md), and the same query as an `empty` expectation on a fixture whose `cfg_<domain>` input sets `last_complete_period` one period before `cap_period` ([transform-tests.md](transform-tests.md)).
 - The spine's upper bound and `cap_period`: [entities-and-time.md](entities-and-time.md).
 
