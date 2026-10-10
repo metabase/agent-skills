@@ -10,7 +10,7 @@ A Metabase **action** is a saved, parameterized SQL write against the data wareh
 
 ## What's in the schema (and what isn't)
 
-Before writing any action-invoking code, enumerate what's available under `schema.actions`. The schema is your **complete** catalog of the actions the app can run. Anything not present doesn't exist as far as the Data App is concerned: when the app needs a write the schema lacks, draft a query action without a model (`mb skills get data-action`; an action created from a model in the Metabase UI belongs to that model and is never listed), show the user its SQL and parameters, and on their yes run `mb data-action create`. An action runs only on a database whose **Data actions** toggle is on (Admin → Databases → <database>, or `mb db set-data-actions <db-id> on`). Then regenerate the schema.
+Before writing any action-invoking code, enumerate what's available under `schema.actions`. The schema is your **complete** catalog of the actions the app can run. Anything not present doesn't exist as far as the Data App is concerned: when the app needs a write the schema lacks, draft a query action without a model (`mb skills get data-action`; an action created from a model in the Metabase UI belongs to that model and is never listed), show the user its SQL and parameters, and on their yes run `mb data-action create`. An action runs only on a database whose **Data actions** toggle is on (Admin → Databases → <database>, or `mb db set-data-actions <db-id> true`). Then regenerate the schema.
 
 ## The hook
 
