@@ -38,4 +38,6 @@ Remote sync merges nothing and resolves no conflicts. An import on a dirty insta
 
 ## Staging
 
-In staging (STATE.md `environment`): build freely, then export the work to a job branch with `mb git-sync export --branch <job-branch> -m "<what and why>"`, never to the main branch without confirmation, and hand back the branch for review; importing into production is the reviewer's step.
+In staging (STATE.md `environment`): build freely, then export the work to a job branch: `mb git-sync create-branch <job-branch>` (it starts from the last synced commit and switches the instance to the new branch), then `mb git-sync export -m "<what and why>"`; `export --branch` naming a branch that does not exist yet is refused. Never export to the main branch without confirmation. Hand back the branch for review; importing into production is the reviewer's step, and production imports one merged branch at a time, running its transforms before the next.
+
+When the user says the branch is merged, bring the instance back before the next job: with `mb git-sync status --json` clean, `mb git-sync import --branch <main>`, and tell the user to run `git checkout <main> && git pull` in the working tree. A job never starts from an unmerged job branch: when the instance still tracks one, ask whether it was merged first.

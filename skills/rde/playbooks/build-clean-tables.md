@@ -33,7 +33,7 @@ Read STATE.md; confirm its tables exist (`mb table list --db-id $DB --fields id,
 
 ## 2. Collections, tag, job, rows
 
-Reuse what exists; else one collection per layer, one tag per chain, one job over the tag at the loader's cadence (ask when data lands; default daily after, `[DECIDED, reversible]`). Ids into STATE.md; one Models row per model in dependency order, `cfg_<domain>` first when a constant exists. Materialization: `layering-and-naming.md`.
+Reuse what exists; else one collection per layer and one tag per chain at the loader's cadence (ask when data lands; default daily, `[DECIDED, reversible]`). With remote sync, the tag is a built-in one (`hourly`, `daily`, `weekly`, `monthly`), run by its built-in job: transforms and tags sync but jobs do not, so a custom job never runs in production. Without remote sync, a custom tag and one job over it. Ids into STATE.md; one Models row per model in dependency order, `cfg_<domain>` first when a constant exists. Materialization: `layering-and-naming.md`.
 
 ## 3. Build loop, one model at a time
 
