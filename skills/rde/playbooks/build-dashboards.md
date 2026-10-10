@@ -15,7 +15,7 @@ jq .dataset_query ./.scratch/card.json | mb query --file - --dry-run; mb card cr
 mb card query <card-id> --fields status,data.rows                  # equals STATE.md's verified number
 mb dashboard create --file ./.scratch/dash.json
 mb dashboard cards <dash-id>                                       # a row's id is the dashboard_card_id; card_id is the card
-mb setting get email-smtp-host | jq .value                         # null: no email, stop
+mb setting get 'email-configured?' | jq .value                     # false: stop
 mb subscription create --file ./.scratch/sub.json
 mb card update <card-id> --body '{"dashboard_id":<dash-id>}'
 mb dashboard update <dash-id> --body '{"collection_id":<final collection id>}'
