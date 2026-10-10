@@ -18,7 +18,7 @@ Read by `extract-business-logic` only: lifting rules from code, documents, and e
 - Join map: key columns, cardinality per path, explicit fan-out and drop warnings, a note wherever keys are unenforced.
 - Unreachable sources: record what surrounding text says they hold, ask the user to export them, carry the gap as `UNKNOWN`.
 - Crawl stop rule: open a page or file only when its title, its index entry, or a page already read names a table, a column, or a number the build needs; stop when one pass over the remaining index names none. A table or column in the database absent from the document is a defect to list.
-- Documented exclusions and known incidents land as `dim_exclusion_rule` rows ([state.md](state.md)) the models left-join, so an adjusted figure sits beside the reported one; verify each documented identifier against the data first.
+- Documented exclusions and known incidents land as flagged columns ([state.md](state.md), "Where state lives"), so an adjusted figure sits beside the reported one; verify each documented identifier against the data first.
 
 ## The gap report
 

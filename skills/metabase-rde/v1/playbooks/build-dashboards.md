@@ -17,7 +17,7 @@ mb dashboard create --file ./.scratch/dash.json
 mb dashboard cards <dash-id>                                       # a row's id is the dashboard_card_id; card_id is the card
 mb setting get 'email-configured?' | jq .value                     # false: stop
 mb subscription create --file ./.scratch/sub.json
-mb card update <card-id> --body '{"collection_id":<final collection id>}'
+mb card update <card-id> --body '{"dashboard_id":<dash-id>}'
 mb dashboard update <dash-id> --body '{"collection_id":<final collection id>}'
 ```
 
@@ -32,7 +32,7 @@ Bodies (ids from STATE.md and `mb table get <table-id> --include fields`):
 {"name":"CEO weekly","collection_id":<drafts>,
  "parameters":[{"id":"period","name":"Period","slug":"period","type":"date/month-year"}],
  "dashcards":[
-  {"id":-1,"card_id":null,"col":0,"row":0,"size_x":24,"size_y":2,"visualization_settings":{"virtual_card":{"display":"text"},"text":"Data through August 2026; September flagged incomplete. Refreshed daily 03:00 UTC, a day behind billing. MRR: Reconciled to finance on 2026-09-12, within 1%. Churn: Draft, provisional decisions: D7."}},
+  {"id":-1,"card_id":null,"col":0,"row":0,"size_x":24,"size_y":2,"visualization_settings":{"virtual_card":{"display":"text"},"text":"Data through August 2026; September flagged incomplete. Refreshed daily 03:00 UTC, a day behind billing. MRR: Reconciled to finance on 2026-09-12, within 1%. Churn: Draft, provisional decisions: D7 (churn after one month without revenue)."}},
   {"id":-2,"card_id":<card-id>,"col":0,"row":2,"size_x":6,"size_y":3,"parameter_mappings":[{"parameter_id":"period","card_id":<card-id>,"target":["dimension",["field",<period_month-id>,null]]}]}]}
 {"name":"CEO weekly","dashboard_id":<dash-id>,"cards":[{"id":<card-id>,"dashboard_card_id":<dashcard-id>,"include_csv":false,"include_xls":false}],
  "channels":[{"channel_type":"email","schedule_type":"weekly","schedule_hour":8,"schedule_day":"mon","recipients":[{"email":"ceo@acme.example"}]}]}
@@ -50,11 +50,11 @@ Per audience and cadence, shaped like the finished plan in `dashboard-content-de
 
 ## 3. Draft, then review on screen
 
-Per `dashboard-content-design.md`, Draft, then review on screen: build in `Drafts`, hand back the link, the card list, and the omissions.
+Per `dashboard-content-design.md`, Draft, then review on screen: build in `Drafts`, hand back the link, the card list, and the omissions. This overrides the bundled `dashboard` skill's advice to build in the synced collection. Adding cards to an existing Library dashboard skips the draft: create each as a dashboard question on it (`mb card create` with `dashboard_id` and its `collection_id`), add the dashcard with `mb dashboard update <dash-id> --file <body>` carrying every existing dashcard, read with `mb dashboard cards <dash-id> --json --full --max-bytes 0` (compact or truncated output drops `visualization_settings` and dashcards, and the update then blanks or removes them), plus the new one (`id` negative), and update its header and `Definitions` text cards.
 
 ## 4. Cards
 
-One card per plan entry, naming the metric, measure, or segment by id, adding only a breakout and a display; dry-run before create. The card's headline equals the number verified in STATE.md; a mismatch means the card added a filter. Read the card back; set `graph.dimensions` and `graph.metrics` (output column names) only when the auto-pick is wrong: `mb skills path visualization`, "Minimum-viable settings per chart family".
+One card per plan entry, naming the metric, measure, or segment by id, adding only a breakout and a display; dry-run before create. The card's headline equals the number verified in STATE.md; a mismatch means the card added a filter. Read the card back; set `graph.dimensions` and `graph.metrics` (output column names) only when the auto-pick is wrong: `mb skills path visualization`, "Minimum-viable settings per chart family". A metric's own filters don't drop breakout buckets: a card on a metric with a breakout still gets a row with a null value for each bucket the metric excludes (an incomplete month, a test merchant), so add the segment that excludes them (`Complete periods`, a live-entities segment) and check the first and last rows. A KPI where lower is better (a refund rate, churn) sets `scalar.switch_positive_negative: true`, so a fall shows green. An ordered top-N orders by the aggregation's `lib/uuid` (`["aggregation",{},"<uuid>"]`, the uuid from `mb uuid --format text` set on the aggregation clause), never an index. A ratio or rate shows as a percent: set the card's column formatting, keyed by the output column's name from `mb card query <id> --json` `.data.cols[].name` (a measure's or aggregation's name, not the metric's) (`column_settings` with `number_style: "percent"`, same skill, section "`column_settings`: the JSON-string-key footgun"), and a money figure as currency (`number_style: "currency"` with its `currency`), since a dashboard card does not inherit the metric's own formatting; read the KPI back and check it reads `8.8%`, not `0.088`. A header text card holds its text: size it so nothing is cut off.
 
 ## 5. The page
 
@@ -66,11 +66,11 @@ Per `dashboard-content-design.md`; chase every implausible number; never ship it
 
 ## 7. Delivery per audience
 
-Readers who do not open Metabase: a subscription on the cadence (channel configured; mail to real people is irreversible, `[CHECKPOINT]` on recipients). Prose readers: a document embedding the cards (`mb skills path document`, Read "Embedding an existing card"). Numbers not to miss: an alert (body in [`validate-and-reconcile.md`](validate-and-reconcile.md)).
+Readers who do not open Metabase: a subscription on the cadence (channel configured; mail to real people is irreversible, `[CHECKPOINT]` on recipients). Numbers not to miss: an alert (body in [`validate-and-reconcile.md`](validate-and-reconcile.md)).
 
 ## 8. Final collection
 
-The final collection is the domain collection, under STATE.md `synced_root` when it has one (`SKILL.md`, "Filing with a `synced_root`"). Move leaf first, after the pass. For each `card_id` from `mb dashboard cards <dash-id>`, read `mb card get <id> --json --fields id,name,collection_id,dashboard_id,document_id` (the `dashboard_id` from `mb dashboard cards` is the dashcard's, so it never shows a dashboard question) and file it by the first matching rule in `references/remote-sync.md`, "Filing": `dashboard_id` or `document_id` set, skip it; `collection_id` equal to STATE.md `drafts`, move it (`mb card update <id> --body '{"collection_id":<final collection id>}'`); anything else is not the job's, so leave it. Then the dashboard, pinned to the top of its collection in the same call: `mb dashboard update <dash-id> --body '{"collection_id":<final collection id>,"collection_position":1}'`; its dashboard questions move with it. When Metabase refuses it with `Uses content that is not remote synced.`, take the `[CHECKPOINT]` in that section, then try again. Then the `How to use <area> numbers` document beside it at position 2 (`mb document update`). Record it in the STATE.md Questions rows. Then `mb collection items <drafts>`: if a `Drafts` collection you created is empty, `mb collection archive <drafts>` and remove it from STATE.md `collections`; never leave an empty one behind.
+With remote sync, the dashboard's final place is the Library's Dashboards collection (`mb collection list --json`, `"type": "library-dashboards"`), which holds dashboards only; without remote sync, the collection `semantic-layer-design.md`, "Own, file, change, retire", names. After the pass, make every card the job created on it a dashboard question (`mb card update <id> --body '{"dashboard_id":<dash-id>}'`; read each `card_id` from `mb dashboard cards <dash-id>` with `mb card get <id> --json --fields id,name,collection_id,dashboard_id`), each reading only published tables and Library metrics (one that reads anything else is rebuilt on them first); a card the job did not create takes the `[CHECKPOINT]` in `references/remote-sync.md`, "Filing". Then move the dashboard: `mb dashboard update <dash-id> --body '{"collection_id":<final collection id>,"collection_position":1}'`; its dashboard questions move with it. Record it in the STATE.md Questions rows. Then `mb collection items <drafts>`: if a `Drafts` collection you created is empty, `mb collection archive <drafts>` and remove it from STATE.md `collections`; never leave an empty one behind.
 
 ## Done when
 

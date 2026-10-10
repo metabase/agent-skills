@@ -22,7 +22,7 @@ mb transform update <id> --file ./.scratch/patch.json       # source-only patch
 mb transform-test create --file ./.scratch/<m>.test.json | jq '{id,name}'   # body: references/transform-tests.md; v65+. Refuses a mis-declared input set here, before any run
 mb transform-test run <id> | jq '{status, failed: [.expectations[] | select(.status != "passed") | {name, status, "row-counts", "missing-rows", "extra-rows", "cell-mismatches", sample, error}]}'   # exit 1 unless passed
 mb transform-test update <id> --file ./.scratch/<m>.test.patch.json   # inputs and expectations replace whole, and re-validate
-mb transform-test list --transform <id> --fields id,name       # every test on a model
+mb transform-test list --transform-id <id> --fields id,name       # every test on a model
 mb transform run <id> --sync | jq '{status:.final.status, table:.target_table_id, msg:.final.message}'
 mb transform list --full | jq '[.data[] | select(.source.query.stages[0].native | test("<schema>.<name>")) | .id]'   # dependents
 ```
@@ -33,7 +33,7 @@ Read STATE.md; confirm its tables exist (`mb table list --db-id $DB --fields id,
 
 ## 2. Collections, tag, job, rows
 
-Reuse what exists; else one collection per layer, one tag per chain, one job over the tag at the loader's cadence (ask when data lands; default daily after, `[DECIDED, reversible]`). Ids into STATE.md; one Models row per model in dependency order, `cfg_<domain>` first when a constant exists. Materialization: `layering-and-naming.md`.
+Reuse what exists; else one collection per layer and one tag per chain at the loader's cadence (ask when data lands; default daily, `[DECIDED, reversible]`). With remote sync, the tag is a built-in one (`hourly`, `daily`, `weekly`, `monthly`), run by its built-in job: transforms and tags sync but jobs do not, so a custom job never runs in production. Without remote sync, a custom tag and one job over it. Ids into STATE.md; one Models row per model in dependency order, `cfg_<domain>` first when a constant exists. Materialization: `layering-and-naming.md`.
 
 ## 3. Build loop, one model at a time
 
@@ -47,7 +47,7 @@ For a model that carries a rule (every intermediate and final-layer model; a sta
 
 ## 5. Gate
 
-The eight checks as one query per `data-quality-checks.md`, at its cadence. A FAIL stops the chain. Judgment calls (`modeling-decisions.md`) are `[DECIDED, reversible]` from the profile, `[CHECKPOINT]` when irreversible; a decision taken here gets its case added to the step 4 test. Write the Checks and Models rows. Then `mb table update <table-id> --body '{"visibility_type":"technical"}'` on every raw, staging, and intermediate table the model read or wrote.
+The eight checks as one query per `data-quality-checks.md`, at its cadence. A FAIL stops the chain. Judgment calls (`modeling-decisions.md`) are `[DECIDED, reversible]` from the profile, `[CHECKPOINT]` when irreversible; a decision taken here gets its case added to the step 4 test. Write the Checks and Models rows. Then `mb table update <table-id> --body '{"visibility_type":"technical"}'` on every raw, staging, and intermediate table the model read or wrote, except a table a data app reads or writes (now or planned in STATE.md; `semantic-layer-design.md`, metadata chain step 1).
 
 ## 6. Metadata on final-layer tables
 
@@ -55,11 +55,11 @@ Per table, unhide it (`"visibility_type":null`), then in the order `semantic-lay
 
 ## 7. Schedule, run once
 
-`mb transform-job transforms $JOB` lists every model; `mb transform-job run $JOB`, then `mb transform runs` until none is `started`: every member `succeeded`.
+`mb transform-job transforms $JOB` lists every model; `mb transform-job run $JOB`, then poll each member's `mb transform get <id> --full --json` until its `last_run` is newer than the job start and not `started` (a fresh run is not listed at once, so an empty `mb transform runs` proves nothing): every member `succeeded`.
 
 ## 8. Change a deployed model
 
-Copy the SQL to `<m>.prev.sql` (rollback is a patch with it). Run the model's tests as they stand (`transform-test list --transform <id>`, then `run` each): a green baseline, or a finding to report before touching anything. Add the case that motivated the change as a fixture row and its expectation, see it fail. Classify: logic only, patch and run; shape change, `mb transform delete-table <id> --yes` first; rename, re-point every definition and card on the old column, and every expectation that names it. Patch; run the tests; an expectation the changed rule moved is handled per `transform-tests.md`, Cadence. Then find dependents in stored SQL, run their tests, run the job, re-gate each rebuilt table, re-verify their definitions per `semantic-layer-design.md`, add the timeline event (body in `validate-and-reconcile.md`), restate per the contract.
+Copy the SQL to `<m>.prev.sql` (rollback is a patch with it). Run the model's tests as they stand (`transform-test list --transform-id <id>`, then `run` each): a green baseline, or a finding to report before touching anything. Add the case that motivated the change as a fixture row and its expectation, see it fail (a case that adds a source: `transform-tests.md`, Cadence). Classify: logic only, patch and run; added columns, patch and run in place; a dropped or retyped column, `mb transform delete-table <id> --yes` first, unless a published table, measure, or segment uses it: then a `[CHECKPOINT]`, since `delete-table` under a published table risks its Library entry, measures, and segments; rename, re-point every definition and card on the old column, and every expectation that names it. Patch; run the tests; an expectation the changed rule moved is handled per `transform-tests.md`, Cadence. Then find dependents in stored SQL, run their tests, run the job, re-gate each rebuilt table, re-check their definitions per `semantic-layer-design.md`, add the timeline event (body in `validate-and-reconcile.md`), restate per the contract.
 
 Finished example, a transform description (the SQL header mirrors it):
 

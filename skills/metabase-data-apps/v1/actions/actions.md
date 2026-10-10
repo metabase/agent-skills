@@ -10,7 +10,7 @@ A Metabase **action** is a saved, parameterized SQL write against the data wareh
 
 ## What's in the schema (and what isn't)
 
-Before writing any action-invoking code, enumerate what's available under `schema.actions`. The schema is your **complete** catalog of the actions the app can run. Anything not present doesn't exist as far as the Data App is concerned: when the app needs a write the schema lacks, ask the user to create it as a query action without a model (`POST /api/action` with `type: "query"` and no `model_id`; actions created in the Metabase UI belong to a model and are never listed), on a database with actions enabled, then regenerate the schema.
+Before writing any action-invoking code, enumerate what's available under `schema.actions`. The schema is your **complete** catalog of the actions the app can run. Anything not present doesn't exist as far as the Data App is concerned: when the app needs a write the schema lacks, draft a query action without a model (`mb skills get data-action`; an action created from a model in the Metabase UI belongs to that model and is never listed), show the user its SQL and parameters, and on their yes run `mb data-action create`. An action runs only on a database whose **Data actions** toggle is on (Admin → Databases → <database>, or `mb db set-data-actions <db-id> true`). Then regenerate the schema.
 
 ## The hook
 
@@ -126,7 +126,7 @@ That whole string is `error.data.message`. Render it as-is.
 
 When an action succeeds, the data the user sees may be stale. Without an explicit refresh, the list still shows the old rows; the stat tile still shows the old count; the row the user just edited still shows its old values. The action worked, but the UI lies — and there is no warning.
 
-The rule is simple and absolute: **after an action resolves successfully, every piece of data on the screen that the action could have changed must be refreshed.**
+The rule is simple and absolute: **after an action resolves successfully, every piece of data on the screen that the action could have changed must be refreshed.** The refresh is the `refetch` that `useMetabaseQuery` returns beside `data`, `isLoading`, and `error` (`refetch: () => Promise<void>`): `await execute(...)`, then `await Promise.all([ordersQuery.refetch(), totalsQuery.refetch()])`.
 
 ## Mapping parameters
 
