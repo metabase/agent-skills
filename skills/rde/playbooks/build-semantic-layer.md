@@ -1,6 +1,6 @@
 # Build the semantic layer
 
-Applies: final-layer tables exist with rows. Produces one starting object per table, the definitions with descriptions, verified, and the canonical set published or filed.
+Applies: final-layer tables exist with rows. Produces one starting object per table, the definitions with descriptions and checked numbers, and the canonical set published or filed.
 
 Checklist: `1 STATE.md` `2 starting objects` `3.<table> metadata` `4 Questions` `5 conformed dims` `6.<definition> define` `7 describe` `8 verify` `9 publish, owners` `reply`.
 

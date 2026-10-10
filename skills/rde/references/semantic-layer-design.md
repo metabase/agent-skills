@@ -1,6 +1,6 @@
 # Semantic layer design
 
-Which kind of definition a number needs, the metadata chain, and how definitions are owned, verified, and changed; the router sends you here before any definition or metadata edit. Extend an existing definition (discovery: [layering-and-naming.md](layering-and-naming.md)), never a parallel one; two saved questions disagreeing about one number reconcile under [reconciliation.md](reconciliation.md).
+Which kind of definition a number needs, the metadata chain, and how definitions are owned and changed; the router sends you here before any definition or metadata edit. Extend an existing definition (discovery: [layering-and-naming.md](layering-and-naming.md)), never a parallel one; two saved questions disagreeing about one number reconcile under [reconciliation.md](reconciliation.md).
 
 ## Which kind of definition
 

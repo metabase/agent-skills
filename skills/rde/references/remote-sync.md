@@ -6,7 +6,7 @@ Read before the first collection, card, dashboard, or transform of a job and bef
 
 Remote sync carries what sits in a synced collection, each collection with its whole subtree, plus transforms when the `remote-sync-transforms` setting is on. The semantic layer lives in the Library: curated tables published to its Data collection with their field metadata, measures, and segments (these serialize only on a Library-published table in a synced Library; a measure on an unpublished table never reaches the repository). `mb git-sync dirty` may not list measures, segments, or dashboard questions even when they export: check scope by the table being published or the collection being under a synced root, and trust the files in the exported commit; metrics in its Metrics collection. Dashboards, questions, documents, models, and `Definitions` live under STATE.md `synced_root`. Transforms, their tags, and their jobs sync together through the setting, all or none, never by collection.
 
-When a set of definitions passes its gate (described, trust-labelled, verified), ask whether to sync it now rather than waiting for an app to need it. Clean up drafts before the first export: once exported, a mistake stays in the git history.
+When a set of definitions passes its gate (described, trust-labelled, its numbers checked), ask whether to sync it now rather than waiting for an app to need it. Clean up drafts before the first export: once exported, a mistake stays in the git history.
 
 ## Filing
 
