@@ -19,10 +19,10 @@ Command groups, in full: authenticate with named profiles; inspect databases (li
 
 Don't drive Metabase by `curl`ing `/api/...` directly — the CLI handles auth profiles, retries, schema validation, and credential redaction.
 
-**Doing a whole job, not one command?** Higher-level data-engineering workflows — raw data to clean tables, the semantic layer, dashboards — live in the `rde` skill, which drives this CLI:
+**Doing a whole job, not one command?** Higher-level data-engineering workflows — raw data to clean tables, the semantic layer, dashboards — live in the `metabase-rde` skill, which drives this CLI:
 
 ```bash
-npx skills add metabase/agent-skills --skill rde
+npx skills add metabase/agent-skills --skill metabase-rde
 ```
 
 When it is installed, follow it; it loads the bundled skills it needs.

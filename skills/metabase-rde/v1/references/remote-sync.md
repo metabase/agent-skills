@@ -1,6 +1,6 @@
 # Remote sync
 
-Read before the first collection, card, dashboard, or transform of a job and before any sync step when STATE.md `remote_sync` is not `none`, and always for a data app, which requires remote sync; with `none` and no app, nothing here applies (`SKILL.md`, "Where the work lands"). A data app reads only synced Library content: `rde-data-apps`, sections 4 to 6. Mechanics: `mb skills path git-sync`.
+Read before the first collection, card, dashboard, or transform of a job and before any sync step when STATE.md `remote_sync` is not `none`, and always for a data app, which requires remote sync; with `none` and no app, nothing here applies (`SKILL.md`, "Where the work lands"). A data app reads only synced Library content: `data-apps.md`, sections 4 to 6. Mechanics: `mb skills path git-sync`.
 
 ## What belongs in git
 
