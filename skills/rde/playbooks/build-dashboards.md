@@ -54,7 +54,7 @@ Per `dashboard-content-design.md`, Draft, then review on screen: build in `Draft
 
 ## 4. Cards
 
-One card per plan entry, naming the metric, measure, or segment by id, adding only a breakout and a display; dry-run before create. The card's headline equals the number verified in STATE.md; a mismatch means the card added a filter. Read the card back; set `graph.dimensions` and `graph.metrics` (output column names) only when the auto-pick is wrong: `mb skills path visualization`, "Minimum-viable settings per chart family".
+One card per plan entry, naming the metric, measure, or segment by id, adding only a breakout and a display; dry-run before create. The card's headline equals the number verified in STATE.md; a mismatch means the card added a filter. Read the card back; set `graph.dimensions` and `graph.metrics` (output column names) only when the auto-pick is wrong: `mb skills path visualization`, "Minimum-viable settings per chart family". A ratio or rate shows as a percent: set the card's column formatting (`column_settings` with `number_style: "percent"`, same section), since a dashboard card does not inherit the metric's own formatting; read the KPI back and check it reads `8.8%`, not `0.088`. A header text card holds its text: size it so nothing is cut off.
 
 ## 5. The page
 
