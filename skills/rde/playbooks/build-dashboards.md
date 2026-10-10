@@ -50,7 +50,7 @@ Per audience and cadence, shaped like the finished plan in `dashboard-content-de
 
 ## 3. Draft, then review on screen
 
-Per `dashboard-content-design.md`, Draft, then review on screen: build in `Drafts`, hand back the link, the card list, and the omissions. This overrides the bundled `dashboard` skill's advice to build in the synced collection. Adding cards to an existing Library dashboard skips the draft: create each as a dashboard question on it (`mb card create` with `dashboard_id` and its `collection_id`), add the dashcard with `mb dashboard update <dash-id> --file <body>` carrying every existing dashcard plus the new one (`id` negative; one left out is removed), and update its header and `Definitions` text cards.
+Per `dashboard-content-design.md`, Draft, then review on screen: build in `Drafts`, hand back the link, the card list, and the omissions. This overrides the bundled `dashboard` skill's advice to build in the synced collection. Adding cards to an existing Library dashboard skips the draft: create each as a dashboard question on it (`mb card create` with `dashboard_id` and its `collection_id`), add the dashcard with `mb dashboard update <dash-id> --file <body>` carrying every existing dashcard, read with `mb dashboard cards <dash-id> --json --full --max-bytes 0` (compact or truncated output drops `visualization_settings` and dashcards, and the update then blanks or removes them), plus the new one (`id` negative), and update its header and `Definitions` text cards.
 
 ## 4. Cards
 
