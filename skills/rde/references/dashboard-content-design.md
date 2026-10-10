@@ -44,7 +44,6 @@ Build the plan as a dashboard in a `Drafts` collection (or the company's equival
 ## Delivery per audience
 
 - Readers who do not open Metabase: a subscription on the cadence (`mb subscription create`, monthly `first` or weekly `mon`), `skip_if_empty: true` for exception dashboards, `parameters` per recipient where audiences differ; recipients confirmed first.
-- Readers of prose: a document (`mb document create`) with the period's narrative, each headline a `cardEmbed` linked to its metric by a `smartLink` (`model: "metric"`).
 
 ## The plausibility pass
 
