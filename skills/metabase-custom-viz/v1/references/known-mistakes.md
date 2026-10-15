@@ -198,7 +198,8 @@ row · Click object incomplete, or clickable mark without
 - **Fix** — Follow the statement's `Colors` (`api-contract.md`,
   Colors); user-picked colors from a setting are fine.
 - **Detector** — Every `getColor(` argument and every
-  `var(--mb-color-…)` name is from the `api-contract.md` Colors list.
+  `var(--mb-color-…)` name is a key of `colors` in
+  `<sdk>/host-contract.json`.
   Text, backgrounds and lines use those names, never literals (`#…`,
   `rgb(`, `hsl(`, named CSS colors).
   `Colors: theme` → no literals at all. `Colors: own` → mark literals

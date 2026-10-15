@@ -59,33 +59,19 @@ label truncation and fitting instead of guessing character widths.
 
 ## Colors
 
-Valid names are the keys of `colors.light` in `<sdk>/host-contract.json`
-(the same keys as `colors.dark`, with the resolved values per theme).
-The roles below pick from them; a role's name missing from the contract →
-use the closest name the contract has. Use the names two ways. In DOM and SVG styles, write the CSS
-variable `var(--mb-color-<name>)`: it follows the theme by itself. Where
-a literal value is needed (canvas libraries, color math), call
+The valid names are the keys of `colors` in `<sdk>/host-contract.json`.
+Each has a `role` (what to use it for: text, surfaces, lines, emphasis,
+status, series and their variants) and its resolved `light` and `dark`
+values. Pick a name by its `role`; never use a name the contract lacks.
+
+Use the names two ways. In DOM and SVG styles, write the CSS variable
+`var(--mb-color-<name>)`: it follows the theme by itself. Where a literal
+value is needed (canvas libraries, color math), call
 `renderingContext.getColor("<name>")`. Any other name renders black:
 `getColor` returns an unknown name unchanged, and an unknown variable
 resolves to nothing.
 
-- Text: `text-primary` (labels, values), `text-secondary` (axis
-  labels, captions), `text-disabled` (hints)
-- Surfaces: `background_page-primary` (viz background),
-  `background_page-secondary` (bands, alternate rows)
-- Lines: `border-neutral` (gridlines, axes, separators)
-- Emphasis: `core-brand` (single-series marks, selection)
-- Status: `feedback-positive`, `feedback-negative`, `feedback-warning`
-  (up/down, thresholds)
-- Series, one per category in order: `accent0`, `accent1`, `accent2`,
-  `accent3`, `accent4`, `accent5`, `accent6`, `accent7`
-- Series variants: `accent0-light`, `accent1-light`, `accent2-light`,
-  `accent3-light`, `accent4-light`, `accent5-light`, `accent6-light`,
-  `accent7-light`, `accent0-dark`, `accent1-dark`, `accent2-dark`,
-  `accent3-dark`, `accent4-dark`, `accent5-dark`, `accent6-dark`,
-  `accent7-dark`
-
-Text, surfaces and lines always use these names. The statement's
+Text, surfaces and lines always use contract names. The statement's
 `Colors` decides data marks only:
 
 - `theme` → marks use these names too; a color setting's default is one
