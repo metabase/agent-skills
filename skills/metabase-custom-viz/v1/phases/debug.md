@@ -10,8 +10,8 @@ rules apply), `.claude/fix-log.md`, `references/known-mistakes.md`,
 
 Read on demand: `references/api-contract.md` when the cause
 involves host props or `checkRenderable`;
-`references/sandbox-substitutes.md` when the fix replaces a
-blocked API.
+`api-contract.md` Metabase ways when the fix replaces a blocked
+API.
 
 1. Run Checks (`project.md`) once; treat errors as fact.
 2. Match the symptom against `known-mistakes.md` symptoms; a host

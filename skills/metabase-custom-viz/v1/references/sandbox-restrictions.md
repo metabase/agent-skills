@@ -15,8 +15,17 @@ shows one of:
 
 The lists live in `sandbox` of `<sdk>/host-contract.json`, which matches
 the installed package. This file says how each list applies; read the
-list itself before relying on a tag, listener, attribute or API. For what
-to use **instead**, read `references/sandbox-substitutes.md`.
+list itself before relying on a tag, listener, attribute or API. For
+the Metabase way to do what a blocked API would, read `api-contract.md`,
+Metabase ways.
+
+## The host page is invisible
+
+The viz mounts inside a subtree marked `data-plugin-sandbox="<pluginId>"`;
+DOM nodes outside it come back as detached decoys (`document.body`,
+sibling dashcards, tree walkers and MutationObservers rooted at
+`document`). Only query and observe inside your own mount.
+`document.activeElement` returns `null` while focus is on host UI.
 
 ## Tags
 

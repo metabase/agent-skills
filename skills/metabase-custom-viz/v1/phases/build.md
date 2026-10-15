@@ -14,8 +14,7 @@ Read before writing:
 - `<sdk>/types/viz.d.ts`, `<sdk>/types/viz-settings.d.ts`, other
   `<sdk>/types/*.d.ts` as needed
 - `references/api-contract.md`
-- `references/sandbox-restrictions.md`,
-  `references/sandbox-substitutes.md`
+- `references/sandbox-restrictions.md`
 - `references/known-mistakes.md` — write code that passes every
   detector
 

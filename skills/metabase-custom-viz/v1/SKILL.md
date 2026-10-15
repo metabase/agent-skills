@@ -52,7 +52,6 @@ the phase yourself.
 - `api-contract.md` — host behavior the types cannot express
 - `known-mistakes.md` — bugs with symptoms, fixes, detectors
 - `sandbox-restrictions.md` — what the sandbox blocks at runtime
-- `sandbox-substitutes.md` — what to use instead
 - `operations.md` — dev server, connecting Metabase, reading a question,
   renaming, user edits
 - `fix-log-rules.md` — format and rules of `.claude/fix-log.md`

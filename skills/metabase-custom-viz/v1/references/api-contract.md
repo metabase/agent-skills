@@ -175,4 +175,22 @@ with event handlers):
 - Custom vizzes are not rendered in emails or Slack — static contexts
   fall back to a default visualization.
 - The plugin is a single JS bundle; the only served asset is the manifest
-  icon. Images: `sandbox-substitutes.md`, SVG references.
+  icon. Images: inline SVG in JSX, or rasters as `data:image/*` URIs in
+  `<img>`.
+
+## Metabase ways
+
+What a blocked API would do, the way Metabase expects it:
+
+- Navigate from a data point → call the host `onClick` prop; the drill
+  menu owns navigation.
+- Remember something across reloads → a `defineSetting`; it is persisted
+  with the card. React state lasts only for the session.
+- Text input → never fake a text field (a `div` that handles keystrokes
+  itself). Free text that configures the viz → a `defineSetting` with the
+  `input` widget (the settings sidebar renders outside the sandbox). Free
+  text that filters data → a dashboard filter feeding the question.
+  Discrete choices → `<select>` or `<button>`s.
+- More data → add it to the Metabase question; all data arrives through
+  the `series` prop.
+- Fonts → `renderingContext.fontFamily` and `measureText`.

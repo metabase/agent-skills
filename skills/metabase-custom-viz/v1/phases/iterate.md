@@ -16,8 +16,8 @@ Read on demand, before the edit that needs it:
   or colors → the matching `references/known-mistakes.md` entries
   (Contents at the top)
 - the request needs a browser API, tag or global listener →
-  `references/sandbox-restrictions.md`, then
-  `references/sandbox-substitutes.md`
+  `references/sandbox-restrictions.md`, then `references/api-contract.md`
+  Metabase ways
 - the request names a library, or one would clearly help →
   `references/project.md` Libraries
 
