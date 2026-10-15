@@ -70,12 +70,13 @@ a literal value is needed (canvas libraries, color math), call
 resolves to nothing.
 
 - Text: `text-primary` (labels, values), `text-secondary` (axis
-  labels, captions), `text-tertiary` (hints)
-- Surfaces: `background-primary` (viz background),
-  `background-secondary` (bands, alternate rows)
-- Lines: `border` (gridlines, axes, separators)
-- Emphasis: `brand` (single-series marks, selection)
-- Status: `success`, `error`, `warning` (up/down, thresholds)
+  labels, captions), `text-disabled` (hints)
+- Surfaces: `background_page-primary` (viz background),
+  `background_page-secondary` (bands, alternate rows)
+- Lines: `border-neutral` (gridlines, axes, separators)
+- Emphasis: `core-brand` (single-series marks, selection)
+- Status: `feedback-positive`, `feedback-negative`, `feedback-warning`
+  (up/down, thresholds)
 - Series, one per category in order: `accent0`, `accent1`, `accent2`,
   `accent3`, `accent4`, `accent5`, `accent6`, `accent7`
 - Series variants: `accent0-light`, `accent1-light`, `accent2-light`,
