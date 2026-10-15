@@ -59,10 +59,11 @@ label truncation and fitting instead of guessing character widths.
 
 ## Colors
 
-The valid names are the keys of `colors` in `<sdk>/host-contract.json`.
-Each has a `role` (what to use it for: text, surfaces, lines, emphasis,
-status, series and their variants) and its resolved `light` and `dark`
-values. Pick a name by its `role`; never use a name the contract lacks.
+The valid names are the keys of `colors` in `<sdk>/host-contract.json`;
+each maps to its role (what to use it for: text, surfaces, lines,
+emphasis, status, series and their variants). Pick a name by its role;
+never use a name the contract lacks. The host resolves the value for the
+current theme.
 
 Use the names two ways. In DOM and SVG styles, write the CSS variable
 `var(--mb-color-<name>)`: it follows the theme by itself. Where a literal
