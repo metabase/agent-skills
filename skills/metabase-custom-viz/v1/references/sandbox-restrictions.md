@@ -13,34 +13,25 @@ shows one of:
 - `[plugin <id>] DOMPurify stripped content from <source>: […]` (a log, not
   an exception — content silently disappears)
 
-The exact lists live in `sandbox` of `<sdk>/host-contract.json`, which
-matches the installed package. Read the list a section names before
-relying on a tag, listener or API. For what to use **instead**, read
-`references/sandbox-substitutes.md`.
+The lists live in `sandbox` of `<sdk>/host-contract.json`, which matches
+the installed package. This file says how each list applies; read the
+list itself before relying on a tag, listener, attribute or API. For what
+to use **instead**, read `references/sandbox-substitutes.md`.
 
-## Blocked tags
+## Tags
 
-`sandbox.blockedTags`. Rejected by `createElement`/`createElementNS` and
-stripped from sanitized HTML; rendering them from JSX throws at runtime.
-Among them: `a`, `style`, `link`, `input`, `form`, `iframe`, `video`,
-`audio`, and the SVG `use`, `image`, `foreignObject`.
-
-## Allowed tags
-
-Every tag not in `sandbox.blockedTags`. The commonly needed ones are
-allowed: `div`, `span`, `button`, `select`, `option`, `label`, `svg`, `g`,
-`path`, `rect`, `circle`, `line`, `polyline`, `polygon`, `text`, `tspan`,
-`canvas`, `img`.
+`sandbox.blockedTags` are rejected by `createElement`/`createElementNS`;
+rendering one from JSX throws at runtime. Every other tag is allowed.
 
 ## HTML string sanitization
 
 `innerHTML`, `outerHTML`, `ShadowRoot.innerHTML`, and `insertAdjacentHTML`
-are sanitized with DOMPurify: the blocked tags plus `form`, `a`, `style`,
-`frame`, `map`, `area` are stripped, as are the `target`, `formaction` and
-`action` attributes; URLs other than `#…`, `/…`, `http(s):` and
-`data:image/(png|jpeg|gif|svg+xml|webp)` are removed.
+are sanitized with DOMPurify. It strips the tags in
+`sandbox.sanitizerForbiddenTags` and the attributes in
+`sandbox.sanitizerForbiddenAttributes`, and removes URLs that don't match
+`sandbox.sanitizerAllowedUrlPattern`.
 
-## Blocked attribute assignments
+## Attribute assignments
 
 `setAttribute`, `setAttributeNS`, `setAttributeNode(NS)`,
 `setNamedItem(NS)`, and the `Attr.value` setter reject:
@@ -48,29 +39,16 @@ are sanitized with DOMPurify: the blocked tags plus `form`, `a`, `style`,
 - any inline event handler attribute (name matching `/^on/i`)
 - `javascript:` URLs in the attributes of `sandbox.urlValuedAttributes`
 
-## Blocked global event listeners
+## Global event listeners
 
 `addEventListener` on `document` or `window` throws for the types in
-`sandbox.blockedGlobalEventTypes` — keyboard, input, clipboard,
-composition and `storage` events.
+`sandbox.blockedGlobalEventTypes`. Assigning the matching `on<type>`
+handler is blocked too: the `… set <handler>` labels in
+`sandbox.blockedApiCalls`. Listening on the viz's own elements is fine.
 
-Assigning the matching `on<type>` handler is blocked too: the
-`… set <handler>` labels in `sandbox.blockedApiCalls`. Listening on the
-viz's own elements is fine.
+## API calls
 
-## Blocked API calls
-
-`sandbox.blockedApiCalls`. Each entry is exactly the `<label>` that
+Each entry of `sandbox.blockedApiCalls` is exactly the `<label>` that
 follows `blocked API call:` in the console. `<handler>` stands for any
-`on<type>` from the global event types above; `Navigator.get <key>` is
+`on<type>` of the global event types above; `Navigator.get <key>` is
 blocked for every key in `sandbox.blockedNavigatorGetters`.
-
-The groups to expect: network and workers (`window.fetch`,
-`window.XMLHttpRequest`, `window.WebSocket`, `window.Worker`,
-`FontFace.load`, …), stylesheets (`adoptedStyleSheets`,
-`CSSStyleSheet.replace`), document writing and editing, cookies, host
-location, storage (`localStorage`, `sessionStorage`, `indexedDB`),
-windows and dialogs (`window.open`, `window.alert`, …), navigator,
-history, performance, caret, HTML parsing (`DOMParser.parseFromString`, …)
-and synthetic clicks and navigation (`HTMLElement.click`,
-`HTMLAnchorElement.set href`, …).
