@@ -107,7 +107,13 @@ Deriving from a base color the way Metabase does (HSL lightness, 0–100):
 `Error` with a user-readable message for every data-shape or settings
 constraint; Metabase shows the message instead of rendering. The
 component may then assume the constraints hold — do not duplicate the
-checks. Keep runtime guards in the component only for what
+checks as user-facing validation: user-readable errors come only from
+`checkRenderable`. The component still cannot see that
+`checkRenderable` ran, so narrowing types it already guaranteed is fine,
+like the scaffold's `typeof value !== "number"` guard before comparing a
+cell (`RowValue`) or an optional setting. Narrow with `typeof` and
+similar guards, never with `Number(...)`, a made-up default or `as`.
+Keep other runtime guards in the component only for what
 `checkRenderable` cannot see: `width` and `height` are `null` until the
 first measure — return `null` then, after the last hook call
 (known-mistakes: React error #310).
