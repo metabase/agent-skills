@@ -59,10 +59,11 @@ label truncation and fitting instead of guessing character widths.
 
 ## Colors
 
-The valid names are the keys of `colors` in `<sdk>/host-contract.json`;
-each maps to its role (what to use it for: text, surfaces, lines,
-emphasis, status, series and their variants). Pick a name by its role;
-never use a name the contract lacks. The host resolves the value for the
+The valid names are `MetabaseColorKey` in
+`<mb>/frontend/src/metabase/ui/colors/types/color-keys.ts` (`<mb>`: `.claude/metabase-src`), plus the accent names from
+`<mb>/frontend/src/metabase/ui/colors/constants/accents.ts`. Pick a name
+by what its token says it is for (text, surfaces, lines, emphasis,
+status, series); never use a name the file lacks. The host resolves the value for the
 current theme.
 
 Use the names two ways. In DOM and SVG styles, write the CSS variable
@@ -72,7 +73,7 @@ value is needed (canvas libraries, color math), call
 `getColor` returns an unknown name unchanged, and an unknown variable
 resolves to nothing.
 
-Text, surfaces and lines always use contract names. The statement's
+Text, surfaces and lines always use those names. The statement's
 `Colors` decides data marks only:
 
 - `theme` → marks use these names too; a color setting's default is one
@@ -110,11 +111,10 @@ first measure — return `null` then, after the last hook call
 
 Predicates check `base_type`/`effective_type` and `semantic_type`.
 Native SQL columns have no `semantic_type`; query-builder columns
-usually do. `columns` in `<sdk>/host-contract.json` has, for each kind of
-column Metabase sends (`text` from SQL, `category` from the query
-builder, `count`, `date-breakout`, `day-of-week`, …), its types and every
-predicate it passes; check there before relying on a predicate. Pick
-predicates that hold for both:
+usually do. The predicates are defined in
+`<mb>/frontend/src/metabase-lib/v1/types/utils/isa.ts`; read a
+predicate there before relying on it. Pick predicates that hold for
+both:
 
 - Text, labels, categories → `isString`. `isStringLike` is only for
   special text types (IP addresses, BSON ids) and is false for ordinary

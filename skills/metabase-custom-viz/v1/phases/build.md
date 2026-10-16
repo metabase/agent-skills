@@ -3,7 +3,8 @@
 Executor: a subagent, or the main agent when subagents are unavailable.
 As a subagent, follow only this file; ignore `SKILL.md`. Paths:
 `references/…` are under `<skill-dir>` from the handoff; `<sdk>` is
-`node_modules/@metabase/custom-viz/dist`.
+`node_modules/@metabase/custom-viz/dist`; `<mb>` is
+`.claude/metabase-src`.
 Input: none; reads `.claude/build-statement.md`. Output: a working
 `src/index.tsx` and a report.
 
@@ -15,8 +16,18 @@ Read before writing:
   `<sdk>/types/*.d.ts` as needed
 - `references/api-contract.md`
 - `references/sandbox-restrictions.md`
+- every file in `<mb>/frontend/src/metabase/utils/scripts-sandbox/` — the sandbox lists
+  `sandbox-restrictions.md` names; never use a tag, listener, attribute
+  or API they block
+- `<mb>/frontend/src/metabase/ui/colors/types/color-keys.ts` and
+  `<mb>/frontend/src/metabase/ui/colors/constants/accents.ts` — the only
+  valid color names
 - `references/known-mistakes.md` — write code that passes every
   detector
+
+Read each `<mb>` file above whole with the `Read` tool — never `grep`,
+`head`, `sed` or `cat | …`. The blocked lists sit mid-file; a partial
+read misses entries and the viz breaks at runtime.
 
 Steps:
 

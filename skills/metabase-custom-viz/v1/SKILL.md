@@ -25,12 +25,24 @@ input and the paths above.
    name from the request (ask only if there is none), run
    `npx @metabase/custom-viz@latest init <name>`, and work in `<name>/`.
 2. `node_modules/` missing → `npm install`.
-3. Read `<sdk>/host-contract.json`: what the Metabase host provides and
-   blocks, matching the installed package. Missing → the package
-   predates it: `npm install -D @metabase/custom-viz@latest`, then read
-   again. `contractVersion` is not `1` → stop and tell the user this
-   skill handles contract version 1 only; update it with
-   `npx skills add metabase/agent-skills --skill metabase-custom-viz`.
+3. Metabase source: the host rules (sandbox, colors, column types) live
+   in the public Metabase repo. Download each file below, keeping its
+   path and overwriting an older copy, with `curl` (never a web fetch
+   tool: it summarizes):
+   `curl -fsSL --create-dirs -o .claude/metabase-src/<path> https://raw.githubusercontent.com/metabase/metabase/master/<path>`
+   - `frontend/src/metabase/utils/scripts-sandbox/distortions-dom-mutate.ts`
+   - `frontend/src/metabase/utils/scripts-sandbox/distortions-event.ts`
+   - `frontend/src/metabase/utils/scripts-sandbox/distortions-blocked-apis.ts`
+   - `frontend/src/metabase/utils/scripts-sandbox/distortions.ts`
+   - `frontend/src/metabase/ui/colors/types/color-keys.ts`
+   - `frontend/src/metabase/ui/colors/constants/accents.ts`
+   - `frontend/src/metabase-lib/v1/types/utils/isa.ts`
+
+   `<mb>` is `.claude/metabase-src`. Now read the four `scripts-sandbox`
+   files, `color-keys.ts` and `accents.ts`, each whole with the `Read`
+   tool — never `grep`, `head`, `sed` or `cat | …`. The blocked lists sit
+   mid-file; a partial read misses entries and the viz breaks at runtime.
+   `isa.ts` on demand.
 
 Then read `references/project.md` and `references/operations.md`.
 
