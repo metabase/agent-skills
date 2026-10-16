@@ -44,6 +44,12 @@ Drives a Metabase instance from the terminal via the official `mb` CLI — every
 
 This skill is a thin discovery stub; the workflow content lives in [`@metabase/cli`](https://www.npmjs.com/package/@metabase/cli) and is served at runtime by `mb skills get`. Install the CLI (`npm i -g @metabase/cli`) and the skill resolves the rest. The same skill is also available as a Claude Code plugin direct from the CLI repo (`/plugin marketplace add metabase/mb-cli` + `/plugin install metabase-cli@metabase`); one install path is enough.
 
+### Custom visualizations
+
+[metabase-custom-viz](./skills/metabase-custom-viz/v1/SKILL.md)
+
+Build Metabase custom visualizations with [`@metabase/custom-viz`](https://www.npmjs.com/package/@metabase/custom-viz): scaffold a project, turn a request into a working visualization, iterate on it against a local Metabase, debug sandbox and rendering issues, and package the `.tgz` for upload. The skill reads the sandbox rules, color names and column type predicates straight from the Metabase source on GitHub, so it follows the latest host. Each breaking change gets a new version folder (`v1`, `v2`, ...).
+
 ### Data apps
 
 [metabase-data-apps](./skills/metabase-data-apps/v1/SKILL.md)
