@@ -37,14 +37,17 @@ Then read `references/project.md` and `references/operations.md`.
 ## Phases
 
 - `phases/refine.md` — you
-- `phases/build.md` — a subagent told to read and follow that file
+- `phases/build.md` — a subagent: spawn it with the `Task` tool and tell
+  it to read and follow that file. Never write `src/index.tsx` yourself:
+  build needs a fresh context holding only the build statement and its
+  references.
 - `phases/iterate.md` — you
 - `phases/debug.md` — you
 - `phases/ship.md` — you
 
 When executing a phase yourself, follow that file only; skip reading
-files whose content is still in your context. No subagent support → run
-the phase yourself.
+files whose content is still in your context. Only when the `Task` tool
+is unavailable, run build yourself.
 
 ## References
 
