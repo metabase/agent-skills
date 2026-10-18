@@ -66,6 +66,11 @@ by what its token says it is for (text, surfaces, lines, emphasis,
 status, series); never use a name the file lacks. The host resolves the value for the
 current theme.
 
+Never use anything legacy or deprecated: skip every name under a
+`Legacy` comment (`// Legacy colors`, `// Legacy names`) and anything
+marked `@deprecated`, in these files and in `<sdk>/types/`. Newer hosts
+drop them and the viz renders black.
+
 Use the names two ways. In DOM and SVG styles, write the CSS variable
 `var(--mb-color-<name>)`: it follows the theme by itself. Where a literal
 value is needed (canvas libraries, color math), call

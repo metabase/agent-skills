@@ -21,7 +21,8 @@ Read before writing:
   or API they block
 - `<mb>/frontend/src/metabase/ui/colors/types/color-keys.ts` and
   `<mb>/frontend/src/metabase/ui/colors/constants/accents.ts` — the only
-  valid color names
+  valid color names; never a name under a `Legacy` comment or anything
+  `@deprecated` (`api-contract.md`, Colors)
 - `references/known-mistakes.md` — write code that passes every
   detector
 
