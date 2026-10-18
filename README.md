@@ -48,7 +48,7 @@ This skill is a thin discovery stub; the workflow content lives in [`@metabase/c
 
 [metabase-custom-viz](./skills/metabase-custom-viz/v1/SKILL.md)
 
-Build Metabase custom visualizations with [`@metabase/custom-viz`](https://www.npmjs.com/package/@metabase/custom-viz): scaffold a project, turn a request into a working visualization, iterate on it against a local Metabase, debug sandbox and rendering issues, and package the `.tgz` for upload. The skill reads the sandbox rules, color names and column type predicates straight from the Metabase source on GitHub, so it follows the latest host. Each breaking change gets a new version folder (`v1`, `v2`, ...).
+Build Metabase custom visualizations with [`@metabase/custom-viz`](https://www.npmjs.com/package/@metabase/custom-viz): scaffold a project, turn a request into a working visualization, iterate on it against a local Metabase, debug sandbox and rendering issues, and package the `.tgz` for upload. The skill reads the sandbox rules, color names and column type predicates straight from the Metabase source on GitHub, at the tag the installed `@metabase/custom-viz` was released from. Each breaking change gets a new version folder (`v1`, `v2`, ...).
 
 ### Data apps
 
