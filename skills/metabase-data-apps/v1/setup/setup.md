@@ -1,86 +1,52 @@
-# Create a Metabase Data App
+# Create a Metabase data app
 
-A Metabase **data-app** is a single JS bundle that the host loads inside a Near Membrane sandbox and renders inside its own React tree. The scaffold is a Vite + React + TypeScript project: source under `src/`, a dev server that previews the app against a real Metabase **through the same Near Membrane sandbox + distortion rules Metabase uses in production** — so `npm run dev` behaves like production, including for third-party libraries the app bundles — and `npm run build` producing a single `dist/index.js`. (Because the sandbox runs a built bundle, a change rebuilds it and does a *soft reload* — re-evaluates the bundle in the sandbox and remounts the app, keeping auth/SDK loaded — rather than hot-swapping modules; component state resets, but there's no full browser refresh.) The dev preview also shows a corner **⚠ Diagnostics** toolbar that captures runtime errors — including the sandbox's otherwise-opaque blocked-API messages — so failures surface instead of being swallowed. The same data is served as JSON at `http://localhost:5174/__data-app/diagnostics`, which is how *you* read it (see "Reading the diagnostics feed" below) — you have a shell, not a browser, and these failures are invisible from the terminal otherwise.
+The scaffold ships in this skill at `setup/template/`: a Vite + React + TypeScript project whose whole build and dev setup is the SDK preset behind `dataAppConfig()`. Copy it into the app directory. If you find yourself writing `package.json`, `vite.config.ts`, `tsconfig.json`, or `src/index.tsx` by hand, stop and copy the template instead.
 
-**Data apps are served from Git** (they can also be created and updated through `/api/apps`). A single repository is connected to Metabase via remote-sync (Admin → Settings → Remote sync). Each app lives in its own directory `data_apps/<slug>/` inside that repo — its source, a `data_app.yaml` (slug/name/path/collection), and the committed built bundle at the `path` its `data_app.yaml` declares (`dist/index.js` by default). Its collection, with its saved questions and the copies of the metrics and actions it uses, is YAML under the repo's `collections/data_apps/`, like every collection of the `data-apps` namespace. On each remote-sync import Metabase materializes each app and serves it at `/apps/<slug>`, where the slug is the `slug` its `data_app.yaml` declares. So this skill always scaffolds **into the connected repo's `data_apps/<slug>/` directory**, never as a standalone project.
+- `npm run dev` previews the app at `http://localhost:5174` against a real Metabase, through the same sandbox and distortion rules Metabase uses, so third-party libraries the app bundles behave as they will in production. An edit rebuilds the bundle and soft-reloads it: the app remounts and its component state resets, while auth and the SDK stay loaded. There's no browser refresh and no Fast Refresh.
+- `npm run build` writes the single bundle, `dist/index.js`, that Metabase serves from the committed tree.
 
-**The scaffold ships inside this skill at `setup/template/`** — a Vite + React + TypeScript project installed with the skill. Step 3 just copies it into the app directory; this guide then walks you through the customization + first-app-content steps — it never generates project files from scratch. If you find yourself writing `package.json`, `vite.config.ts`, `tsconfig.json`, or `src/index.tsx` by hand, stop — copy the template instead.
-
-## When to use this guide
-
-- "scaffold a new data app" / "create a Metabase data app" / "set up a data-app project"
-- "I want to build a data app" / any vague intent to author a data app
-- Starting a fresh agent task that will produce a data-app bundle.
-- "remove the <slug> data app" / "delete a data app" — only *Removing an app* below applies.
-- Do **not** use this guide for an existing data-app project when the task is to
-  build screens, use Metabase data, generate or refresh schema files, wire saved
-  questions / tables / metrics / actions, add filters, or author data hooks.
-  Treat those as existing-data-app editing tasks and read the part `SKILL.md`
-  lists for them.
+Apps can also be created and updated through `/api/apps`. This guide covers the Git path. To remove an app, only _Removing an app_ applies.
 
 ## Step 1 — Locate the remote-sync repository
 
-Data apps live inside the Git repository connected to Metabase via remote-sync. Find it before scaffolding:
-
-- Ask: **"Do you already have a Git repository connected to this Metabase via remote-sync?"**
-  - **Yes** → ask for its local path.
-  - **No** → ask the user to **create one** (a plain Git repo they will connect under Admin → Settings → Remote sync) and share its path. The skill does **not** create or connect the repo — the user owns that.
-- Verify the path exists and is a Git working tree (it has a `.git`). This repo is the working directory for every step below.
+Ask: **"Do you already have a Git repository connected to this Metabase via remote sync?"** If yes, ask for its local path. If no, ask the user to create one, a plain Git repository they connect under Admin > Settings > Remote sync, and to share its path. This skill neither creates nor connects it. Check that the path is a Git working tree (it has a `.git`). Every step below runs in it.
 
 ## Step 2 — Name the app and create its directory
 
-1. Settle on the app's **slug** before scaffolding — the `/apps/<slug>` URL — so it **must be dash-cased**: lowercase letters, numbers, and single dashes (`[a-z0-9]+(?:-[a-z0-9]+)*`), e.g. `sales-overview`. Anything else (uppercase, spaces, underscores) is rejected on sync. If the purpose isn't clear yet, ask a one-line "what's this app for?" and propose a slug; confirm it.
-2. Ensure `<repo>/data_apps/` exists; create it if missing.
-3. Create `<repo>/data_apps/<slug>/`. **If it already exists**, treat it as an existing project (see below) — never overwrite without confirmation.
+1. Settle the **slug**, the `/apps/<slug>` URL. It must be dash-cased (`[a-z0-9]+(?:-[a-z0-9]+)*`, such as `sales-overview`), or sync rejects it. If the app's purpose isn't clear yet, ask "what's this app for?" in one line, then propose a slug and confirm it.
+2. Create `<repo>/data_apps/<slug>/`, and `data_apps/` first if it's missing. If the directory already exists, it holds an existing app: check it as below, and never overwrite a file without confirmation.
 
-### Detecting an existing app
+### An existing app
 
-If `<repo>/data_apps/<slug>/` already holds a project, verify it matches the current `data-app-template`. Check **all** of:
+The app is template-shaped when both of these hold:
 
-1. `vite.config.ts` is a one-liner: `export default dataAppConfig()`
-   (from `@metabase/embedding-sdk-react/data-app-dev/config`). There is **no**
-   local `config/` directory: the whole bundle contract (externals/globals, the
-   dev sandbox entry, CSS/SVG handling) lives inside that SDK config, not the
-   scaffold. `dataAppConfig` takes only a curated set of overrides (currently just
-   `port`); the contract plugin is always applied and can't be overridden.
-2. `src/index.tsx` default-exports a `DataAppFactory` (type from
-   `@metabase/embedding-sdk-react/data-app`) returning `{ component, providerProps? }`
-   (no args).
+1. `vite.config.ts` is `export default dataAppConfig()`, imported from `@metabase/embedding-sdk-react/data-app-dev/config`, and there is no local `config/` directory.
+2. `src/index.tsx` default-exports a `DataAppFactory` (from `@metabase/embedding-sdk-react/data-app`) that takes no arguments and returns `{ component, providerProps? }`.
 
-**All checks pass** → template-shaped. Ask: "Extend this app, or scaffold a new one under a different slug?" If extend → skip the copy step, edit `src/`. If new → pick a different slug and restart at Step 2.
+If both hold, ask: "Extend this app, or scaffold a new one under a different slug?" To extend, skip the copy and edit `src/`. For a new one, pick another slug and restart at Step 2.
 
-**Any check fails**: not template-shaped (older scaffold or drift). **Stop.** Tell the user the structure differs from the current template, extending it risks breaking the bundle contract, and ask whether to (1) migrate it (a separate task, in `migrate/migrate.md`), (2) scaffold fresh under a new slug and port the code over, or (3) proceed anyway at their risk. Wait for the answer.
+If either fails, **stop**. Tell the user the app differs from the current template, so extending it risks breaking the bundle contract. Ask whether to (1) migrate it (`migrate/migrate.md`), (2) scaffold a fresh app under a new slug and port the code over, or (3) proceed at their own risk. Wait for the answer.
 
-Never overwrite existing files without explicit confirmation.
-
-## Step 3 — Copy the template into the app directory
-
-The template ships **inside this skill** at `setup/template/` and is installed with it. Copy it into the app directory:
+## Step 3 — Copy the template
 
 ```bash
 APP_DIR="<repo>/data_apps/<slug>"
-# `<skill-dir>` = the directory holding this skill's SKILL.md
-# (e.g. `.claude/skills/metabase-data-apps`).
 cp -R "<skill-dir>/setup/template/." "$APP_DIR/"
 ```
 
-A data app is a *subdirectory* of the remote-sync repo, not its own repository — so this is a plain copy, never a nested `git clone` / `git init`. Everything below runs **inside `$APP_DIR`**.
-
-The copy includes two root-level directories, `queries/` and `actions/`, each holding only a `README.md`. Keep both, even while empty: every query the app runs is a `defineQuery(...)` export in `queries/`, every action a `defineAction(...)` export in `actions/`, and the hooks refuse anything else at compile time. Read both READMEs before writing the first `useMetabaseQuery` / `useMetabaseQueryObject` / `useAction` call.
+The app is a subdirectory of the repository, so this is a plain copy. Everything below runs in `$APP_DIR`. Keep the root-level `queries/` and `actions/` directories even while each holds only its README.
 
 ## Step 4 — Customize
 
-Once the template is in `<repo>/data_apps/<slug>/` (run everything below from that directory):
-
-1. Edit `package.json` `name` to match the slug.
-2. Pin `@metabase/embedding-sdk-react` to the published data-apps tag (the template ships with `*`):
+1. Set the `name` in `package.json` to the slug.
+2. Pin the SDK to the data-apps tag (the template ships `*`):
 
    ```bash
    npm install @metabase/embedding-sdk-react@65-beta
    ```
 
-   This resolves to the current internal-testing SDK build with the `@metabase/embedding-sdk-react/data-app` entrypoint (the app's APIs) and the `@metabase/embedding-sdk-react/data-app-dev/config` entrypoint `vite.config.ts` uses (the dev/build preset, which serves the sandbox entry). Do not use `latest` as data apps are only in Metabase 65 Beta.
-3. **Ensure the repo-root `.gitignore` ignores `.env.local`** — do this *before* creating any credentials file so the secret can never be committed. Create the `.gitignore` if the repo doesn't have one, then add the entry if it's missing:
+   Data apps exist only in the Metabase 65 beta, so never use `latest`. The tag provides `@metabase/embedding-sdk-react/data-app`, the app's APIs, and `@metabase/embedding-sdk-react/data-app-dev/config`, the dev and build preset that `vite.config.ts` uses.
+3. Make the repo-root `.gitignore` ignore `.env.local`, before any credentials file exists:
 
    ```bash
    ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
@@ -88,26 +54,20 @@ Once the template is in `<repo>/data_apps/<slug>/` (run everything below from th
      echo "MISSING (run this from inside the connected git repo)"
    else
      GITIGNORE="$ROOT/.gitignore"
-     # Create the repo-root .gitignore if absent, then ensure `.env.local` is
-     # ignored so the credentials file (next step) can never be committed.
      [ -f "$GITIGNORE" ] || : > "$GITIGNORE"
      grep -qxF ".env.local" "$GITIGNORE" || echo ".env.local" >> "$GITIGNORE"
    fi
    ```
-4. Set up the Metabase credentials at the **repository root** — `<repo>/.env.local` (usually two levels up from the app dir), **not** the app dir. One `.env.local` there serves every data app in the repo.
-
-   Create it from the example if absent, then verify the two vars are set **without printing the file** (it may hold other secrets) — `source` it and echo only a pass/fail signal, never the values:
+4. Create `.env.local` at the repository root (one file serves every app in the repository), then check its two variables without printing them:
 
    ```bash
-   # Resolve the repo root first; an unguarded $(git ...) would expand to
-   # "/.env.local" outside a repo and touch a system-level file.
+   # An unguarded $(git ...) would expand to "/.env.local" outside a repo.
    ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
    if [ -z "$ROOT" ]; then
      echo "MISSING (run this from inside the connected git repo)"
    else
      ENV_FILE="$ROOT/.env.local"
      [ -f "$ENV_FILE" ] || cp .env.local.example "$ENV_FILE"
-     # Source inside a subshell so the vars never leak into your environment.
      ( source "$ENV_FILE" 2>/dev/null
        [ -n "$DATA_APP_MB_URL" ] && [ "$DATA_APP_MB_URL" != "mb_replace_me" ] &&
        [ -n "$DATA_APP_MB_API_KEY" ] && [ "$DATA_APP_MB_API_KEY" != "mb_replace_me" ]
@@ -115,130 +75,39 @@ Once the template is in `<repo>/data_apps/<slug>/` (run everything below from th
    fi
    ```
 
-   If it prints `MISSING`, **ask the user to fill `DATA_APP_MB_URL` (the running Metabase instance) and `DATA_APP_MB_API_KEY` (Admin → Authentication → API keys, a key in the Administrators group, since the typed schema answers only an admin) in `<repo>/.env.local` themselves** — up front, before anything needs the key.
+   If it prints `MISSING`, ask the user to fill in `DATA_APP_MB_URL` (the running Metabase instance) and `DATA_APP_MB_API_KEY` (from Admin > Authentication > API keys, a key in the Administrators group) in `<repo>/.env.local` themselves. Ask now, before anything needs the key. `creds present` means only that both variables are filled in. A bad URL or key shows up later, when a request fails.
+5. **Generate `data_app.yaml` and the app's collection.** First check whether `data_apps/<slug>/data_app.yaml` exists. The template ships none, so a file there means the app already exists.
 
-   > **Never ask the user to paste the API key into the chat, and never `cat` / `echo` / print `.env.local` or its variables.** It's git-ignored and may hold *other* secrets — the file's contents and the key must never enter the conversation or your context. Every command that needs the key `source`s the file (as above) so the shell uses the value directly; you only ever see the `creds present` / `MISSING` signal, never the secret itself. (`creds present` only means both vars are filled and not the default `mb_replace_me` placeholder — not that the URL or key are valid; a bad key surfaces later when a request fails.)
-5. **Generate `data_app.yaml` and the app's collection.** Metabase writes both. Call `POST /api/apps/generate/app` with the app's display name, its `/apps/<slug>` slug, and an optional one-line description: `{"name": "Sales App", "slug": "sales-app", "description": "Pipeline health and quota attainment by region"}`. Authenticate with the API key as the `x-api-key` header, sourced from `.env.local` as above.
+   Call `POST /api/apps/generate/app` with the API key in the `x-api-key` header, sourced from `.env.local` as above. The body holds the app's display name, its slug, and an optional description: `{"name": "Sales App", "slug": "sales-app", "description": "Pipeline health and quota attainment by region"}`.
 
-   It answers `{"files": [{"path": "...", "yaml": "..."}]}`: the app's `data_app.yaml` (at `data_apps/<slug>/data_app.yaml`) and its collection's file under `collections/data_apps/`. Write each `yaml` unchanged to its `path`, which is relative to the repo root. Any other answer is an error: show it to the user and stop.
+   - A new app gets new entity IDs.
+   - An existing app must send the IDs it has. Otherwise the call writes a new app with a new collection, and the app's saved questions and copies stay behind in the old one. Send its `entity_id` as `entity_id`, its `collection:` value as `collection_id`, and its `slug` unchanged. Regenerate an existing app only to change its name or description. If its `version` is lower than the one in the answer, the app is outdated: stop and migrate it first (`migrate/migrate.md`). Otherwise, copy its `allowed_hosts` into the new file.
 
-   **Before calling it, check whether `data_apps/<slug>/data_app.yaml` exists.** The template ships none, so one there means the app already exists. A new app gets new entity IDs. An existing app must pass the ones it has, or the call writes a new app with a new collection and leaves the app's saved questions and copies in the old one: send its `entity_id` as `entity_id`, its `collection:` value as `collection_id`, and its `slug` unchanged, and both files come back with the same IDs. Regenerate an existing app only to change its name or description. The answer carries the `version` Metabase serves and no `allowed_hosts`: if the existing `version` is lower, the app is outdated, so stop and migrate it first (`migrate/migrate.md`); otherwise copy the existing `allowed_hosts` into the new `data_app.yaml`.
+   The answer is `{"files": [{"path": "...", "yaml": "..."}]}`: the app's `data_apps/<slug>/data_app.yaml` and its collection's file under `collections/data_apps/`. Write each `yaml` unchanged to its `path`, which is relative to the repo root. Any other answer is an error: show it to the user and stop.
 
-   Never copy `data_app.yaml` or its `collection:` line from another app. Edit the generated `data_app.yaml` only to add `allowed_hosts` (below).
+   - **`description`** is one short sentence about what this app does, shown under its name in the admin list so admins can tell apps apart. Sync folds whitespace into single spaces and rejects more than 255 characters. Leave it out if it adds nothing beyond the name.
+   - **`version`** is the contract version the app's code targets. Metabase writes it, so never change it by hand. Metabase raises the version it serves only on a breaking change. An app on an older version is marked _Outdated_, hidden from every other user, and won't open until it's migrated with `migrate/migrate.md`, one version at a time, never ad hoc.
+   - **`allowed_hosts`** is needed only when the app calls an **external** API with `fetch` or XHR. Each origin listed, exact or a `*.` subdomain wildcard, opens in both `npm run dev` and Metabase. Never list the Metabase instance, and leave the key out entirely when the app talks only to Metabase. A native `<form action>` submit (`form-action`) and an `<iframe src>` or navigation (`frame-src`) obey the same list, and the target must also allow framing (`X-Frame-Options`, `frame-ancestors`), which many public sites don't. Prefer `<form onSubmit>` with `preventDefault`: a native submit navigates the sandboxed iframe away from the app.
+6. Run `npm install`, or use the user's package manager. The template ships no lockfile, so keep whichever one the install creates.
+7. Commit both the lockfile and the built bundle: Metabase serves the file at `data_app.yaml`'s `path` straight from the Git tree, and the lockfile keeps installs reproducible. After installing and building, check `git status` to confirm both are committable.
+8. If the preview hits CORS, add `http://localhost:5174` under Admin > Embedding > Embedded analytics SDK > CORS.
 
-   **`description`** — optional: a single short sentence saying what the app
-   does, shown under its name in the admin UI so admins can tell apps apart at a
-   glance. Sync folds any whitespace into single spaces and rejects anything over
-   255 characters; the admin list wraps what is left rather than cutting it off,
-   so a sentence reads well there and a paragraph crowds out the rows around it.
-   Pass a real sentence about *this* app, or leave `description` out of the
-   request if it adds nothing beyond the name.
-
-   **`version`** — the data app contract version this app's code targets, a
-   whole number. Metabase writes the version it serves; do not change it by
-   hand. Metabase bumps the version it serves only on a breaking
-   change to the contract. An app on an older version is marked *Outdated* in
-   the admin list, hidden from every other user, and refuses to open until it
-   is migrated to the current contract, its `version` raised to match, rebuilt,
-   and synced. That migration is a separate, instructed procedure, one version
-   at a time, in `migrate/migrate.md`; never do it ad hoc.
-
-   **`allowed_hosts`** — only needed if the app calls an **external** API directly
-   with `fetch`/`XHR`. The sandbox blocks all network egress by default; listing an
-   origin here (exact or a `*.` subdomain wildcard) opens it in both `npm run dev`
-   (dev-server CSP) and Metabase (iframe CSP + sandbox). Do **not** list the
-   Metabase instance — Metabase data is read via the `useMetabaseQuery` data hooks
-   and written via `useAction` (the SDK handles auth), never raw `fetch`. Leave
-   `allowed_hosts` out entirely when the app only talks to Metabase.
-
-   Native `<form action="…">` submissions and `<iframe src="…">`/navigations obey
-   the **same** allowlist. Prefer a client-side `<form onSubmit>` that
-   `preventDefault`s and writes via `useAction`/`fetch`: a native submit
-   *navigates the sandboxed iframe away* from the app. If you do use one, the
-   target host must be in `allowed_hosts` or it's blocked (`form-action` for
-   submits, `frame-src` for embeds/navigations). A host you navigate to or embed
-   must also permit framing (`X-Frame-Options`/`frame-ancestors`) — many public
-   sites don't.
-
-6. `npm install` (or whichever package manager the user prefers — the template ships with no lockfile, so `npm` / `yarn` / `pnpm` / `bun` all work; use the project's existing lockfile if one appears post-clone).
-7. **The lockfile and the built bundle must both be committed.** Metabase serves the file at the `path` declared in `data_app.yaml` (the template builds to `dist/index.js`) straight from the committed Git tree, and the lockfile keeps installs reproducible. **Verify with `git status`** after `npm install` and a build: both must appear as committable files.
-8. `npm run dev` and confirm the preview at http://localhost:5174 renders the starter "Hello, data app" message.
-9. If the preview hits CORS, add `http://localhost:5174` under Admin → Embedding → Embedded analytics SDK → CORS.
-
-### The order of the app's files
-
-An app's YAML is written in this order, and each step needs the one before it:
-
-1. `data_app.yaml` and the collection's file under `collections/data_apps/`,
-   both generated at item 5.
-2. The files in the collection's directory: a saved question per query and
-   copies of the metrics and actions they use, which `npm run write-resources`
-   regenerates once the app has definitions in `queries/` or `actions/`. It
-   writes into the collection `data_app.yaml` names, so it refuses to run until
-   the manifest names one whose file exists.
-
-Scaffolding ends after the first. The second is part of building the app's
-data layer, in `semantic-layer/semantic-layer.md`.
+`npm run write-resources` writes into the collection that `data_app.yaml` names, so it refuses to run until that collection's file exists. The app's saved questions and copies come later, when you build its data layer (`semantic-layer/semantic-layer.md`).
 
 ## Step 5 — Verify the starter app
 
-At this point the data app exists. Keep this workflow focused on creating the
-project scaffold and proving the starter bundle works.
+1. `npm run typecheck`.
+2. `npm run check-resources`. It fails when `data_app.yaml` names no collection, or one without a file, and it validates the repository's YAML. It changes nothing in Metabase.
+3. `npm run build`.
+4. `git status` shows the app source, the lockfile, `data_app.yaml`, the collection's file under `collections/data_apps/`, and `dist/index.js` as committable files.
+5. Run `npm run dev` and confirm the preview at `http://localhost:5174` shows "Hello, data app". Read the diagnostics feed once (below). Expect `clients: 1` and no entry with `"alert": true`.
+6. Confirm that `@metabase/embedding-sdk-react` is on the data-apps tag.
 
-1. Run `npm run typecheck`.
-2. Run `npm run check-resources`. It fails when `data_app.yaml` names no
-   collection or one without a file, and it validates the repository's YAML
-   against the format. It changes nothing in Metabase.
-3. Run `npm run build`.
-4. Confirm `git status` shows the app source, lockfile, `data_app.yaml`, the
-   collection's file under `collections/data_apps/`, and the built bundle
-   (`dist/index.js` by default) as committable files.
-5. If the user asked for a live preview, run `npm run dev` and confirm the
-   starter "Hello, data app" screen renders through the sandbox preview.
-6. With the preview open, check the diagnostics feed once — it is the only place
-   runtime failures appear to you (see *Reading the diagnostics feed*):
-
-   ```bash
-   curl -s "http://localhost:5174/__data-app/diagnostics?startEventId=0"
-   ```
-
-   Expect `clients: 1` and no entries with `"alert": true`. `clients: 0` means no
-   preview tab is open, so an empty feed proves nothing.
-
-Stop here if the user only asked to create, scaffold, or set up a data app.
-
-If the next task is to build or iterate on the actual app UI — especially if it
-mentions an existing data app, Metabase data, generated schema files, saved
-questions, tables, metrics, actions, filters, semantic-layer entities, or data
-hooks — treat it as a separate existing-data-app editing task, and read the
-part `SKILL.md` lists for it. Do not expand this scaffold guide with data-layer
-authoring rules.
-
-**Do not modify `src/index.tsx` or `tsconfig.json` unless the change is genuinely required.** The whole build/dev setup lives in the SDK behind `dataAppConfig()` (which also serves the dev HTML shell — there's no `index.html` to edit), so `vite.config.ts` is just:
-
-```ts
-import { dataAppConfig } from "@metabase/embedding-sdk-react/data-app-dev/config";
-
-export default dataAppConfig();
-```
-
-`dataAppConfig` exposes only a curated set of overrides (currently just `port`). The whole contract — factory shape, externals/globals, the dev sandbox entry, CSS inlining, and SVG-as-component support — is baked in and **can't** be overridden; that's deliberate, so a data app can't drift from what Metabase loads. There's no local build config to touch (and no `index.html` — the SDK's dev server serves the HTML shell), and tweaks to `src/index.tsx` still risk breaking the factory shape and silently break drill popups and routing.
-
-There is intentionally **no escape hatch** for extra Vite plugins, aliases, or `define`s — `port` is the only knob. If you think you need more, you almost certainly don't; solve it in `src/` instead.
-
-**After every meaningful round of edits, run `npm run typecheck`.** It runs `tsc --noEmit` over `src/`, `queries/`, `actions/` and `vite.config.ts` — catches wrong prop shapes against the SDK types, broken refactors, missing imports, etc. The Vite dev server does NOT typecheck (it only transpiles), so errors that would fail a production CI run can sit invisibly in a passing `npm run dev` session. Run it before declaring a task complete.
-
-**Before handoff, re-check package hygiene.** `@metabase/embedding-sdk-react` should use the expected data-app SDK source/tag for the target environment. No date picker dependency should be installed when the app only needs date ranges — not `react-datepicker`, `react-day-picker`, `flatpickr`, or a UI suite's picker (`@mui/x-date-pickers`, `antd`, `rsuite`, …); that is `DateRangePopover` from `@metabase/embedding-sdk-react/data-app`. `@types/react-datepicker` should not be installed unless the chosen `react-datepicker` version actually needs it.
+Stop here if the user only asked to create or set up an app.
 
 ## Reading the diagnostics feed
 
-`npm run dev` serves everything the toolbar shows as JSON — the only way *you*
-see runtime failures, since sandbox blocks, CSP refusals, failed queries and
-uncaught errors reach neither the terminal nor `npm run typecheck`. Check it
-after any change you can't verify by reading the code.
-
-**Loop:** note `nextEventId` before editing → make the change (rebuilds
-automatically) → re-read. `startEventId` is inclusive and survives page reloads.
+`npm run dev` serves everything its corner **⚠ Diagnostics** toolbar shows as JSON. That's how you see runtime failures, since you have a shell, not a browser. Note `nextEventId` before an edit, make the change (it rebuilds on its own), then read again from that ID. `startEventId` is inclusive and survives page reloads.
 
 ```bash
 curl -s "http://localhost:5174/__data-app/diagnostics?startEventId=0"
@@ -253,164 +122,86 @@ curl -s "http://localhost:5174/__data-app/diagnostics?startEventId=0"
     "hint": "Add https://api.example.com to allowed_hosts in data_app.yaml …",
     "buildId": 7      // the bundle generation that reported it
   }],
-  "clients": 1,       // connected preview tabs — 0 means nothing ran
+  "clients": 1,       // connected preview tabs; 0 means nothing ran
   "buildId": 7,       // the generation running now
-  "staleEntries": 164, // held back, reported by an older build — see below
+  "staleEntries": 164, // withheld, reported by an older build
   "nextEventId": 32   // pass back as ?startEventId=
 }
 ```
 
-**`clients: 0` does not mean healthy** — it means no preview tab is open, so an
-empty `entries` proves nothing. Open `http://localhost:5174` first.
-
-**The feed answers for the bundle that is running, not for everything that ever
-happened.** Every save rebuilds and remounts the app, so a multi-step edit runs
-through builds that don't compile or don't render — errors from those describe
-code the preview has already replaced. They're withheld and counted in
-`staleEntries`; read mid-edit and you see the current build's failures, not a
-pile of them. Nothing is lost: the rebuild re-runs the app from scratch, so
-anything still broken reports itself again under the new `buildId`, and
-`?includeStale=true` hands back the withheld entries when comparing builds is
-the point. A *failed* build doesn't advance `buildId` — the preview keeps
-running the last good bundle, so its entries stay current.
-
-Triage by `kind` (always read `hint` — it names the exact fix; never soften a
-`summary` when reporting it):
+- **`clients: 0` doesn't mean healthy.** It means no preview tab is open, so empty `entries` prove nothing. Open `http://localhost:5174` first.
+- The feed answers for the bundle that is running now. A multi-step edit passes through builds that don't compile or don't render. Their errors describe code the preview has already replaced, so they're withheld and counted in `staleEntries`. Anything still broken reports itself again under the new `buildId`. `?includeStale=true` returns the withheld entries when comparing builds is the point. A *failed* build doesn't advance `buildId`: the preview keeps running the last good bundle, so its entries stay current.
+- Always read `hint`, which names the exact fix, and quote `summary` as it is when you report it.
 
 | `kind` | Fix |
 |---|---|
-| `blocked-network` / `csp-violation` | add the origin to `allowed_hosts` in `data_app.yaml`, then **restart** `npm run dev` (allowlist + CSP are read at boot) |
-| `blocked-api` | blocked in production too — use an SDK API or drop the call, don't work around it |
-| `sdk-call` + `alert: true` | a Metabase request failed; fix the query — `summary` has the endpoint and status |
-| `error` | a real bug; `detail` has the stack |
+| `blocked-network` / `csp-violation` | Add the origin to `allowed_hosts` in `data_app.yaml`, then **restart** `npm run dev`, which reads the allowlist and CSP at boot. |
+| `blocked-api` | It's blocked in production too. Use an SDK API or drop the call. Don't work around it. |
+| `sdk-call` + `alert: true` | A Metabase request failed. Fix the query. `summary` has the endpoint and status. |
+| `error` | A real bug. `detail` has the stack. |
 
-Text is truncated and the buffer holds the last 200 events. `curl -X DELETE
-.../__data-app/diagnostics` clears it for every reader.
+Text is truncated, and the buffer keeps the last 200 events. `curl -X DELETE .../__data-app/diagnostics` clears it for every reader.
 
 ## Source conventions
 
-### 1. Write TSX
-
-Plain ESM + TSX, normal package imports:
+Write plain ESM and TSX with normal package imports:
 
 ```tsx
-// src/components/CustomerCard.tsx
-import { StaticQuestion } from "@metabase/embedding-sdk-react";
-
-type Customer = { name: string; questionId: number };
-
-export default function CustomerCard({ customer }: { customer: Customer }) {
-  return (
-    <article>
-      <h3>{customer.name}</h3>
-      <StaticQuestion questionId={customer.questionId} height={300} width="100%" />
-    </article>
-  );
-}
-```
-
-### 2. Structure from the start
-
-Default project layout once the starter app is extended:
-
-```
-queries/               (root level, beside package.json — NOT under src/)
-│   └── orders.query.ts   (defineQuery exports; one file per topic)
-actions/               (root level, beside package.json — NOT under src/)
-│   └── orders.action.ts  (defineAction exports; one file per topic)
-src/
-├── index.tsx          (template — the factory; don't edit)
-├── App.tsx            (routing + composition only)
-├── theme.ts
-├── metabase.data.ts   (generated schema — see semantic-layer/semantic-layer.md)
-├── pages/             (one file per screen)
-│   ├── Overview.tsx
-│   └── CustomerDetail.tsx
-├── components/        (shared UI)
-│   └── Card.tsx
-├── hooks/             (custom hooks that wrap a query export, never the query itself)
-│   └── useCustomers.ts
-├── lib/               (pure helpers / derivations)
-│   └── format.ts
-└── types/             (shared TS types)
-    └── customer.ts
-```
-
-Vite bundles everything reachable from `src/index.tsx` into a single `dist/index.js` IIFE — the `src/` layout is purely for your own readability. `queries/` and `actions/` are not: each definition in those two root-level directories is backed by a file in the app's collection under the repo's `collections/data_apps/`, `npm run build` fails until they match, and the query and action hooks accept only the `defineQuery` / `defineAction` exports declared there. A query object written at a hook call, under `src/`, or spread from a definition does not compile (`Property 'definedWithDefineQuery' is missing`); the fix is to move it into `queries/` and import it, never a cast.
-
-**If the app has multiple tabs (or any top-level screen switcher), the default — leftmost / first — tab MUST be selected on initial load.** The app should never boot to a blank page, an empty shell, or a "nothing selected" state that waits for the user to click. Agents repeatedly forget this. For local-state tabs, initialize the active tab to the first one so the very first render shows it:
-
-```tsx
-const [active, setActive] = useState(TABS[0].id); // default = leftmost tab
-```
-
-If the tabs are instead backed by URL routes (multiple pages), the same rule applies via the router — `routing/routing.md` makes the base path `/` resolve to the default tab. Either way, verify by loading the app fresh: the leftmost tab's content is visible immediately and reads as selected.
-
-**The build output is one self-contained `.js` file — nothing else.** The backend serves a single bundle, so there are no sidecar files: CSS is inlined into the JS, and every imported asset (images, fonts, SVGs-as-URLs) is base64-inlined as a data URI. So `import logo from "./logo.png"` / `import iconUrl from "./icon.svg"` give you a ready-to-use data-URI string, and SVGs can also be imported as React components with the **`?react`** suffix (built-in `svgr`): `import Icon from "./icon.svg?react"`. Everything gets baked into `dist/index.js` — just keep large binaries out, since inlining inflates the bundle. (If your editor doesn't recognize a `?react` import, add `declare module "*.svg?react";` to a `.d.ts` in `src/`.)
-
-### 3. Import SDK values from the correct SDK entrypoint
-
-The build externalizes React, the JSX runtimes, `@metabase/embedding-sdk-react`, and `@metabase/embedding-sdk-react/data-app` to sandbox globals in **both** production and `npm run dev` — in dev the sandbox entry endows them from the npm package, so the bundle runs identically in both. Just import from the entrypoints normally:
-
-```tsx
-// ✅ correct
 import { StaticQuestion } from "@metabase/embedding-sdk-react";
 import {
-  DataAppRouter,
   DataAppLink,
   useMetabaseQuery,
 } from "@metabase/embedding-sdk-react/data-app";
-
-// ❌ wrong — no globalThis pattern; you'd be reading nothing
-const { MetabaseProvider, StaticQuestion } = globalThis;
+import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 ```
 
-**Do NOT render `<MetabaseProvider>` in `App.tsx`.** The dev entry (served by the SDK's dev preset) and the production host both wrap your tree in a provider that lives in their own realm — wrapping inside the bundle would route the SDK's `setState`-via-listener paths through the Near Membrane sandbox and silently break drill popups, plugin init, and similar.
+- The build externalizes React, React DOM, the JSX runtimes, `@metabase/embedding-sdk-react`, and `@metabase/embedding-sdk-react/data-app` to sandbox globals, in `npm run dev` as in production. Import from the entrypoints as usual. Never read SDK values off `globalThis`: nothing is there.
+- Data-app APIs (routing, the data hooks, `useAction`, `copy`, the date pickers) come from `/data-app`. Components such as `StaticQuestion` come from the main entry.
+- JSX uses the automatic runtime, so don't write `import React from "react"`. Import hooks by name, and React types as named type imports, not through the `React.` namespace.
+- `dataAppConfig()` takes one override, `port`. The bundle contract (the factory shape, externals, the dev sandbox entry, CSS inlining, SVG handling) can't be overridden, and there's no way to add Vite plugins, aliases, or `define`s. There's no `index.html` either: the SDK's dev server serves the HTML shell. If you think you need one, solve the problem in `src/` instead.
+- The build is one self-contained `.js` file. CSS is inlined, and every imported asset becomes a data URI: `import logo from "./logo.png"` gives a ready-to-use string, and `import Icon from "./icon.svg?react"` a React component. If the editor doesn't recognize `?react`, add `declare module "*.svg?react";` to a `.d.ts` file in `src/`. Keep large binaries out, since inlining inflates the bundle.
 
-### 4. Import `react` normally too
+Layout once the starter grows:
 
-The build externalizes `react` and `react-dom`, so plain imports resolve the same way in both modes — the production host and the dev sandbox both endow them as sandbox globals:
-
-```tsx
-import { useState, useEffect, useMemo } from "react";
+```
+queries/               defineQuery exports, one <topic>.query.ts per topic
+actions/               defineAction exports, one <topic>.action.ts per topic
+src/
+├── index.tsx          the factory (from the template)
+├── App.tsx            routing and composition only
+├── theme.ts
+├── metabase.data.ts   the generated schema
+├── pages/             one file per screen
+├── components/        shared UI
+├── hooks/             hooks that call a query export, never define one
+├── lib/               pure helpers
+└── types/             shared types
 ```
 
-**No `import React from "react"` needed in TSX files** — the template uses the automatic JSX runtime (`jsx: "react-jsx"` in `tsconfig.json`; `dataAppConfig()` includes the React plugin). The compiler injects the JSX-runtime imports it needs (`react/jsx-runtime` in production, `react/jsx-dev-runtime` in dev — both externalized and endowed by the sandbox). Just write JSX and named imports — that's it.
-
-For React *types* (e.g. `ComponentType`, `ReactNode`, `RefObject`), use named type imports rather than the `React.` namespace:
-
-```ts
-import type { ComponentType, ReactNode } from "react";
-```
+Vite bundles everything reachable from `src/index.tsx`, so the layout under `src/` is only for readability.
 
 ## Theme rules
 
-`MetabaseProvider`'s `theme` (defined in `src/theme.ts`) is the only way SDK component appearance changes. It is NOT a stylesheet for the bundle's own chrome.
+The `theme` in `src/theme.ts`, passed through `providerProps`, is the only way to change how SDK components look. It never styles your own UI: give page backgrounds, headers, and card wrappers inline `style` or CSS modules.
 
 | Field | Purpose | Notes |
 |---|---|---|
-| `colors.brand` | Accent for SDK widgets | Use the data app's primary color. |
-| `colors.brand-hover`, `colors.brand-hover-light` | Hover/accent backgrounds for SDK widgets | Use a subtle surface tint that contrasts with hover text. Do not use the same saturated color as `brand`. |
-| `colors.charts` | Chart palette | Array of strings. Use vivid brand-shade colors only; **never pale tints** — palette index 1+ may render labels and pale-on-white is invisible. |
+| `colors.brand` | Accent for SDK widgets | The app's primary color. |
+| `colors.brand-hover`, `colors.brand-hover-light` | Hover backgrounds | A subtle tint that contrasts with hover text, never the saturated `brand`. For a blue brand, use something like `#EAF4FF`. |
+| `colors.charts` | Chart palette | Vivid brand shades only, **never pale tints**: palette entries from index 1 on may color labels, and pale on white is invisible. |
 | `colors.positive` / `colors.negative` | Semantic indicators | |
-| `colors.background`, `colors.background-secondary` | SDK component surface | **MUST match the immediate parent container of the SDK component.** If the chart sits inside a white card, use `"white"`. If it sits on a tinted page, use that tint. |
-| `colors.text-primary`, `text-secondary`, `text-tertiary` | Text on SDK surfaces | **MUST contrast with `background`.** For white bg: use `#1f2937` or similar dark color. The SDK's default `text-primary` resolves to ~white, so leaving it unset on a white surface produces invisible white text. **Always pair `background` and `text-primary` when overriding.** |
-| `fontFamily` | SDK widget typography | |
+| `colors.background`, `colors.background-secondary` | SDK component surface | **Must match the SDK component's immediate parent container**: `"white"` inside a white card, the tint on a tinted page. |
+| `colors.text-primary`, `text-secondary`, `text-tertiary` | Text on SDK surfaces | **Must contrast with `background`**, such as `#1f2937` on white. The SDK's default `text-primary` is near white, so always set it together with `background`. |
+| `fontFamily` | SDK typography | |
 
-Hover colors are a contrast pair. If you set `colors.text-hover`, verify it
-contrasts with `colors.brand-hover` / `colors.brand-hover-light` in open menus,
-chart type selectors, and visualization settings dropdowns. For a blue `brand`,
-use a pale hover surface like `#EAF4FF`, not the brand blue itself.
+If you set `colors.text-hover`, check that it contrasts with `brand-hover` and `brand-hover-light` in open menus, chart-type selectors, and visualization-settings dropdowns.
 
-**The theme only styles SDK widgets — never your own UI.** For your page background, headers, card wrappers, etc., use inline `style={{ background: "#f5f5f7" }}` or CSS modules on your own elements.
-
-**Don't expect per-subtree theming.** Multiple `<MetabaseProvider>`s on the page fight for the single CSS-variable slot. If the look needs to change with state, recompute `sdkTheme` at the App level and re-render — the whole tree re-themes.
+Several `<MetabaseProvider>`s fight over one set of CSS variables, so per-subtree theming doesn't work. When the look depends on state, recompute `sdkTheme` at the app level and let the whole tree re-theme.
 
 ## Custom error UI (optional)
 
-When an embedded question or dashboard can't load — its `questionId` was removed, the user lacks access, or a request fails — the host renders a **neutral built-in error state** in place of that component (a muted icon + the SDK's message). This needs no setup; leave it alone unless the app has a strong reason to restyle it.
-
-To match the app's look, return your own `errorComponent` in the factory's `providerProps` (the same object that carries `theme`). It's an ordinary `providerProps` key, not a change to the factory shape — safe to add:
+When an embedded question or dashboard can't load (its `questionId` was removed, the user lacks access, or a request fails), the host renders a neutral built-in error state in its place. Leave that alone unless the app has a strong reason to restyle it. To match the app's look, add an `errorComponent` to the factory's `providerProps`:
 
 ```tsx
 // src/components/AppError.tsx
@@ -423,132 +214,87 @@ export default function AppError({ message }: SdkErrorComponentProps) {
     </div>
   );
 }
-```
 
-```tsx
-// src/index.tsx — add the key alongside `theme`
-import AppError from "./components/AppError";
-
+// src/index.tsx
 const factory: DataAppFactory = () => ({
   component: App,
   providerProps: { theme: sdkTheme, errorComponent: AppError },
 });
 ```
 
-Rules:
-
-- **It replaces the error UI for *every* SDK component in the app**, not just not-found — so keep the copy generic. Render `message` (or your own wording), not an assumption about which error occurred.
-- `message` is a `ReactNode` — render it as-is; don't call `.toString()` or index into it.
-- Keep it a small **presentational** component. It renders inside the host's provider, but treat it as leaf UI — no data hooks, no `useMetabaseQuery`.
-- Omit `errorComponent` entirely to keep the neutral default. There's no need to re-implement it.
+- It replaces the error UI of **every** SDK component in the app, not only not-found errors, so keep the wording generic.
+- `message` is a `ReactNode`. Render it as it is: don't call `.toString()` on it or index into it.
+- Keep the component small and presentational, with no data hooks.
 
 ## Available SDK surface
 
-The bundle imports React hooks/JSX, SDK components from `@metabase/embedding-sdk-react`, and data-app-specific routing/query APIs from `@metabase/embedding-sdk-react/data-app`. `dataAppConfig()` externalizes these packages at build time, so production references the host's copies at runtime (`globalThis.__metabase_sdk__` / `globalThis.__metabase_data_app__` for SDK packages), and the Vite dev sandbox endows the same globals from the installed npm package.
-
-`<MetabaseProvider>` is **not** rendered by the bundle's `App.tsx` — the dev entry and the host wrap it for their respective modes. Bundle author only renders the **content** below.
-
 | Import | Purpose |
 |---|---|
-| `React` (from `"react"`) | Hooks (`useState`, `useEffect`, etc.), JSX runtime. Externalized to the host's React via `react: "React"`. |
-| `StaticQuestion` | Non-drillable question. Props include `questionId`, `card`, `withChartTypeSelector`, `height`, `width`. |
-| `InteractiveQuestion` | Drillable question. Same props as StaticQuestion plus drill behaviors. Use `card={{ query }}` for ad hoc SDK-rendered questions. See *Rendering a chart: Metabase first* for choosing between the two and for `visualization` / `visualizationSettings`. |
-| `MetabaseCard` | Type-only import from `@metabase/embedding-sdk-react` for ad hoc SDK-rendered cards with `visualization` or `visualizationSettings`; read `semantic-layer/semantic-layer.md` for the full generated-query card contract before authoring data-layer code. |
+| `StaticQuestion` | A question without drill-through. Props include `card`, `questionId`, `withChartTypeSelector`, `withDownloads`, `title`, `height`, `width`. |
+| `InteractiveQuestion` | A drillable question, with the same props plus drill behavior. Pass `isSaveEnabled={false}` unless the app is an editing surface, and `title={false}` inside a card that has a heading. Choosing between the two and rendering a query are in `semantic-layer/semantic-layer.md`. |
+| `MetabaseCard` | Type of the `card` prop. |
 | `CreateQuestion`, `MetabotQuestion` | More question variants. |
 | `StaticDashboard`, `InteractiveDashboard`, `EditableDashboard` | Dashboard variants. |
-| `CreateDashboardModal` | Modal for new-dashboard flow. |
-| `CollectionBrowser` | Collection picker. |
-| `@metabase/embedding-sdk-react/data-app` exports | Data-app-only helpers for routing, schema-backed data reads, actions, clipboard, and sandbox-safe integration. Treat schema-backed queries, generated schema files, filters, metrics, actions, and other data-layer behavior as existing-data-app editing work; read the part `SKILL.md` lists for it before authoring that code. |
-| `DateRangePopover`, `DateRangeCalendar`, `useDateFormatter` (from `@metabase/embedding-sdk-react/data-app`) | Date range selection for filter bars. `DateRangePopover` wraps the app's own trigger element and opens a Metabase-styled range calendar under it; `DateRangeCalendar` is that calendar inline. `value`/`onChange` are `[start, end]` pairs of `YYYY-MM-DD` strings, `null` on either end while half-picked. `useDateFormatter().formatDateRange(value)` makes the trigger's label in the instance's locale, without the UTC-parsing bug of `new Date("YYYY-MM-DD")`. Use these instead of `<input type="date">` or a third-party picker — no dependency, no CSS import. |
+| `CreateDashboardModal` | The new-dashboard flow. |
+| `CollectionBrowser` | A collection picker. |
+| `@metabase/embedding-sdk-react/data-app` | Routing (`routing/routing.md`), the data hooks and query helpers (`semantic-layer/semantic-layer.md`), `useAction` (`actions/actions.md`), `copy`, and `DateRangePopover`, `DateRangeCalendar`, and `useDateFormatter` for date ranges. |
 
 ### Blocked APIs
 
-The Near Membrane sandbox throws at runtime on these globals. Use the endowed replacement instead:
+The sandbox throws at runtime on these globals. Use the replacement:
 
-| Blocked | Use instead                                                                                                                                                                                                                                                                     |
-|---|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Network** — `fetch`, `XMLHttpRequest`, `WebSocket` | Use the SDK/data-app APIs for Metabase reads and writes — never raw `fetch`. Raw `fetch`/`XHR` reach **only** the external origins listed in `data_app.yaml`'s `allowed_hosts` (Step 4); everything else (including the Metabase origin) throws. `WebSocket` is always blocked. |
-| **UI dialogs** — `alert`, `confirm`, `prompt` | Render a React modal in your own tree.                                                                                                                                                                                                                                          |
-| **Storage** — `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie` | Treat the data app as stateless across reloads; persist via a Metabase action.                                                                                                                                                                                                  |
-| **Window / history navigation** — `window.open`, `history.pushState`, `history.replaceState` | `useDataAppLocation().navigate` for in-app; `<a target="_blank" rel="noopener">` for external.                                                                                                                                                                                  |
-| **Clipboard** — `document.execCommand("copy")`, `navigator.clipboard` | `copy` (write-only): `import { copy } from "@metabase/embedding-sdk-react/data-app"`, then `await copy(text)` from a user event. There is **no** read/paste API — that would let a bundle exfiltrate whatever the user copied.                                                  |
-| **Other `navigator.*` device APIs** — `geolocation`, etc. | Not available.                                                                                                                                                                                                                                                                  |
-| **Global `document`/`window` listeners** for typing/clipboard events — `keydown`, `keyup`, `keypress`, `beforeinput`, `input`, `paste`, `copy`, `cut`, `before*paste/copy/cut`, `compositionstart/update/end`, `storage` | Attach the listener to your own element, or use the React handler (`onKeyDown`, `onPaste`, …) on the specific input/container. The same listener on a script-owned element still works.                                                                                         |
+| Blocked | Use instead |
+|---|---|
+| **Network**: `fetch`, `XMLHttpRequest`, `WebSocket` | The SDK and data-app APIs for Metabase reads and writes. Raw `fetch` and XHR reach **only** the external origins in `data_app.yaml`'s `allowed_hosts` (Step 4). Everything else, the Metabase origin included, throws. `WebSocket` is always blocked. |
+| **Dialogs**: `alert`, `confirm`, `prompt` | A React modal in your own tree. |
+| **Storage**: `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie` | Nothing persists across reloads. Persist through a Metabase action. |
+| **Window and history navigation**: `window.open`, `history.pushState`, `history.replaceState` | `useDataAppLocation().navigate` inside the app, and `<a target="_blank" rel="noopener">` for external links. |
+| **Clipboard**: `document.execCommand("copy")`, `navigator.clipboard` | `import { copy } from "@metabase/embedding-sdk-react/data-app"`, then `await copy(text)` from a user event. It's write-only: there is no paste API, since one would let a bundle read whatever the user copied. |
+| **Other `navigator.*` device APIs**, such as `geolocation` | Not available. |
+| **Global `document`/`window` listeners** for typing and clipboard events: `keydown`, `keyup`, `keypress`, `beforeinput`, `input`, `paste`, `copy`, `cut`, `before*paste/copy/cut`, `compositionstart/update/end`, `storage` | Attach the listener to your own element, or use the React handler (`onKeyDown`, `onPaste`, …) on the input or container. |
 
-**Rule of thumb:** if you're about to touch `window.X`, `document.X`, `navigator.X`, `history.X`, or any storage global, stop and pick the endowed replacement above. The endowed surface (React + React DOM + SDK components + data hooks + `useAction` + DataAppRouter + `DateRangePopover` + `copy`) covers every routine need; anything outside it is intentionally unreachable.
+If you're about to touch `window.X`, `document.X`, `navigator.X`, `history.X`, or a storage global, stop and pick the replacement above. React, React DOM, the SDK components, the data hooks, `useAction`, the routing primitives, `DateRangePopover`, and `copy` cover every routine need. Anything outside them is unreachable on purpose.
 
-### Rendering a chart: Metabase first
+## App layout: fill the frame height
 
-This is a per-element decision, not one taken once for a row, a section, or the app. One tile that needs custom code makes a row with one custom tile in it, not a row of them — the rest stay SDK components and keep their formatting, theming and drill-through. Consistent heights and card chrome come from the container each tile sits in, so "the others should match it" is not a reason to hand-build the others.
-
-A built-in visualization carries the instance's theming, accessibility, tooltips, formatting and drill-through. A chart built in React carries none of that, and drifts from every other chart in the app as soon as either changes. So the question is never "which looks closer to my design" — it is **can Metabase display this at all?**
-
-- **Yes → `useMetabaseQueryObject` + `StaticQuestion` / `InteractiveQuestion`.** Bar, line, area, combo, row, trend, **pie/donut**, scalar/smartscalar, gauge, progress, funnel, scatter, waterfall, boxplot, sankey, pivot, map, object/list views, sortable table, and anything else in the chart-type list. Also whenever visualization settings can carry the presentation — axes, labels, stacking, goals, trendlines, split panels, series, formatting, table/pie/pivot/list settings — or the user benefits from sorting, column inspection, drill-through, or downloading. Build the semantic query from generated schema objects, destructure the returned `query`, and pass only that value in a card object — `<StaticQuestion card={{ query }} visualization="pie" ... />`. Never pass the whole `{ query, error, isLoading }` hook result as `card.query`.
-- **No → `useMetabaseQuery` and your own component.** Only when the user asked for a custom visualization, or nothing Metabase renders can express the request: bespoke scorecards, alert panels, narrative layouts or mixed-content cards, custom interactions its chart/table chrome cannot express, unusual forms such as calendar grids, timelines, heat strips, radial views, custom maps or domain-specific diagrams, and elements combining several queries into one visual unit. Keep the row handling typed. Use a charting dependency the app already has; otherwise SVG is fine.
-
-**`StaticQuestion` is the default of the two.** It renders the visualization and nothing else — no query bar, no editor, no save — and takes `withChartTypeSelector`, `withDownloads`, `title` and the sizing props. Use `InteractiveQuestion` when the element is meant to be explored: drill-through, filtering, switching the chart type, or the notebook editor. It shows a Save button unless you turn it off — `isSaveEnabled` defaults to `true` — which offers viewers a save-to-collection flow that belongs in Metabase, not in an app, so pass `isSaveEnabled={false}` unless the app is deliberately an editing surface. That applies to the default layout; giving `InteractiveQuestion` its own children replaces the layout, so a composed `<InteractiveQuestion.QuestionVisualization />` renders no toolbar and no Save button.
-
-**Pass `title={false}` when the question sits in a card or section that already carries a heading.** `InteractiveQuestion`'s default layout shows the question's own title, so you get two; `StaticQuestion` hides it already.
-
-"It has to match our styling" is not a reason to hand-build one: pass `visualization` for the chart type, `visualizationSettings` for setting-level changes, and theme the SDK for the rest. A pie chart in a data app is a Metabase pie chart — unless the user asked for a custom one, which is their call to make, not one to infer from a design reference, brand colours, or a screenshot of something bespoke.
-
-**A single-value KPI is a scalar** — or smartscalar, gauge, progress. If the tile wants a number plus something Metabase does not draw, such as a star row, a caption, or a total from a second query, render the scalar for the number and put the extra beside it. Hand-build it only when the number itself cannot come from one.
-
-**Always render a spinner (or skeleton) while `isLoading` is `true`** — never an empty slot or stale value, which causes layout shift when the data arrives. Same rule for lifted / derived queries (pass `isLoading` down) and for `useAction`'s `isExecuting` (spinner in the button + `disabled={isExecuting}`).
-
-For the hook contract itself — generics, table sources, segments, measures, breakouts, sorting, and debugging — read `semantic-layer/semantic-layer.md` before authoring schema-backed data-layer code.
-
-## App layout — fill the frame height
-
-Metabase and `npm run dev` both give the bundle a full-height frame, but nothing between it and your root element sets a height — so an app shorter than the frame ends where its content ends, leaving its background, sidebar and footer in a short strip over bare white.
-
-So the app's outermost element carries `minHeight: "100vh"` (plus `boxSizing: "border-box"` when it has padding) and paints the page background. `minHeight`, never `height` — taller content must still scroll. Regions that should reach the bottom (sidebar, sticky footer) go in a flex-column root with `flex: 1`. Check the emptiest screen — loading, empty state, a lone KPI — those are the ones that render short.
+Metabase and `npm run dev` both give the bundle a full-height frame, but nothing in between sets a height, so a short app ends where its content ends and leaves bare white below. Give the app's outermost element `minHeight: "100vh"` (plus `boxSizing: "border-box"` when it has padding), and paint the page background on it. Use `minHeight`, never `height`, so taller content still scrolls. Regions that should reach the bottom, such as a sidebar or a sticky footer, go in a flex-column root with `flex: 1`. Check the emptiest screens (loading, empty states, a lone KPI), since they render shortest.
 
 ## SDK component sizing
 
-SDK components do NOT auto-fit their parent — without `height`/`width` they render at their intrinsic size and overflow. Setting only the outer container or card height is not enough either; the height goes on the SDK component that owns the visualization:
+SDK components don't fit their parent on their own: without `height` and `width` they render at their intrinsic size and overflow. A height on the outer container or card isn't enough either. Give the height to the component that owns the visualization:
 
-- Chart only: pass `height` to `InteractiveQuestion.QuestionVisualization`.
-- Default question layout with query bar: pass `height` to `InteractiveQuestion`.
-- Static question: pass `height` to `StaticQuestion`.
+- A chart alone: `InteractiveQuestion.QuestionVisualization`.
+- The default question layout with its query bar: `InteractiveQuestion`.
+- A static question: `StaticQuestion`.
 
-Use the actual body height available to the chart. For example, if a card is 560px tall and has a 60px header, pass `height="500px"`.
+Pass the height actually available to the chart: in a 560px card with a 60px header, `height="500px"`. Or pass `height="100%"` inside a container with a fixed height:
 
 ```tsx
 <div style={{ height: 360 }}>
-  <StaticQuestion
-    questionId={1}
-    height="100%"
-    width="100%"
-    withChartTypeSelector={false}
-  />
+  <StaticQuestion card={{ query }} height="100%" width="100%" />
 </div>
 ```
 
-Do not wrap `InteractiveQuestion` or `StaticQuestion` in containers that clip or move on hover. Avoid `overflow: hidden`, hover transforms, and hover-driven layout shifts around embedded Metabase UI; popovers, menus, and chart tooltips need stable geometry and visible overflow.
+Don't wrap an SDK question in a container that clips or moves on hover: no `overflow: hidden`, hover transforms, or hover-driven layout shifts. Popovers, menus, and tooltips need stable geometry and visible overflow.
 
 ## Sync to Metabase
 
-Data apps are delivered by Git — you commit the app directory and Metabase pulls it on its next remote-sync import.
+1. After any change to `queries/` or `actions/`, run `npm run write-resources`, regenerating `src/metabase.data.ts` first if it doesn't cover what the definitions use. Then run `npm run check-resources`.
+2. Run `npm run build`. It fails when the app's collection files don't match the definitions: run `npm run write-resources` and build again.
+3. From the **repo root**, commit the app directory together with the app's collection files, and push:
 
-1. After any change to `queries/` or `actions/`, run `npm run write-resources` (regenerating `src/metabase.data.ts` first if it doesn't cover what the definitions use), then `npm run check-resources`. Nothing reaches Metabase until the pull in step 4 applies it.
-2. `npm run build` produces the bundle at your `data_app.yaml` `path` (the template builds to `dist/index.js`). It fails when the app's collection files don't match the definitions; run `npm run write-resources` and rebuild.
-3. From the **repo root**, commit the app directory — its `data_app.yaml`, the built bundle (the file `path` points at), the source, and the lockfile — together with the app's collection files, and **push**:
    ```bash
    git add data_apps/<slug> collections/data_apps
    git commit -m "Add <slug> data app"
    git push
    ```
-4. The app appears in Metabase on the next remote-sync import — a manual **Pull changes** (Admin > Data apps / Remote sync), the auto-import poll, or a restart — reachable at `/apps/<slug>`.
+4. The app appears at `/apps/<slug>` on Metabase's next remote-sync import: a manual **Pull changes** (Admin > Data apps, or Remote sync), the auto-import poll, or a restart.
 
-> **Don't offer to "deploy" the app or ask how the bundle reaches a staging environment** — there is no separate deploy step, and the question only confuses users: Metabase imports the committed bundle straight from the connected repo on its next sync. Once the change is on the branch Metabase syncs from — however the user gets it there (a merged PR, or a push straight to that branch) — just tell them to pull it in and open the app in Metabase at `/apps/<slug>`.
-
-- **To update:** run `npm run write-resources` if the definitions changed, commit a new build, and pull again.
-- **To remove:** see *Removing an app* below.
+Don't offer to "deploy" the app, and don't ask how the bundle reaches a staging environment. Metabase imports the committed bundle straight from the connected repository. Once the change is on the branch Metabase syncs from, however the user gets it there (a merged PR or a direct push), tell them to pull it in and open `/apps/<slug>`. An update is the same loop: `write-resources` if the definitions changed, a new build, a commit, and another pull.
 
 ## Removing an app
 
-When the user asks to remove or delete a data app, delete its directory **and** its collection's files in one commit, from the repo root, and push:
+Delete the app's directory **and** its collection's files in one commit, from the repo root, and push:
 
 ```bash
 git rm -r data_apps/<slug> collections/data_apps/<collection>.yaml collections/data_apps/<collection>
@@ -556,27 +302,25 @@ git commit -m "Remove <slug> data app"
 git push
 ```
 
-`<collection>` is the collection `data_app.yaml` names as `collection`: the file under `collections/data_apps/` whose `entity_id` is that value, and the directory of the same name beside it (`data_app__order_desk` for `Data App: Order Desk`). The next pull removes the app, and with it its collection, saved questions, metric copies and action copies.
+`<collection>` is the collection that `data_app.yaml` names as `collection`: the file under `collections/data_apps/` whose `entity_id` is that value, and the directory of the same name beside it (`data_app__order_desk` for `Data App: Order Desk`). The next pull removes the app, along with its collection, saved questions, and copies of metrics and actions.
 
-A directory deleted without its collection's files still removes the app on the next pull, and with it the collection; the next push from Metabase then deletes those files from the repository. Delete both anyway: until that push, a pull that reloads every file brings the collection back as one no app owns, and the push would then keep it. The other way round is refused: an app whose directory stays while its collection file is gone fails the pull.
+Delete both. If the directory goes without the collection's files, the next pull still removes the app and its collection, and Metabase's next push deletes the files. Until that push, though, a pull that reloads every file brings the collection back with no app owning it, and the push then keeps it. The other way round is refused: a pull fails when an app's directory stays but its collection file is gone.
 
 ## Common pitfalls
 
 | Symptom | Fix |
 |---|---|
-| "Failed to fetch the user, the session might be invalid." | Bad API key or CORS — check `( ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"; [ -n "$ROOT" ] && source "$ROOT/.env.local" 2>/dev/null; [ -n "$DATA_APP_MB_URL" ] && [ "$DATA_APP_MB_URL" != "mb_replace_me" ] && [ -n "$DATA_APP_MB_API_KEY" ] && [ "$DATA_APP_MB_API_KEY" != "mb_replace_me" ] && curl -H "x-api-key: $DATA_APP_MB_API_KEY" "$DATA_APP_MB_URL/api/user/current" || echo "set real DATA_APP_MB_URL / DATA_APP_MB_API_KEY in the repo-root .env.local" )` (uses the repo-root `.env.local`), add `http://localhost:5174` to SDK CORS origins. |
-| Invisible chart labels. | Set `text-primary` in the theme (see *Theme rules*). |
-| A chart looks unlike the rest of the instance, ignores the theme, or has no tooltips, formatting or drill-through. | It was built in React. Render it with `StaticQuestion`/`InteractiveQuestion` and a `visualization` instead (see *Rendering a chart: Metabase first*). |
-| Chart overflows its container. | Pass `height` / `width` to the SDK component (see *SDK component sizing*). |
-| App background stops partway down, bare white below short content. | Give the root `minHeight: 100vh` (see *App layout*). |
-| "Invalid hook call" at runtime. | Two React copies. `dataAppConfig()` externalizes `react` — ensure `react`/`react-dom` are installed and you haven't added a second React or a mismatched version. |
-| Bundle is multi-MB. | React/the SDK should be externalized by the contract plugin — confirm `vite.config.ts` still uses `dataAppConfig()` and the pinned data-apps SDK tag is installed. (A large but not multi-MB bundle can also be inlined assets — see the single-file note above.) |
-| `dist/index.js` doesn't assign to `__dataAppFactory__`. | `src/index.tsx` must `export default` the `DataAppFactory` — the preset wires that into the IIFE global. |
-| `Cannot find module '@metabase/embedding-sdk-react'`. | Run `npm install` (or the equivalent for your package manager). Types come from the package directly. |
-| `Property 'definedWithDefineQuery' is missing` / `Property 'definedWithDefineAction' is missing` on a hook call. | The hook got an inline object, a `satisfies`-typed object, or a spread copy instead of a definition. Export it with `defineQuery` from root-level `queries/` (or `defineAction` from `actions/`) and pass the import. Do not cast, and do not wrap the object in `defineQuery(...)` at the call site: that compiles but is never backed by a saved question. |
-| Drill popups don't open / SDK components show empty / "MetabaseProvider not found" at runtime in dev. | `App.tsx` is rendering its own `<MetabaseProvider>` — remove it. The dev entry (SDK) and the production host provide the provider; wrapping it inside the bundle routes the SDK's state paths through the sandbox and breaks them. |
-| Dev preview blank / `Bundle did not assign a function to __dataAppFactory__` / sandbox errors in dev. | `src/index.tsx` isn't default-exporting the factory, or your app code throws while the sandbox evaluates the bundle. Read the real error from the diagnostics feed (`curl -s "http://localhost:5174/__data-app/diagnostics?startEventId=0"`), or the dev toolbar's **Diagnostics** panel. |
-| A network call works in `npm run dev` but is blocked after syncing to Metabase. | It was never allowed — you edited `allowed_hosts` without restarting the dev server, so the running sandbox and CSP still use the boot-time list. Restart `npm run dev`; the feed's `manifest` section flags this as `restartRequired`. |
-| The SDK was rebuilt or reinstalled but the preview still behaves like the old version. | Vite pre-bundles the SDK into `node_modules/.vite` and keys that cache on the package version, so an in-place rebuild doesn't invalidate it. Stop the dev server, delete the `node_modules/.vite` directory, and start it again (or run `npx vite --force`). |
-| Component state resets on every edit. | Expected: dev rebuilds the bundle and does a *soft reload* — re-evaluates it in the sandbox and remounts the app (auth/SDK stay loaded, no browser refresh). There's no module-level HMR / Fast Refresh because the app is an evaluated bundle in an isolated realm, so local component state resets. |
-| URL changes but UI doesn't update in production (works in dev). | Import the routing primitives from `@metabase/embedding-sdk-react/data-app` (not the main entry) and keep using `dataAppConfig()` — it externalizes `/data-app` so its routing isn't inlined (inlining triggers the React-state-batching-through-Near-Membrane bug). |
+| "Failed to fetch the user, the session might be invalid." | A bad API key, or CORS. Check the key by sourcing the repo-root `.env.local` in a subshell, as in Step 4, and running `curl -H "x-api-key: $DATA_APP_MB_API_KEY" "$DATA_APP_MB_URL/api/user/current"`. Add `http://localhost:5174` to the SDK CORS origins. |
+| Invisible chart labels. | Set `text-primary` in the theme (_Theme rules_). |
+| A chart looks unlike the rest of the instance, ignores the theme, or has no tooltips, formatting, or drill-through. | It was built in React. Render it with `StaticQuestion` or `InteractiveQuestion` and a `visualization` (`semantic-layer/semantic-layer.md`, _Rendering_ under _Rules_). |
+| A chart overflows its container. | Pass `height` and `width` to the SDK component (_SDK component sizing_). |
+| The app's background stops partway down the frame. | Give the root `minHeight: "100vh"` (_App layout_). |
+| "Invalid hook call" at runtime. | Two copies of React. `dataAppConfig()` externalizes `react`: make sure `react` and `react-dom` are installed and nothing adds a second or mismatched React. |
+| The bundle is several MB. | React and the SDK aren't externalized. Confirm `vite.config.ts` still uses `dataAppConfig()` and the data-apps SDK tag is installed. A large but not multi-MB bundle can be inlined assets. |
+| `dist/index.js` doesn't assign `__dataAppFactory__`, or the preview is blank with `Bundle did not assign a function to __dataAppFactory__`. | `src/index.tsx` must `export default` the `DataAppFactory`. Otherwise app code throws while the sandbox evaluates the bundle: read the real error in the diagnostics feed. |
+| `Cannot find module '@metabase/embedding-sdk-react'`. | Run `npm install`, or the equivalent for the package manager. |
+| Drill popups don't open, SDK components render empty, or "MetabaseProvider not found" in dev. | The app renders its own `<MetabaseProvider>`. Remove it. |
+| A network call works in `npm run dev` but is blocked after syncing. | `allowed_hosts` was edited without restarting the dev server, so the running sandbox still used the old list. Restart `npm run dev`. The feed's `manifest` section flags this as `restartRequired`. |
+| The SDK was rebuilt or reinstalled, but the preview behaves like the old version. | Vite caches its pre-bundled SDK in `node_modules/.vite`, keyed on the package version. Stop the dev server, delete `node_modules/.vite`, and start it again, or run `npx vite --force`. |
+| Component state resets on every edit. | Expected: each edit rebuilds the bundle and remounts the app in the sandbox. |
+| The URL changes but the UI doesn't, only after syncing. | Import the routing primitives from `@metabase/embedding-sdk-react/data-app`, not the main entry, and keep `dataAppConfig()`. Inlining `/data-app` triggers the sandbox's React batching bug. |

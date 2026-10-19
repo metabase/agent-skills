@@ -36,11 +36,9 @@ Every step below follows from these. Never break them.
 
 Work from the app directory, `<repo>/data_apps/<slug>/`. Resolve the repo root
 with `ROOT="$(git rev-parse --show-toplevel)"`. The instance checks need the
-repo-root `.env.local` credentials (`DATA_APP_MB_URL`, `DATA_APP_MB_API_KEY`).
-Check them by sourcing the file in a subshell and printing only whether both are
-set; never print the file or its variables. The key must belong to an admin:
-the API returns `version` and `outdated` only to admins and refuses an outdated
-app's metadata to everyone else, so a non-admin key cannot prove anything here.
+repo-root `.env.local` credentials, checked as `SKILL.md` says. The API returns
+`version` and `outdated` only to admins, and refuses an outdated app's metadata
+to everyone else, so a non-admin key can't prove anything here.
 
 `npm` below stands for the app's own package manager, the one whose lockfile is
 committed (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`).
@@ -168,10 +166,9 @@ few representative diagnostics rather than pasting it whole.
 
 ## Never do
 
-- Set or edit `version` before the upgrade's checks pass, or by more than one at a time.
+Besides breaking an invariant:
+
 - Skip an upgrade, or apply two upgrades' steps at once.
-- Run `npm run typecheck` or `npm run build` before the last upgrade, or push before the final gates pass.
-- Hand-edit `dist/` or `src/metabase.data.ts`, or change the app's collection files or a definition's entity ID beyond what an upgrade guide says.
 - Copy a step's outcome from the previous session's chat instead of re-running its **Done when**.
 - Migrate with a checklist of your own when an upgrade guide exists; when one does not exist for an upgrade you need, stop and say so.
 
