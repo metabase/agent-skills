@@ -224,7 +224,7 @@ export const CompletedOrders = defineQuery({
 
 const { data } = useMetabaseQuery(CompletedOrders, {
   // a result column, not a segment or measure
-  filters: plan === null ? [] : [filter({ type: "column", name: "PLAN" }, "=", plan)],
+  filters: plan === null ? [] : [filter({ type: "column", name: orders.fields.plan.name }, "=", plan)],
 });
 ```
 
