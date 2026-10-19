@@ -23,13 +23,13 @@ These rules add to the ones in `SKILL.md`. The sections after them show how to f
 - A query the user filters (a lookup, a search, a filtered top-N) has no static `limit`, because a static `limit` runs before the dynamic filters. Put its `orderBys` and `limit` in the dynamic part.
 - Fixed permission-boundary filters, aggregations, and breakouts stay inside `defineQuery`, baked into its saved question. Never apply them again outside it.
 - `filter(...)` takes one value and doesn't fully check value types: `filter(field, "=", [a, b])` compiles, but it isn't an IN filter.
-- `contains`, `does-not-contain`, `starts-with`, and `ends-with` match case-sensitively, and `filter(...)` has no option to change that. Show a search box over a query as case-sensitive. Filter rows in React only when the query returns them all: no `limit`, and a result small enough to load whole.
+- `contains`, `does-not-contain`, `starts-with`, and `ends-with` match case-sensitively, and `filter(...)` has no option to change that. When a search box feeds one of them, say in the UI that search is case-sensitive, such as in its placeholder. Filter rows in React only when the query returns them all: no `limit`, and a result small enough to load whole.
 - Use `fields` only in row-list queries. With `aggregations` and `breakouts`, the breakouts decide the result columns.
 - Order with `orderBy(...)`, never `{ field, direction }` literals. To order by a bucketed breakout or an aggregation, pass the same constant to `breakouts` or `aggregations` and to `orderBy`. `orderBy` takes no `unit` or `binning`.
 - Write no generics on `defineQuery` or the hooks. Never cast a query to `Parameters<typeof useMetabaseQuery>[0]`, which hides invalid fields, metrics, and breakouts, or to `DefinedQuery`, which hides a query without a saved question.
 - Run each query once per render tree. Lift the hook to the highest component that needs the data, and pass `data`, `isLoading`, and `error` down: a second call fires a duplicate request, and the two disagree mid-load. The same query with different filters or breakouts is a different data source. Never call a hook in a loop, a condition, or a callback.
 - Render every hook's `error` in its own panel. A query hook's `error` is `unknown`: render `error instanceof Error ? error.message : String(error)`.
-- `useMetabaseQuery` returns `isLoading: false` with `data: null` until its first request starts, while the SDK signs in. Treat `data === null` without an `error` as loading, unless you held the query back with `enabled: false`. Show the empty state only when `data.rows` is empty. `useMetabaseQueryObject`'s `isLoading` is already `true` in that window.
+- `useMetabaseQuery` returns `isLoading: false` with `data: null` until its first request starts, while the SDK signs in. Treat `data === null` without an `error` as loading, unless you held the query back with `enabled: false`. Show the empty state only when `data.rows` is empty. `useMetabaseQueryObject`'s `isLoading` is already `true` in that window. A query held back with `enabled: false` returns `isLoading: false` from both hooks, with `data` or `query` `null`. Show what the page shows before a choice, such as a prompt to pick an item, never a spinner.
 
 ### Rows
 
@@ -45,7 +45,7 @@ These rules add to the ones in `SKILL.md`. The sections after them show how to f
   - **Yes:** `useMetabaseQueryObject` with `StaticQuestion` or `InteractiveQuestion`. This covers bar, line, area, combo, row, pie (drawn as a donut), scalar, smartscalar (a number with its trend), gauge, progress, funnel, scatter, waterfall, boxplot, sankey, pivot, map, object and list views, sortable tables, and any other `visualization` the `MetabaseCard` type accepts. It also covers anything where visualization settings carry the presentation (axes, labels, stacking, goals, trend lines, series, formatting), or where users benefit from sorting, column inspection, drill-through, or downloads.
   - **No:** `useMetabaseQuery` and your own component, only when the user asked for a custom visualization or nothing Metabase renders can express it: bespoke scorecards, alert panels, narrative or mixed-content cards, interactions Metabase's chrome can't express, calendar grids, timelines, heat strips, radial views, custom maps, domain-specific diagrams, or one visual unit built from several queries. Keep its row handling typed, and draw with a charting dependency the app already has, or with SVG.
 - Styling is never a reason to hand-build. Pass `visualization` for the chart type and `visualizationSettings` for setting-level changes, and theme the SDK for the rest. A pie chart is a Metabase pie chart unless the user asked for a custom one. That's the user's call: don't infer it from a design reference, brand colors, or a screenshot of something bespoke.
-- A single-value KPI is a scalar, smartscalar, gauge, or progress visualization. Put whatever Metabase doesn't draw (stars, a caption, a total from a second query) beside it. Hand-build the tile only when the number itself can't come from one query. A number for one selected item, such as one product's average rating, comes from an unaggregated query that filters and aggregates in its dynamic part (_Static and dynamic query parts_).
+- A single-value KPI is a scalar, smartscalar, gauge, or progress visualization. Put whatever Metabase doesn't draw (stars, a caption, a total from a second query) beside it. Hand-build the tile only when the number itself can't come from one query. A number for one selected item, such as one product's average rating, comes from a query filtered to that item in its dynamic part (_Static and dynamic query parts_).
 - Give each SDK question a `card` built with `useMemo`: a new `card` object re-runs its query (_Render a query_).
 - `StaticQuestion` is the default: it renders the visualization alone. Use `InteractiveQuestion` for an element meant to be explored (drill-through, filtering, chart-type switching, the notebook editor), and pass `isSaveEnabled={false}` unless the app is an editing surface, or viewers get a save-to-collection flow. Its default layout shows the question's title: pass `title={false}` inside a card that already has a heading. Giving `InteractiveQuestion` children replaces that layout, so a composed `<InteractiveQuestion.QuestionVisualization />` shows no toolbar and no Save button.
 - Label charts with user-facing names, not opaque IDs such as `franchise_id`. Prefer a related table's name dimension to its foreign key.
@@ -228,7 +228,7 @@ const { data } = useMetabaseQuery(CompletedOrders, {
 });
 ```
 
-`{ type: "column", name }` names a static result column, typed from that column: an unknown name, or an operator the column's type doesn't take, is a compile error. Use a named breakout's or aggregation's own name.
+`{ type: "column", name }` names a static result column, typed from that column: an unknown name, or an operator the column's type doesn't take, is a compile error. Use a named breakout's or aggregation's own name. An unnamed field's column carries the database's name for it, so its case depends on the database (`PLAN` on H2, `plan` on Postgres). Write the schema entry's `name`, such as `orders.fields.plan.name`, rather than a literal.
 
 The dynamic part can also aggregate and group the result columns, for example to fold away a breakout added only so a control can filter on it. Fold only additive aggregations, such as sums and counts: a distinct count or an average can't be re-added.
 
@@ -241,19 +241,30 @@ const { data } = useMetabaseQuery(RevenueByMonthAndCategory, {
 });
 ```
 
-A control that switches a segment on and off chooses between static queries: define one query per state and pick between them, or express the same condition as a filter on a result column. Each query is another saved question in the app's collection. So when the segment is a plain test of a field the result keeps, such as `quantity > 0` for "In stock", one query with a dynamic filter on that field serves every state. A segment can't be negated. To exclude its rows, filter on the field it tests.
+A control that switches a segment on and off chooses between static queries: define one query per state and pick between them. Each is another saved question in the app's collection. The schema gives a segment's description, not its definition, so never rewrite a segment as a filter of your own. A filter on a result column replaces the per-state queries only when the user states the condition. You can ask, such as whether "In stock" means `in_stock = true`, and then label the control by that condition, not by the segment. A segment can't be negated: for the rows outside it, ask the user for a segment that covers them.
 
-A number for one selected item, such as one product's average rating, needs the item's key in the result before the dynamic part can filter on it, and a breakout on that key would leave one row per item. Leave the static query unaggregated instead, and filter and aggregate in the dynamic part, which returns a single value for a scalar:
+A number for one selected item, such as one product's average rating, needs the item's key in the result, so the dynamic part can filter on it. That puts a key column beside the number. With a curated measure, keep the measure in the static query with a breakout on the key, and filter in the dynamic part. Then point the scalar at the measure's column with `scalar.field`: without it, the scalar shows the first column, which is the key.
 
 ```ts
-export const Reviews = defineQuery({ source: reviewsTable });
+// queries/reviews.query.ts
+const productKey = breakout(reviewsTable.fields.productId, { name: "product_id" });
+const avgRating = aggregations.measure(reviewsTable.measures.averageRating, { name: "avg_rating" });
 
-const { query } = useMetabaseQueryObject(Reviews, {
+export const RatingByProduct = defineQuery({
+  source: reviewsTable,
+  aggregations: [avgRating],
+  breakouts: [productKey],
+});
+
+// the component; its memoized card adds visualization: "scalar" and
+// visualizationSettings: { "scalar.field": "avg_rating" }
+const { query } = useMetabaseQueryObject(RatingByProduct, {
   enabled: productId !== null,
-  filters: [filter({ type: "column", name: "PRODUCT_ID" }, "=", productId)],
-  aggregations: [aggregations.avg({ type: "column", name: "RATING" }, { name: "avg_rating" })],
+  filters: [filter({ type: "column", name: "product_id" }, "=", productId)],
 });
 ```
+
+Without a measure, leave the static query unaggregated, and filter and aggregate in the dynamic part, which returns the number alone: `{ filters: [filter({ type: "column", name: reviewsTable.fields.productId.name }, "=", productId)], aggregations: [aggregations.avg({ type: "column", name: reviewsTable.fields.rating.name })] }`.
 
 When you memoize the dynamic part instead of writing it at the call, add `as const` to the object: it keeps `aggregations` a non-empty tuple, which `breakouts` require.
 
@@ -463,12 +474,17 @@ function TotalAmountChart() {
     [query],
   );
 
-  // PanelError and Spinner stand for the app's own error and loading UI
+  // PanelError, Spinner and PickPrompt stand for the app's own UI
   if (error) {
     return <PanelError error={error} />;
   }
-  if (isLoading || !query) {
+  if (isLoading) {
     return <Spinner />;
+  }
+  // only a query held back with `enabled: false` leaves `query` null here:
+  // show what the page shows before a choice
+  if (!query) {
+    return <PickPrompt />;
   }
 
   return <StaticQuestion card={card} height={360} />;
@@ -497,7 +513,7 @@ const chartRows = (data?.rows ?? []).map((row) => ({
 
 `data.columns` describes the result. Use it with `rawRows` for a known positional shape, or narrow a key to a literal before indexing `data.rows`. An unnamed aggregation comes back under its operator's name, and a named breakout or aggregation under its name (_Result column names_).
 
-React may group, sort, slice, format, and derive display-only values from the rows. When a page feels like a raw table browser, enrich the query (a segment for the curated subset, a measure or metric for the business number, filters for the page's intent, breakouts for trends and comparisons) rather than computing it in React. If the result is still a sortable or drillable table, render it with an SDK component.
+React may group, sort, slice, format, and derive display-only values from the rows.
 
 ## Build the filter bar
 
@@ -546,7 +562,5 @@ const orderFilters = useMemo(
 - Confirm that every definition the app renders sits in `queries/` or `actions/` beside `package.json` and has its entity ID, and that `write-resources`, `check-resources`, and `build` ran after the last change.
 - Check that every panel has three states besides its data: a spinner or skeleton until data arrives (for `useMetabaseQuery`, while `data` is `null` without an `error`), its `error`, and an empty state when a query returns no rows.
 - Open the preview with every panel mounted, and read the diagnostics feed: in `npm run dev`, a query error is also an `error` entry there.
-- Trace every rendered value to a returned row property, schema field, measure, or deterministic transform.
 - Search the touched files for `row[0]`, `row[1]`, `row.orderedAt`, `row.orderDate`, `as unknown as`, `DisplayRow`, `<select`, `type="date"`, `new Date(`, `margin`, `rate`, `score`, `percent`, `%`, `* 100`, and `.toFixed`. Fix positional rows, guessed result keys, entity `<select>` filters, native date inputs in date-range filters, UTC-parsed date labels, and unsupported readings of business fields. An action form's `"Date"` parameter keeps its `type="date"` input (`actions/actions.md`).
 - For every visible filter, check that All maps to no filter, that its options come from a runtime query, and that each other option changes every card it claims to affect. Check that every date preset bar ends with Custom, unless the user asked otherwise, that every visible date filter affects the current page, and that no scope has two date filters.
-- Confirm that `data_app.yaml`'s `path` points at the built bundle, and that git tracks it.
