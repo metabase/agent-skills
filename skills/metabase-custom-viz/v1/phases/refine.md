@@ -4,7 +4,8 @@ Executor: main agent (needs the user dialog).
 Input: the user's request. Output: `.claude/build-statement.md`.
 
 Read: `references/project.md`, `references/operations.md`,
-`<sdk>/types/viz-settings.d.ts` (widget catalog).
+`references/api-contract.md`, `<sdk>/types/viz-settings.d.ts` (widget
+catalog).
 
 1. Ask 1–4 questions, only where different answers produce a different
    viz:

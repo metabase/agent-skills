@@ -3,18 +3,13 @@
 Custom visualizations run inside a `@locker/near-membrane-dom` sandbox.
 Everything below fails **at runtime**, not at compile time — TypeScript
 will not catch any of it. When code hits a restriction, the host console
-shows one of:
-
-- `[plugin <id>] blocked API call: <label>`
-- `[plugin <id>] blocked createElement: <tag>`
-- `[plugin <id>] blocked setAttribute for inline event handler: <name>`
-- `[plugin <id>] blocked setAttribute with javascript: URL: <name>`
-- `[plugin <id>] blocked addEventListener for global event type: <type>`
-- `[plugin <id>] DOMPurify stripped content from <source>: […]` (a log, not
-  an exception — content silently disappears)
-
-The lists live in the sandbox source, `<mb>/frontend/src/metabase/utils/scripts-sandbox/` (`<mb>`: `.claude/metabase-src`). This file says how each list applies and where it is; read
-the list itself before relying on a tag, listener, attribute or API. For
+shows `[plugin <id>] blocked …`; the exact messages, like the lists, are
+in the sandbox source, `<mb>/frontend/src/metabase/utils/scripts-sandbox/`
+(`<mb>`: `.claude/metabase-src`), so match a console line against those
+files. The DOMPurify one, `DOMPurify stripped content from …`, is a log,
+not an exception — content silently disappears. This file says how each
+list applies and where it is; read the list itself before relying on a
+tag, listener, attribute or API. For
 the Metabase way to do what a blocked API would, read `api-contract.md`,
 Metabase ways.
 

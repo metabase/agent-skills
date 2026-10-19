@@ -15,7 +15,8 @@ API.
 
 1. Run Checks (`project.md`) once; treat errors as fact.
 2. Match the symptom against `known-mistakes.md` symptoms; a host
-   console message against the messages in `sandbox-restrictions.md`;
+   console message against the sandbox sources `sandbox-restrictions.md`
+   points to;
    a Metabase error message against `checkRenderable` and setting
    defaults.
 3. Read the relevant code and confirm the cause before editing. No
@@ -32,8 +33,6 @@ Rules:
 
 - Edit only `src/index.tsx`,
   `.claude/fix-log.md`, `.claude/build-statement.md`.
-- Never read or edit files outside the project, Metabase source
-  included; host behavior is in `api-contract.md`.
 - User edits rules apply.
 - Same symptom after two fixes → stop, report what was tried and the
   remaining hypotheses.

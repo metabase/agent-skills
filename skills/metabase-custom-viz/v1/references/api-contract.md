@@ -34,8 +34,6 @@ onClick({
 - `dimensions` drives the "filter by this dimension" actions. For a mark
   that aggregates several rows (a category arc, a band), pass only the
   aggregating dimension.
-- `onClick(null)` closes the menu — use it for background clicks that
-  clear selection.
 
 ## onHover → the tooltip
 
@@ -48,14 +46,6 @@ drives value formatting. Pass `element` and `event` to anchor it, as for
 `onClick`. On a canvas, build the anchor event at the mark's position:
 `new MouseEvent("mouseover", { clientX, clientY })` from the chart's
 bounding rect plus the mark's pixel coordinates.
-
-## renderingContext
-
-Host helpers so your output matches the host exactly: `getColor(name)`
-resolves a Metabase palette color for the current theme (Colors below),
-`colorScheme` is `"light" | "dark"`, `fontFamily` is the font Metabase renders with, and
-`measureText(text, style)` returns real rendered pixel sizes — use it for
-label truncation and fitting instead of guessing character widths.
 
 ## Colors
 
@@ -171,17 +161,6 @@ with event handlers):
   `[plugin] … render failed` to the browser console, with no message in
   Metabase. A data problem the user should see belongs in
   `checkRenderable`.
-- `formatValue` and the column-type predicates exported by the package
-  delegate to the host at runtime (`__METABASE_VIZ_API__`) — they work
-  only inside a running Metabase.
-- Setting ids `column` and `column_settings` are reserved by the host.
-  Read the per-column formatting users pick in the popover via
-  `settings.column?.(col)` and pass the result to `formatValue`.
-- Custom vizzes are not rendered in emails or Slack — static contexts
-  fall back to a default visualization.
-- The plugin is a single JS bundle; the only served asset is the manifest
-  icon. Images: inline SVG in JSX, or rasters as `data:image/*` URIs in
-  `<img>`.
 
 ## Metabase ways
 

@@ -3,6 +3,7 @@ name: metabase-custom-viz
 description: Build, change, debug, and package Metabase custom visualizations — React plugins made with `@metabase/custom-viz` and uploaded to Metabase as a `.tgz`. Use when the user asks to create a custom visualization or chart type for Metabase, scaffold one with `npx @metabase/custom-viz init`, change its look, settings, drills or tooltips, fix it when it renders wrong or the host console shows `blocked API call` or `blocked createElement`, connect it to a local Metabase, or package it for upload.
 metadata:
   version: v1
+  sdk: "@metabase/custom-viz ^2"
 ---
 
 # Metabase custom visualizations
@@ -25,10 +26,12 @@ input and the paths above.
    name from the request (ask only if there is none), run
    `npx @metabase/custom-viz@latest init <name>`, and work in `<name>/`.
 2. `node_modules/` missing → `npm install`.
-3. Metabase source: the host rules (sandbox, colors, column types) live
+3. `<version>` is `version` in
+   `node_modules/@metabase/custom-viz/package.json`. Its major is not 2 →
+   tell the user this skill targets `@metabase/custom-viz` 2.x and stop.
+4. Metabase source: the host rules (sandbox, colors, column types) live
    in the public Metabase repo. `<ref>` is `custom-viz-v<version>`, the
-   tag the installed SDK was released from (`<version>` from
-   `node_modules/@metabase/custom-viz/package.json`). Download each file
+   tag the installed SDK was released from. Download each file
    below, keeping its path and overwriting an older copy, with `curl`
    (never a web fetch tool: it summarizes); a file missing at `<ref>`
    comes from `master`:
@@ -41,7 +44,8 @@ input and the paths above.
    - `frontend/src/metabase/ui/colors/constants/accents.ts`
    - `frontend/src/metabase-lib/v1/types/utils/isa.ts`
 
-   `<mb>` is `.claude/metabase-src`. Now read the four `scripts-sandbox`
+   `<mb>` is `.claude/metabase-src`. Add `.claude/metabase-src/` to the
+   project `.gitignore` when the line is missing. Now read the four `scripts-sandbox`
    files, `color-keys.ts` and `accents.ts`, each whole with the `Read`
    tool — never `grep`, `head`, `sed` or `cat | …`. The blocked lists sit
    mid-file; a partial read misses entries and the viz breaks at runtime.
@@ -52,7 +56,7 @@ Then read `references/project.md` and `references/operations.md`.
 ## Phases
 
 - `phases/refine.md` — you
-- `phases/build.md` — a subagent: spawn it with the `Task` tool and tell
+- `phases/build.md` — a subagent: spawn it with the `Agent` tool and tell
   it to read and follow that file. Never write `src/index.tsx` yourself:
   build needs a fresh context holding only the build statement and its
   references.
@@ -61,7 +65,7 @@ Then read `references/project.md` and `references/operations.md`.
 - `phases/ship.md` — you
 
 When executing a phase yourself, follow that file only; skip reading
-files whose content is still in your context. Only when the `Task` tool
+files whose content is still in your context. Only when the `Agent` tool
 is unavailable, run build yourself.
 
 ## References
