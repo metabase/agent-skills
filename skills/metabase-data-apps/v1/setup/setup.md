@@ -9,7 +9,7 @@ Apps can also be created and updated through `/api/apps`. This guide covers the 
 
 ## Step 1 — Locate the remote-sync repository
 
-Ask: **"Do you already have a Git repository connected to this Metabase via remote sync?"** If yes, ask for its local path. If no, ask the user to create one, a plain Git repository they connect under Admin > Settings > Remote sync, and to share its path. This skill neither creates nor connects it. Check that the path is a Git working tree (it has a `.git`). Every step below runs in it.
+If the user already named the repository's path, use it. Otherwise ask: **"Do you already have a Git repository connected to this Metabase via remote sync?"** If yes, ask for its local path. If no, ask the user to create one, a plain Git repository they connect under Admin > Settings > Remote sync, and to share its path. This skill neither creates nor connects it. Check that the path is a Git working tree (it has a `.git`). Every step below runs in it.
 
 ## Step 2 — Name the app and create its directory
 
@@ -46,6 +46,8 @@ The app is a subdirectory of the repository, so this is a plain copy. Everything
    ```
 
    The contract this skill describes (`write-resources`, `/api/apps/generate/*`) starts with Metabase 65, and `latest` predates it, so never use `latest`. The tag provides `@metabase/embedding-sdk-react/data-app`, the app's APIs, and `@metabase/embedding-sdk-react/data-app-dev/config`, the dev and build preset that `vite.config.ts` uses.
+
+   If the user develops against a local SDK build, install that instead and skip the pin. They might say so, or the app's `package.json` might already point at one with a `file:` or `link:` version.
 3. Make the repo-root `.gitignore` ignore `.env.local`, before any credentials file exists:
 
    ```bash
@@ -189,7 +191,7 @@ The `theme` in `src/theme.ts`, passed through `providerProps`, is the only way t
 |---|---|---|
 | `colors.brand` | Accent for SDK widgets | The app's primary color. |
 | `colors.brand-hover`, `colors.brand-hover-light` | Hover backgrounds | A subtle tint that contrasts with hover text, never the saturated `brand`. For a blue brand, use something like `#EAF4FF`. |
-| `colors.charts` | Chart palette | Vivid brand shades only, **never pale tints**: palette entries from index 1 on may color labels, and pale on white is invisible. |
+| `colors.charts` | Chart palette | Fill all 8 slots, starting with the brand color. Metabase assigns series to slots, and an empty slot keeps Metabase's default color, so a short list leaves series in colors from outside the theme. Use vivid colors that are easy to tell apart, **never pale tints**: entries from index 1 on may color labels, and pale on white is invisible. |
 | `colors.positive` / `colors.negative` | Semantic indicators | |
 | `colors.background`, `colors.background-secondary` | SDK component surface | **Must match the SDK component's immediate parent container**: `"white"` inside a white card, the tint on a tinted page. |
 | `colors.text-primary`, `text-secondary`, `text-tertiary` | Text on SDK surfaces | **Must contrast with `background`**, such as `#1f2937` on white. Set it whenever you set `background`. |
@@ -267,11 +269,11 @@ SDK components don't fit their parent on their own: without `height` and `width`
 - The default question layout with its query bar: `InteractiveQuestion`.
 - A static question: `StaticQuestion`.
 
-Pass the height actually available to the chart: in a 560px card with a 60px header, `height="500px"`. Or pass `height="100%"` inside a container with a fixed height:
+Pass the height actually available to the chart: in a 560px card with a 60px header, `height="500px"`. Or pass `height="100%"` inside a container with a fixed height. Here `card` is a memoized card, as in `semantic-layer/semantic-layer.md`, _Render a query_:
 
 ```tsx
 <div style={{ height: 360 }}>
-  <StaticQuestion card={{ query }} height="100%" width="100%" />
+  <StaticQuestion card={card} height="100%" width="100%" />
 </div>
 ```
 
