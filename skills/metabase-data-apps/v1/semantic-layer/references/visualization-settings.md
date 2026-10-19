@@ -24,7 +24,7 @@ rg -n "useMetabaseQueryObject|UseMetabaseQueryObjectResult" node_modules/@metaba
 | `ScatterVisualizationSettings` | scatter |
 | `WaterfallVisualizationSettings` | waterfall |
 | `TableVisualizationSettings` | table, pivot, object detail, list |
-| `PieVisualizationSettings` | pie, donut |
+| `PieVisualizationSettings` | pie (drawn as a donut) |
 | `ScalarVisualizationSettings` | scalar, smartscalar, gauge, progress |
 | `FunnelVisualizationSettings` | funnel |
 | `SankeyVisualizationSettings` | Sankey |

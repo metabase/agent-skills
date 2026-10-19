@@ -6,7 +6,7 @@ A Metabase **action** is a saved, parameterized SQL write against the data wareh
 
 The schema is the complete catalog of the actions the app can run. Each is `schema.actions.<actionName>`, with `type: "query"` and a `parameters` list. Each parameter has a `slug` (the key the app sends), a `displayName` (for labels, never a key), a `jsType` (`"string"`, `"number"`, `"Date"`, `"boolean"`, or `"unknown"`), and an optional `required` flag. Slugs are whatever the action's author named the SQL parameters, so read them from the schema.
 
-List `schema.actions` before writing any action code. An action that isn't there doesn't exist for the app. Never fake the call. When the app needs a write the schema lacks, draft a query action without a model (`mb skills get data-action`; an action created from a model in the Metabase UI belongs to that model and is never listed). Show the user its SQL and parameters, and if they say yes, run `mb data-action create`. An action runs only on a database whose **Data actions** toggle is on (Admin > Databases > <database>, or `mb db set-data-actions <db-id> true`). Then regenerate the schema.
+List `schema.actions` before writing any action code. An action that isn't there doesn't exist for the app. Never fake the call. When the app needs a write the schema lacks, draft a query action without a model (`mb skills get data-action`; an action created from a model in the Metabase UI belongs to that model and is never listed). Show the user its SQL and parameters, and if they say yes, run `mb data-action create`. An action runs only on a database whose **Data actions** toggle is on: Admin > Databases > <database>, or `mb db set-data-actions <db-id> true` in an `mb` whose `mb db --help` lists that command. Then regenerate the schema.
 
 ## The definition and the hook
 
@@ -16,7 +16,7 @@ import { defineAction } from "@metabase/embedding-sdk-react/data-app";
 import schema from "../src/metabase.data";
 
 export const CreatePerson = defineAction({
-  copiedActionEntityId: "<from npx representations generate-entity-id>",
+  copiedActionEntityId: "<from npx @metabase/representations generate-entity-id>",
   action: schema.actions.createPerson,
 });
 ```
@@ -106,7 +106,7 @@ The schema's validation contract is `parameter.required`, plus `jsType` for coer
 
 ## Show the error message
 
-Render both layers of `error`. `error.data.message` is the whole-request failure, which covers every failure of the SQL itself. `error.data.errors` maps a parameter slug to its validation message, or is `{}`. Render the message in a `<pre>`, or any element with `white-space: pre-wrap`: driver errors put the SQL on its own line, and a `<span>` collapses it.
+Render both layers of `error`. `error.data.message` is the whole-request failure, which covers every failure of the SQL itself. `error.data.errors`, when present, maps a parameter slug to its validation message. Query actions usually leave it out, so read it as `error?.data.errors ?? {}`. Render the message in a `<pre>`, or any element with `white-space: pre-wrap`: driver errors often span several lines, and a `<span>` collapses them.
 
 ```tsx
 const fieldErrors = error?.data.errors ?? {};
@@ -127,15 +127,7 @@ const fieldErrors = error?.data.errors ?? {};
 })}
 ```
 
-Submitting a 9-character value into a `CHARACTER(2)` column gives this `error.data.message`. Render it as it is:
-
-```
-Value too long for column "STATE CHARACTER(2)": "'dadasdasd' (9)";
-SQL statement:
-UPDATE "PUBLIC"."PEOPLE" SET … WHERE "PUBLIC"."PEOPLE"."ID" = 1 [22001-214]
-```
-
-Never replace it with "Failed", "Something went wrong", or `String(error)`, and never paraphrase it into something friendlier: the raw message is the only fix-it information the user has. When a field has its own message in `error.data.errors`, show it beside that field too.
+A failing query action comes back with status 500, and an `error.data.message` that wraps the driver's own text: `Error executing Action: Error executing write query: <the driver's message>`. Render it as it is. Never replace it with "Failed", "Something went wrong", or `String(error)`, and never paraphrase it into something friendlier: the raw message is the only fix-it information the user has. When a field has its own message in `error.data.errors`, show it beside that field too.
 
 ## Refresh after the action
 
@@ -147,10 +139,10 @@ After an action succeeds, refresh every piece of data on screen that it could ha
 
 ## Debugging
 
-When an action seems to succeed but the screen doesn't update, or a call fails with a 400:
+When an action seems to succeed but the screen doesn't update, or a call fails:
 
 1. Log `result`, `error`, and `isExecuting` after `await execute(...)` to confirm the request went through.
-2. Confirm that `useAction` got the `defineAction(...)` export from `actions/`. Its `.id` compiles but leaves `execute` untyped, and fails at runtime with "was passed to `useAction` as a raw id". "This action has no copy" means the definition was made inside a component, or a definition in `actions/` lacks its `copiedActionEntityId`.
+2. Confirm that `useAction` got the `defineAction(...)` export from `actions/`. Its `.id` is a type error with the `/data-app` hook. The main entry's hook accepts it untyped, and then fails at runtime with "was passed to `useAction` as a raw id". "This action has no copy" means the definition was made inside a component, or a definition in `actions/` lacks its `copiedActionEntityId`.
 3. Log the object passed to `execute`. Every key must be a parameter `slug` from `schema.actions.<action>.parameters`, and every value must match its `jsType`.
 4. List every view on screen that reads the rows the action writes. Confirm that each one's hook sits above the trigger, and that its `refetch` is awaited after `execute`, all of them together in `Promise.all`.
 5. If the schema doesn't list an action you expect, either the action isn't defined on the instance or the schema file is stale. Regenerate the schema.

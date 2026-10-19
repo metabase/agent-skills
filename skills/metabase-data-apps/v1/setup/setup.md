@@ -2,8 +2,8 @@
 
 The scaffold ships in this skill at `setup/template/`: a Vite + React + TypeScript project whose whole build and dev setup is the SDK preset behind `dataAppConfig()`. Copy it into the app directory. If you find yourself writing `package.json`, `vite.config.ts`, `tsconfig.json`, or `src/index.tsx` by hand, stop and copy the template instead.
 
-- `npm run dev` previews the app at `http://localhost:5174` against a real Metabase, through the same sandbox and distortion rules Metabase uses, so third-party libraries the app bundles behave as they will in production. An edit rebuilds the bundle and soft-reloads it: the app remounts and its component state resets, while auth and the SDK stay loaded. There's no browser refresh and no Fast Refresh.
-- `npm run build` writes the single bundle, `dist/index.js`, that Metabase serves from the committed tree.
+- `npm run dev` previews the app against a real Metabase, through the same sandbox and distortion rules Metabase uses, so third-party libraries the app bundles behave as they will in production. It listens on `http://localhost:5174`, or the next free port when that one is taken, so take the URL from the `Local:` line Vite prints. An edit under `src/` rebuilds the bundle and soft-reloads it: the app remounts and its component state resets, while auth and the SDK stay loaded. There's no browser refresh and no Fast Refresh. Edits under `queries/` and `actions/` don't trigger a rebuild: after one, save a file under `src/` or restart `npm run dev`.
+- `npm run build` writes the single bundle, `dist/index.js`. It's committed, and a pull imports it into Metabase.
 
 Apps can also be created and updated through `/api/apps`. This guide covers the Git path. To remove an app, only _Removing an app_ applies.
 
@@ -13,7 +13,7 @@ Ask: **"Do you already have a Git repository connected to this Metabase via remo
 
 ## Step 2 — Name the app and create its directory
 
-1. Settle the **slug**, the `/apps/<slug>` URL. It must be dash-cased (`[a-z0-9]+(?:-[a-z0-9]+)*`, such as `sales-overview`), or sync rejects it. If the app's purpose isn't clear yet, ask "what's this app for?" in one line, then propose a slug and confirm it.
+1. Settle the **slug**, the `/apps/<slug>` URL. It must be dash-cased (`[a-z0-9]+(?:-[a-z0-9]+)*`, such as `sales-overview`), at most 100 characters, and not `generate`, `repo-status`, or `sandbox-host`, or sync rejects it. If the app's purpose isn't clear yet, ask "what's this app for?" in one line, then propose a slug and confirm it.
 2. Create `<repo>/data_apps/<slug>/`, and `data_apps/` first if it's missing. If the directory already exists, it holds an existing app: check it as below, and never overwrite a file without confirmation.
 
 ### An existing app
@@ -39,13 +39,13 @@ The app is a subdirectory of the repository, so this is a plain copy. Everything
 ## Step 4 — Customize
 
 1. Set the `name` in `package.json` to the slug.
-2. Pin the SDK to the data-apps tag (the template ships `*`):
+2. Pin the SDK to the `65-beta` tag (the template ships `*`). Not `63-data-apps`, an older tag that lacks `data-app-dev/config`:
 
    ```bash
    npm install @metabase/embedding-sdk-react@65-beta
    ```
 
-   Data apps exist only in the Metabase 65 beta, so never use `latest`. The tag provides `@metabase/embedding-sdk-react/data-app`, the app's APIs, and `@metabase/embedding-sdk-react/data-app-dev/config`, the dev and build preset that `vite.config.ts` uses.
+   The contract this skill describes (`write-resources`, `/api/apps/generate/*`) starts with Metabase 65, and `latest` predates it, so never use `latest`. The tag provides `@metabase/embedding-sdk-react/data-app`, the app's APIs, and `@metabase/embedding-sdk-react/data-app-dev/config`, the dev and build preset that `vite.config.ts` uses.
 3. Make the repo-root `.gitignore` ignore `.env.local`, before any credentials file exists:
 
    ```bash
@@ -87,9 +87,9 @@ The app is a subdirectory of the repository, so this is a plain copy. Everything
 
    - **`description`** is one short sentence about what this app does, shown under its name in the admin list so admins can tell apps apart. Sync folds whitespace into single spaces and rejects more than 255 characters. Leave it out if it adds nothing beyond the name.
    - **`version`** is the contract version the app's code targets. Metabase writes it, so never change it by hand. Metabase raises the version it serves only on a breaking change. An app on an older version is marked _Outdated_, hidden from every other user, and won't open until it's migrated with `migrate/migrate.md`, one version at a time, never ad hoc.
-   - **`allowed_hosts`** is needed only when the app calls an **external** API with `fetch` or XHR. Each origin listed, exact or a `*.` subdomain wildcard, opens in both `npm run dev` and Metabase. Never list the Metabase instance, and leave the key out entirely when the app talks only to Metabase. A native `<form action>` submit (`form-action`) and an `<iframe src>` or navigation (`frame-src`) obey the same list, and the target must also allow framing (`X-Frame-Options`, `frame-ancestors`), which many public sites don't. Prefer `<form onSubmit>` with `preventDefault`: a native submit navigates the sandboxed iframe away from the app.
+   - **`allowed_hosts`** is needed only when the app calls an **external** API with `fetch`. XHR is blocked even for listed origins. Each origin listed, exact or a `*.` subdomain wildcard, opens to `fetch` in both `npm run dev` and Metabase. Never list the Metabase instance, and leave the key out entirely when the app talks only to Metabase. In Metabase, a native `<form action>` submit (`form-action`) and an `<iframe src>` or navigation (`frame-src`) obey the same list, and the target must also allow framing (`X-Frame-Options`, `frame-ancestors`), which many public sites don't. The dev preview blocks both, whatever the list. Prefer `<form onSubmit>` with `preventDefault`: a native submit navigates the sandboxed iframe away from the app.
 6. Run `npm install`, or use the user's package manager. The template ships no lockfile, so keep whichever one the install creates.
-7. Commit both the lockfile and the built bundle: Metabase serves the file at `data_app.yaml`'s `path` straight from the Git tree, and the lockfile keeps installs reproducible. After installing and building, check `git status` to confirm both are committable.
+7. Commit both the lockfile and the built bundle: a pull imports the committed file at `data_app.yaml`'s `path`, and the lockfile keeps installs reproducible. After installing and building, check `git status` to confirm both are committable.
 8. If the preview hits CORS, add `http://localhost:5174` under Admin > Embedding > Embedded analytics SDK > CORS.
 
 `npm run write-resources` writes into the collection that `data_app.yaml` names, so it refuses to run until that collection's file exists. The app's saved questions and copies come later, when you build its data layer (`semantic-layer/semantic-layer.md`).
@@ -100,14 +100,14 @@ The app is a subdirectory of the repository, so this is a plain copy. Everything
 2. `npm run check-resources`. It fails when `data_app.yaml` names no collection, or one without a file, and it validates the repository's YAML. It changes nothing in Metabase.
 3. `npm run build`.
 4. `git status` shows the app source, the lockfile, `data_app.yaml`, the collection's file under `collections/data_apps/`, and `dist/index.js` as committable files.
-5. Run `npm run dev` and confirm the preview at `http://localhost:5174` shows "Hello, data app". Read the diagnostics feed once (below). Expect `clients: 1` and no entry with `"alert": true`.
-6. Confirm that `@metabase/embedding-sdk-react` is on the data-apps tag.
+5. Run `npm run dev` and confirm the preview shows "Hello, data app". Read the diagnostics feed once (below). Expect `clients: 1` and no entry with `"alert": true`.
+6. Confirm that `@metabase/embedding-sdk-react` is on `65-beta`.
 
 Stop here if the user only asked to create or set up an app.
 
 ## Reading the diagnostics feed
 
-`npm run dev` serves everything its corner **⚠ Diagnostics** toolbar shows as JSON. That's how you see runtime failures, since you have a shell, not a browser. Note `nextEventId` before an edit, make the change (it rebuilds on its own), then read again from that ID. `startEventId` is inclusive and survives page reloads.
+`npm run dev` serves everything its corner **⚠ Diagnostics** toolbar shows as JSON. That's how you see runtime failures, since you have a shell, not a browser. Note `nextEventId` before an edit, make the change (an edit under `src/` rebuilds on its own), then read again from that ID. `startEventId` is inclusive and survives page reloads. Use the preview's own URL: the examples assume port 5174.
 
 ```bash
 curl -s "http://localhost:5174/__data-app/diagnostics?startEventId=0"
@@ -130,17 +130,17 @@ curl -s "http://localhost:5174/__data-app/diagnostics?startEventId=0"
 ```
 
 - **`clients: 0` doesn't mean healthy.** It means no preview tab is open, so empty `entries` prove nothing. Open `http://localhost:5174` first.
-- The feed answers for the bundle that is running now. A multi-step edit passes through builds that don't compile or don't render. Their errors describe code the preview has already replaced, so they're withheld and counted in `staleEntries`. Anything still broken reports itself again under the new `buildId`. `?includeStale=true` returns the withheld entries when comparing builds is the point. A *failed* build doesn't advance `buildId`: the preview keeps running the last good bundle, so its entries stay current.
-- Always read `hint`, which names the exact fix, and quote `summary` as it is when you report it.
+- The feed answers for the bundle that is running now. A multi-step edit passes through builds that don't compile or don't render. Their errors describe code the preview has already replaced, so they're withheld and counted in `staleEntries`. Anything still broken reports itself again under the new `buildId`. `?includeStale=true` returns the withheld entries when comparing builds is the point. A *failed* build doesn't advance `buildId`: the preview keeps running the last good bundle, so its entries stay current. The compile error goes to the `npm run dev` terminal, not the feed, so when `buildId` didn't advance after an edit, read the terminal.
+- Read `hint` when there is one (`error`, `blocked-api`, and `sdk-call` entries have none), and quote `summary` as it is when you report it. Never add the Metabase URL to `allowed_hosts`, even when a hint says to: in the preview, a raw `fetch` to Metabase reports itself as not in `allowed_hosts`, and the fix is a data-app hook.
 
 | `kind` | Fix |
 |---|---|
-| `blocked-network` / `csp-violation` | Add the origin to `allowed_hosts` in `data_app.yaml`, then **restart** `npm run dev`, which reads the allowlist and CSP at boot. |
+| `blocked-network` / `csp-violation` | For an external API's `fetch`, add its origin to `allowed_hosts` in `data_app.yaml`, then **restart** `npm run dev`, which reads the allowlist and CSP at boot. For a `script-src` or `style-src` violation, bundle the asset instead. For Metabase, use the data-app hooks. |
 | `blocked-api` | It's blocked in production too. Use an SDK API or drop the call. Don't work around it. |
 | `sdk-call` + `alert: true` | A Metabase request failed. Fix the query. `summary` has the endpoint and status. |
 | `error` | A real bug. `detail` has the stack. |
 
-Text is truncated, and the buffer keeps the last 200 events. `curl -X DELETE .../__data-app/diagnostics` clears it for every reader.
+Text is truncated, and the buffer keeps the last 200 events, at most 50 of them `sdk-call`. `curl -X DELETE .../__data-app/diagnostics` clears it for every reader.
 
 ## Source conventions
 
@@ -156,7 +156,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 ```
 
-- The build externalizes React, React DOM, the JSX runtimes, `@metabase/embedding-sdk-react`, and `@metabase/embedding-sdk-react/data-app` to sandbox globals, in `npm run dev` as in production. Import from the entrypoints as usual. Never read SDK values off `globalThis`: nothing is there.
+- The build externalizes React, React DOM, the JSX runtimes, `@metabase/embedding-sdk-react`, and `@metabase/embedding-sdk-react/data-app` to sandbox globals, in `npm run dev` as in production. Import from the entrypoints as usual. Never read SDK values off `globalThis`: the sandbox globals there are private plumbing.
 - Data-app APIs (routing, the data hooks, `useAction`, `copy`, the date pickers) come from `/data-app`. Components such as `StaticQuestion` come from the main entry.
 - JSX uses the automatic runtime, so don't write `import React from "react"`. Import hooks by name, and React types as named type imports, not through the `React.` namespace.
 - `dataAppConfig()` takes one override, `port`. The bundle contract (the factory shape, externals, the dev sandbox entry, CSS inlining, SVG handling) can't be overridden, and there's no way to add Vite plugins, aliases, or `define`s. There's no `index.html` either: the SDK's dev server serves the HTML shell. If you think you need one, solve the problem in `src/` instead.
@@ -192,7 +192,7 @@ The `theme` in `src/theme.ts`, passed through `providerProps`, is the only way t
 | `colors.charts` | Chart palette | Vivid brand shades only, **never pale tints**: palette entries from index 1 on may color labels, and pale on white is invisible. |
 | `colors.positive` / `colors.negative` | Semantic indicators | |
 | `colors.background`, `colors.background-secondary` | SDK component surface | **Must match the SDK component's immediate parent container**: `"white"` inside a white card, the tint on a tinted page. |
-| `colors.text-primary`, `text-secondary`, `text-tertiary` | Text on SDK surfaces | **Must contrast with `background`**, such as `#1f2937` on white. The SDK's default `text-primary` is near white, so always set it together with `background`. |
+| `colors.text-primary`, `text-secondary`, `text-tertiary` | Text on SDK surfaces | **Must contrast with `background`**, such as `#1f2937` on white. Set it whenever you set `background`. |
 | `fontFamily` | SDK typography | |
 
 If you set `colors.text-hover`, check that it contrasts with `brand-hover` and `brand-hover-light` in open menus, chart-type selectors, and visualization-settings dropdowns.
@@ -201,7 +201,7 @@ Several `<MetabaseProvider>`s fight over one set of CSS variables, so per-subtre
 
 ## Custom error UI (optional)
 
-When an embedded question or dashboard can't load (its `questionId` was removed, the user lacks access, or a request fails), the host renders a neutral built-in error state in its place. Leave that alone unless the app has a strong reason to restyle it. To match the app's look, add an `errorComponent` to the factory's `providerProps`:
+When an embedded question or dashboard can't load (its `questionId` was removed, the user lacks access, or a request fails), Metabase renders a neutral built-in error state in its place. The dev preview shows the SDK's default error alert instead. Leave that alone unless the app has a strong reason to restyle it. To match the app's look, add an `errorComponent` to the factory's `providerProps`:
 
 ```tsx
 // src/components/AppError.tsx
@@ -245,7 +245,7 @@ The sandbox throws at runtime on these globals. Use the replacement:
 
 | Blocked | Use instead |
 |---|---|
-| **Network**: `fetch`, `XMLHttpRequest`, `WebSocket` | The SDK and data-app APIs for Metabase reads and writes. Raw `fetch` and XHR reach **only** the external origins in `data_app.yaml`'s `allowed_hosts` (Step 4). Everything else, the Metabase origin included, throws. `WebSocket` is always blocked. |
+| **Network**: `fetch`, `XMLHttpRequest`, `WebSocket` | The SDK and data-app APIs for Metabase reads and writes. Raw `fetch` reaches **only** the external origins in `data_app.yaml`'s `allowed_hosts` (Step 4). Any other `fetch`, the Metabase origin included, rejects. XHR is always blocked: an instance can be constructed, but its methods throw. `WebSocket` is always blocked. |
 | **Dialogs**: `alert`, `confirm`, `prompt` | A React modal in your own tree. |
 | **Storage**: `localStorage`, `sessionStorage`, `indexedDB`, `document.cookie` | Nothing persists across reloads. Persist through a Metabase action. |
 | **Window and history navigation**: `window.open`, `history.pushState`, `history.replaceState` | `useDataAppLocation().navigate` inside the app, and `<a target="_blank" rel="noopener">` for external links. |
@@ -288,7 +288,7 @@ Don't wrap an SDK question in a container that clips or moves on hover: no `over
    git commit -m "Add <slug> data app"
    git push
    ```
-4. The app appears at `/apps/<slug>` on Metabase's next remote-sync import: a manual **Pull changes** (Admin > Data apps, or Remote sync), the auto-import poll, or a restart.
+4. The app appears at `/apps/<slug>` on Metabase's next remote-sync import: a manual pull (**Pull changes** in the Git sync menu, or under Admin > Settings > Remote sync), the auto-import poll, or a restart.
 
 Don't offer to "deploy" the app, and don't ask how the bundle reaches a staging environment. Metabase imports the committed bundle straight from the connected repository. Once the change is on the branch Metabase syncs from, however the user gets it there (a merged PR or a direct push), tell them to pull it in and open `/apps/<slug>`. An update is the same loop: `write-resources` if the definitions changed, a new build, a commit, and another pull.
 
@@ -302,7 +302,7 @@ git commit -m "Remove <slug> data app"
 git push
 ```
 
-`<collection>` is the collection that `data_app.yaml` names as `collection`: the file under `collections/data_apps/` whose `entity_id` is that value, and the directory of the same name beside it (`data_app__order_desk` for `Data App: Order Desk`). The next pull removes the app, along with its collection, saved questions, and copies of metrics and actions.
+`<collection>` is the collection that `data_app.yaml` names as `collection`: the file under `collections/data_apps/` whose `entity_id` is that value, and the directory of the same name beside it. The collection is named after the slug, so the app `order-desk` has `Data App: order-desk`, slugged `data_app__order_desk`. The next pull removes the app, along with its collection, saved questions, and copies of metrics and actions.
 
 Delete both. If the directory goes without the collection's files, the next pull still removes the app and its collection, and Metabase's next push deletes the files. Until that push, though, a pull that reloads every file brings the collection back with no app owning it, and the push then keeps it. The other way round is refused: a pull fails when an app's directory stays but its collection file is gone.
 
@@ -317,10 +317,10 @@ Delete both. If the directory goes without the collection's files, the next pull
 | The app's background stops partway down the frame. | Give the root `minHeight: "100vh"` (_App layout_). |
 | "Invalid hook call" at runtime. | Two copies of React. `dataAppConfig()` externalizes `react`: make sure `react` and `react-dom` are installed and nothing adds a second or mismatched React. |
 | The bundle is several MB. | React and the SDK aren't externalized. Confirm `vite.config.ts` still uses `dataAppConfig()` and the data-apps SDK tag is installed. A large but not multi-MB bundle can be inlined assets. |
-| `dist/index.js` doesn't assign `__dataAppFactory__`, or the preview is blank with `Bundle did not assign a function to __dataAppFactory__`. | `src/index.tsx` must `export default` the `DataAppFactory`. Otherwise app code throws while the sandbox evaluates the bundle: read the real error in the diagnostics feed. |
+| `dist/index.js` doesn't assign `__dataAppFactory__`, or the preview is blank with `Bundle did not assign a function to __dataAppFactory__`. | `src/index.tsx` must `export default` the `DataAppFactory` and export nothing else. Otherwise app code throws while the sandbox evaluates the bundle: read the real error in the diagnostics feed. |
 | `Cannot find module '@metabase/embedding-sdk-react'`. | Run `npm install`, or the equivalent for the package manager. |
-| Drill popups don't open, SDK components render empty, or "MetabaseProvider not found" in dev. | The app renders its own `<MetabaseProvider>`. Remove it. |
+| Drill popups don't open, or SDK components render empty, in dev. | The app renders its own `<MetabaseProvider>`. Remove it. |
 | A network call works in `npm run dev` but is blocked after syncing. | `allowed_hosts` was edited without restarting the dev server, so the running sandbox still used the old list. Restart `npm run dev`. The feed's `manifest` section flags this as `restartRequired`. |
-| The SDK was rebuilt or reinstalled, but the preview behaves like the old version. | Vite caches its pre-bundled SDK in `node_modules/.vite`, keyed on the package version. Stop the dev server, delete `node_modules/.vite`, and start it again, or run `npx vite --force`. |
+| The SDK was rebuilt or reinstalled, but the preview behaves like the old version. | Vite caches its pre-bundled SDK in `node_modules/.vite`, keyed on the lockfile and the Vite config, so rebuilding the package in place doesn't invalidate it. Stop the dev server, delete `node_modules/.vite`, and start it again, or run `npx vite --force`. |
+| The preview doesn't pick up a change to `queries/` or `actions/`. | Only edits under `src/` rebuild the preview. Save a file under `src/`, or restart `npm run dev`. |
 | Component state resets on every edit. | Expected: each edit rebuilds the bundle and remounts the app in the sandbox. |
-| The URL changes but the UI doesn't, only after syncing. | Import the routing primitives from `@metabase/embedding-sdk-react/data-app`, not the main entry, and keep `dataAppConfig()`. Inlining `/data-app` triggers the sandbox's React batching bug. |

@@ -4,11 +4,11 @@ A data app has no router library. Three primitives from `@metabase/embedding-sdk
 
 | API | Purpose |
 |---|---|
-| `<DataAppRouter>` | Wraps the app once and tracks the current sub-path. It takes no `basename`: it detects the iframe's prefix (`/embed/apps/<slug>`) in Metabase and uses none in the dev preview. |
-| `<DataAppLink to="/customers/42">` | An internal link. It renders a real `<a href>`, so middle-click and cmd-click open a new tab, and it passes other anchor props through. |
+| `<DataAppRouter>` | Wraps the app once. It takes no `basename`: the link and the hook detect the iframe's prefix (`/embed/apps/<slug>`) in Metabase, and use none in the dev preview. |
+| `<DataAppLink to="/customers/42">` | An internal link. It renders a real `<a href>` and passes other anchor props through. Modifier and middle clicks go to the browser, but a new tab works only in the dev preview: in Metabase, the link points at the iframe's own URL, which shows "This data app can’t be opened directly." |
 | `useDataAppLocation()` | Returns `{ pathname, navigate }`. Match `pathname` by equality, `startsWith`, or a regex, and call `navigate(to)` to navigate from code. |
 
-- Never add `react-router-dom` or any other router, and never use `<BrowserRouter>` or `<HashRouter>`. A router that runs its own `setState` inside the sandbox hits the Near Membrane batching bug: the URL changes, but the UI doesn't.
+- Never add `react-router-dom` or any other router, and never use `<BrowserRouter>` or `<HashRouter>`. A router library calls `history.pushState`, which the sandbox blocks, so navigating throws.
 - Never call `history.pushState` yourself, and never read or write the parent page's URL. Both are blocked by design.
 - Routing needs no change to `vite.config.ts`, because `dataAppConfig()` already externalizes `/data-app`. Edit `src/App.tsx` and add page components.
 - No app yet? Scaffold one with `setup/setup.md` first.
@@ -102,6 +102,5 @@ Nothing else is needed for the parent page's URL. Metabase mirrors each navigati
 
 | Symptom | Fix |
 |---|---|
-| `<DataAppLink>` renders as plain text on first load. | The bundle hasn't finished loading yet. The fallback turns into a real link once it has. Don't add a `<MetabaseProvider>` to fix it. |
-| The URL changes, but the UI doesn't. | A `<BrowserRouter>` or `<HashRouter>` is still in the tree. Remove the router library and use `<DataAppRouter>` and `<DataAppLink>`. |
-| Middle-click on a `<DataAppLink>` does nothing. | A wrapping component swallows the event. The link itself lets non-left clicks through to the browser. |
+| Navigating throws a blocked `History.pushState` call, and the diagnostics feed has a `blocked-api` entry for it. | A router library, or a direct `history` call, is in the tree. Remove it, and use `<DataAppLink>` and `navigate` from `useDataAppLocation()`. |
+| Middle-click on a `<DataAppLink>` does nothing in the dev preview. | A wrapping component swallows the event. The link itself lets non-left clicks through to the browser. |

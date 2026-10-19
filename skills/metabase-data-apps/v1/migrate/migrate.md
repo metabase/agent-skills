@@ -131,13 +131,13 @@ Do not batch steps across upgrades. Do not touch `version` before item 5.
    app directory is a user edit; say so before committing.
 5. From the repo root,
    `git add data_apps/<slug> collections/data_apps && git commit -m "Migrate <slug> data app to data-app version M" -- data_apps/<slug> collections/data_apps`,
-   push, and tell the user to **Pull changes** under Admin > Data apps.
+   push, and tell the user to pull the change into Metabase (**Pull changes** in the Git sync menu, or under Admin > Settings > Remote sync).
 6. Prove it. After the pull:
    ```bash
    ( source "$ROOT/.env.local"; curl -s -H "x-api-key: $DATA_APP_MB_API_KEY" "$DATA_APP_MB_URL/api/apps/<slug>" )
    ```
    must show `"version": M` and `"outdated": false`.
-   A response holding only `name` and `display_name` means the key is not an
+   A response holding only `name`, `display_name`, and `resource_collection_id` means the key is not an
    admin's: ask for one, or ask the user to read the admin list, and say the
    proof is still pending. Report the command and the result. Do not claim the
    migration is done without it.

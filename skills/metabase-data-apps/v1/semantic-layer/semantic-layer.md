@@ -11,23 +11,24 @@ These rules add to the ones in `SKILL.md`. The sections after them show how to f
 - All Metabase context comes from the generated schema file, `src/metabase.data.ts` (or `src/*.metabase.data.ts`): its runtime object, and the `/* metadata: {...} */` comment an entry opens with. Never from Metabase YAML in the repository, MCP tools, or your own API calls.
 - Building the UI never creates or changes Metabase content: no new tables, cards, or semantic-layer edits. When the app needs a table, metric, or dimension the schema lacks, stop and tell the user what's missing (_Generate Schema_). Never write a replacement or work around the gap. A missing action is drafted for the user to approve, as in `actions/actions.md`.
 - Read data only through `useMetabaseQuery` and `useMetabaseQueryObject`, never through older SDK data hooks.
-- Use the generated schema objects, never raw IDs, strings, or lookup helpers: `source: schema.tables.<table>`, its `fields`, `segments`, and `measures`, `schema.metrics.<metric>` in `aggregations`, and the metric's `dimensions`. Give each table a local constant. For a plain table query, `{ type: "table", id: table.id }` also works as `source`.
+- Use the generated schema objects, never raw IDs, strings, or lookup helpers: `source: schema.tables.<table>`, its `fields`, `segments`, and `measures`, `schema.metrics.<metric>` in `aggregations`, and the metric's `dimensions`. Give each table a local constant, and pass the schema's table object as `source`: a bare `{ type: "table", id }` runs, but types its rows as empty.
 - A metric is an aggregation, never a `source`. Saved questions aren't sources either: the schema has no `schema.questions`, since an app can't copy an existing saved question.
 - Never hand-write `DatasetQuery` or MBQL: no `{ type: "query", query: { "source-table": … } }`, no raw `source-table` clauses, and no field, table, or metric IDs passed to a hook or SDK component. Never invent aggregation objects such as `{ name: "count" }` or `{ name: "sum", field }`. Build queries with `filter(...)`, `breakout(...)`, `orderBy(...)`, the `aggregations` helpers, and the generated measures and metrics.
 - Prefer the semantic layer to React. A segment, measure, or metric that matches the concept beats rebuilding it from rows with string matching, thresholds, or reconstructed categories. Prefer rich queries (segments, measures, filters, breakouts) to shallow table dumps.
 
 ### Queries
 
-- A query's fields, segments, measures, and metric aggregations come from its `source` table. A source-card metric doesn't work in a table-source query. A metric's dimensions, wherever a query uses them (filters, breakouts, order-bys, helper aggregations), need that metric in the same query's `aggregations`, and must resolve to the source table.
+- A query's fields, segments, measures, and metrics come from its `source` table. A metric's dimensions reach the source table's own fields and, through a foreign key, a related table's. A query can use them with or without the metric, such as breaking out a `count()` by a related table's name.
 - A definition never changes with runtime state. A clause whose value comes from a control goes in the hook's second argument (_Static and dynamic query parts_). Segments and measures work only in the definition.
 - A query the user filters (a lookup, a search, a filtered top-N) has no static `limit`, because a static `limit` runs before the dynamic filters. Put its `orderBys` and `limit` in the dynamic part.
 - Fixed permission-boundary filters, aggregations, and breakouts stay inside `defineQuery`, baked into its saved question. Never apply them again outside it.
-- `filter(...)` takes one value and doesn't fully check value types: `filter(field, "=", [a, b])` compiles and returns no rows.
+- `filter(...)` takes one value and doesn't fully check value types: `filter(field, "=", [a, b])` compiles, but it isn't an IN filter.
 - Use `fields` only in row-list queries. With `aggregations` and `breakouts`, the breakouts decide the result columns.
 - Order with `orderBy(...)`, never `{ field, direction }` literals. To order by a bucketed breakout or an aggregation, pass the same constant to `breakouts` or `aggregations` and to `orderBy`. `orderBy` takes no `unit` or `binning`.
 - Write no generics on `defineQuery` or the hooks. Never cast a query to `Parameters<typeof useMetabaseQuery>[0]`, which hides invalid fields, metrics, and breakouts, or to `DefinedQuery`, which hides a query without a saved question.
 - Run each query once per render tree. Lift the hook to the highest component that needs the data, and pass `data`, `isLoading`, and `error` down: a second call fires a duplicate request, and the two disagree mid-load. The same query with different filters or breakouts is a different data source. Never call a hook in a loop, a condition, or a callback.
 - Render every hook's `error` in its own panel. A query hook's `error` is `unknown`: render `error instanceof Error ? error.message : String(error)`.
+- `useMetabaseQuery` returns `isLoading: false` with `data: null` until its first request starts, while the SDK signs in. Treat `data === null` without an `error` as loading, unless you held the query back with `enabled: false`. Show the empty state only when `data.rows` is empty. `useMetabaseQueryObject`'s `isLoading` is already `true` in that window.
 
 ### Rows
 
@@ -40,7 +41,7 @@ These rules add to the ones in `SKILL.md`. The sections after them show how to f
 
 - Decide per element, never per row or page. A row with one custom tile keeps all its other tiles as SDK components. Matching heights and card chrome come from the container each tile sits in.
 - Ask "can Metabase display this at all?", never "which looks closer to the design?" A built-in visualization keeps the instance's theming, accessibility, tooltips, formatting, and drill-through. A chart built in React has none of them, and drifts from every other chart in the app.
-  - **Yes:** `useMetabaseQueryObject` with `StaticQuestion` or `InteractiveQuestion`. This covers bar, line, area, combo, row, trend, pie and donut, scalar, smartscalar, gauge, progress, funnel, scatter, waterfall, boxplot, sankey, pivot, map, object and list views, sortable tables, and any other type in the SDK's `cardDisplayTypes`. It also covers anything where visualization settings carry the presentation (axes, labels, stacking, goals, trend lines, series, formatting), or where users benefit from sorting, column inspection, drill-through, or downloads.
+  - **Yes:** `useMetabaseQueryObject` with `StaticQuestion` or `InteractiveQuestion`. This covers bar, line, area, combo, row, pie (drawn as a donut), scalar, smartscalar (a number with its trend), gauge, progress, funnel, scatter, waterfall, boxplot, sankey, pivot, map, object and list views, sortable tables, and any other `visualization` the `MetabaseCard` type accepts. It also covers anything where visualization settings carry the presentation (axes, labels, stacking, goals, trend lines, series, formatting), or where users benefit from sorting, column inspection, drill-through, or downloads.
   - **No:** `useMetabaseQuery` and your own component, only when the user asked for a custom visualization or nothing Metabase renders can express it: bespoke scorecards, alert panels, narrative or mixed-content cards, interactions Metabase's chrome can't express, calendar grids, timelines, heat strips, radial views, custom maps, domain-specific diagrams, or one visual unit built from several queries. Keep its row handling typed, and draw with a charting dependency the app already has, or with SVG.
 - Styling is never a reason to hand-build. Pass `visualization` for the chart type and `visualizationSettings` for setting-level changes, and theme the SDK for the rest. A pie chart is a Metabase pie chart unless the user asked for a custom one. That's the user's call: don't infer it from a design reference, brand colors, or a screenshot of something bespoke.
 - A single-value KPI is a scalar, smartscalar, gauge, or progress visualization. Put whatever Metabase doesn't draw (stars, a caption, a total from a second query) beside it. Hand-build the tile only when the number itself can't come from one query.
@@ -68,11 +69,11 @@ These rules add to the ones in `SKILL.md`. The sections after them show how to f
 - All stays selectable while options load, come back empty, or fail. Don't disable the whole control. When the selected value disappears from fresh options, reset the filter to All.
 - A date preset bar lists the durations, then All time, then Custom last. Leave Custom out only when the user asked for fixed presets only, or for no range control.
 - A custom date range filters only when both ends are set, as `YYYY-MM-DD` strings. A half-picked range means no date filter, never a sentinel date such as `2000-01-01`.
-- Memoize filter arrays so SDK query keys stay stable. Pass raw filter state between components and build each query's `filters: [...]` inline with spreads: a shared `ReturnType<typeof filter>[]` array, or one built with `push(...)`, collapses overload inference.
+- Pass raw filter state between components and build each query's `filters: [...]` inline with spreads: a shared `ReturnType<typeof filter>[]` array, or one built with `push(...)`, collapses overload inference. The hooks key requests on content, so rebuilding the arrays on each render doesn't refetch.
 
 ## Generate Schema
 
-If the schema file exists and covers what the app needs, use it. Otherwise, generate it. It always holds the same content: the published tables of the `Library / Data` tree, the metrics of the `Library / Metrics` tree with the tables they map, and every query action that belongs to no model, under `schema.actions`. There is no scope to choose. When the app needs a table the schema lacks, ask the user to publish it to the Data library, or for a metric, to move it into the Metrics library, then regenerate. A missing action is drafted as in `actions/actions.md`, _What's in the schema_.
+If the schema file exists and covers what the app needs, use it. Otherwise, generate it. It always holds the same content: the published tables of the `Library / Data` tree, the metrics of the `Library / Metrics` tree with the tables they map, and every query action that belongs to no model, under `schema.actions`. Metrics built on a saved question are left out. There is no scope to choose. When the app needs a table the schema lacks, ask the user to publish it to the Data library, or for a metric, to move it into the Metrics library, then regenerate. A missing action is drafted as in `actions/actions.md`, _What's in the schema_.
 
 From the app directory:
 
@@ -91,11 +92,13 @@ fi
     echo "Set real DATA_APP_MB_URL / DATA_APP_MB_API_KEY in repo-root .env.local" >&2
     exit 1
   fi
-  curl \
-    -o src/metabase.data.ts \
+  # -f keeps an error answer, such as a non-admin key's 403, out of the schema file
+  curl -fsS \
+    -o src/metabase.data.ts.tmp \
     -H "x-api-key: $DATA_APP_MB_API_KEY" \
     -H "Accept: text/typescript" \
-    "$DATA_APP_MB_URL/api/apps/generate/schemas"
+    "$DATA_APP_MB_URL/api/apps/generate/schemas" &&
+    mv src/metabase.data.ts.tmp src/metabase.data.ts
 )
 ```
 
@@ -115,9 +118,9 @@ collections/data_apps/<collection>.yaml            the app's collection, a root 
 collections/data_apps/<collection>/<name>.yaml     a saved question per query, copies of the metrics they use, and a copy of each action the app runs
 ```
 
-`<collection>` is the collection's name as Metabase slugs it, such as `data_app__sales` for `Data App: Sales`. From the app directory, the folder is `../../collections/data_apps/`. The pull and the CLI find the files by content, not by path: the collection whose `entity_id` the manifest names, and the cards and actions whose `collection_id` is that collection. Nothing changes in Metabase until the repository is pulled.
+The collection is named `Data App: <slug>`, and `<collection>` is that name as Metabase slugs it, such as `data_app__sales_ops` for the app `sales-ops`. From the app directory, the folder is `../../collections/data_apps/`. The pull and the CLI find the files by content, not by path: the collection whose `entity_id` the manifest names, and the cards and actions whose `collection_id` is that collection. Nothing changes in Metabase until the repository is pulled.
 
-**`npm run write-resources`** sends the definitions to Metabase, using the credentials in `.env.local`, and regenerates the app's collection folder. It deletes the cards and actions the folder held, then writes what comes back, printing a `Wrote <path>` line per file:
+**`npm run write-resources`** sends the definitions to Metabase, using the credentials in `.env.local`, and regenerates the app's collection folder. It deletes every card and action file of the app's collection, wherever it sits under `collections/data_apps/`, then writes what comes back, printing a `Wrote <path>` line per file:
 
 - a saved question per query, named after the export, with its `savedQuestionEntityId`, holding the query the dev preview runs
 - a copy of each action the app runs
@@ -125,7 +128,7 @@ collections/data_apps/<collection>/<name>.yaml     a saved question per query, c
 
 It needs no pull first. It refuses a definition without an entity ID, naming it, and drops a metric copy once nothing uses it. Run it after every definition change, and after a source the app uses changes in Metabase. With a non-admin key, it fails with `403`. An item that can't be built or copied (a field that doesn't exist, an action that belongs to a model, a metric or action that reads another card) fails the whole command, and nothing is written or deleted. In either case, stop and tell the user. Never write the files another way.
 
-**`npm run check-resources`** never calls Metabase. It lists every disagreement between the definitions and the collection's files: a manifest that names no collection or one without a file, a definition without its entity ID or naming one no file holds, a query that names a card that isn't a question, and a question or action no definition names. Then it validates every Metabase YAML file in the repository against the format's schema. `npm run build` runs the first check. Fix what it reports in the definitions or `data_app.yaml`, and run `write-resources` again. Never edit a generated file. The next pull validates everything again. A refusal names the file on the Data apps admin page: fix the definition or source it names, run `write-resources`, and push again.
+**`npm run check-resources`** never calls Metabase. It lists every disagreement between the definitions and the collection's files: a manifest that names no collection or one without a file, a definition without its entity ID or naming one no file holds, an invalid or duplicate entity ID, an action definition that names no `schema.actions` entry, a query that names a card that isn't a question, and a question or action no definition names. Then it validates every Metabase YAML file in the repository against the format's schema. `npm run build` runs the first check. Fix what it reports in the definitions or `data_app.yaml`, and run `write-resources` again. Never edit a generated file. The next pull validates everything again. A refused pull fails with `Invalid data app files:` and a line per file: fix the definition or source each line names, run `write-resources`, push, and pull again.
 
 The template's `package.json` wires these: `"write-resources": "embedding-sdk-react data-apps write-resources"`, `"check-resources": "embedding-sdk-react data-apps check-resources && representations validate-schema --folder ../.."` (with `@metabase/representations` as a dev dependency), and `"build": "vite build"`. Add any that an older app lacks.
 
@@ -148,7 +151,7 @@ const ordersTable = schema.tables.orders;
 const createdMonth = breakout(ordersTable.fields.createdAt, { unit: "month" });
 
 export const PaidRevenueByMonth = defineQuery({
-  savedQuestionEntityId: "<from npx representations generate-entity-id>",
+  savedQuestionEntityId: "<from npx @metabase/representations generate-entity-id>",
   source: ordersTable,
   filters: [
     ordersTable.segments.completed,
@@ -200,6 +203,8 @@ const { data } = useMetabaseQuery(RevenueQuery, {
 ```
 
 Split them this way even when nothing seems to depend on it. The first argument is always a `queries/` export, never built at render time. Picking between exports, as in `largeOnly ? LargeOrders : Orders`, is fine. Only the second argument varies with runtime state.
+
+Either part can take `enabled: false` to hold the query back, such as until the user picks a value or a route supplies an id: `useMetabaseQuery(CustomerById, { enabled: id !== null, filters: … })`. A held-back query sends nothing and returns `data: null`.
 
 The dynamic clauses run as their own stage, so they see the **result columns** of the static query, not its source table. That's why `plan` is a breakout above: a control can filter on a source column only if that column survives into the result. If it doesn't, add it as a breakout, or leave the static query unaggregated. In the same way, filter an aggregated static query on `count` or `sum`, not on the fields behind them.
 
@@ -303,7 +308,7 @@ In a query with aggregations, a `{ type: "column", name }` order-by must name on
 
 ### Metrics
 
-Pass the table as `source` and the metric in `aggregations`. Filter and break out by the metric's dimensions. Dimensions from the metric's own table work directly. Dimensions from a related table work when the generated entry has a `sourceFieldId`, and they're the only way to reach a related table's fields: a table's `fields` hold only its own columns. A table reached through several foreign keys has one dimension group per key, such as `usersViaCreatedBy` and `usersViaApprovedBy`.
+Pass the table as `source` and the metric in `aggregations`. Filter and break out by the metric's dimensions. Dimensions from the metric's own table work directly. A related table's dimensions, the groups the generated file builds with `pickFields(..., { sourceFieldId })`, work through their foreign key, and they're the only way to reach a related table's fields: a table's `fields` hold only its own columns. A table reached through several foreign keys has one dimension group per key, such as `usersViaCreatedBy` and `usersViaApprovedBy`.
 
 If the metric lacks a dimension the app needs, stop and ask the user to add it on the metric's **Dimensions** tab, under **Available dimensions**, in the group named after the foreign key column, then regenerate the schema. Never assemble a related-table field reference by hand, and never join a second query on the related table in app code instead.
 
@@ -335,7 +340,7 @@ export const CompletedRevenueByStatus = defineQuery({
 });
 ```
 
-A row list's `fields` may name dimensions without their metric.
+A query can use a metric's dimensions without the metric: a row list's `fields`, or a `count()` broken out by a related table's name.
 
 ### Filters, breakouts, and ordering
 
@@ -410,7 +415,7 @@ Pick the `card` shape:
 - `card={{ query, visualization }}` when the request or design calls for a specific chart type, such as a pie for a distribution.
 - `card={{ query, visualization, visualizationSettings }}` only when the user asks for a setting-level change, such as hiding or renaming an axis label, showing values, stacking bars, adding a goal line, ordering table columns, showing pie totals or labels, or controlling series or slice order.
 
-Type a configured card with `satisfies MetabaseCard`. The installed SDK declarations decide what's legal. Search `node_modules/@metabase/embedding-sdk-react/dist/index.d.ts` for `export declare type MetabaseCard`, the relevant `*VisualizationSettings` type, and each setting key, and read their JSDoc. For the chart types, search it for `declare const cardDisplayTypes: readonly [...]`. Never read the whole file, set settings from memory, invent prop names, cast through `any`, or call internal query-resolution helpers. If the SDK says a prop doesn't exist, believe it. `semantic-layer/references/visualization-settings.md` lists the setting families and how to look them up. Sizing a question and theming it are in `setup/setup.md`, _SDK component sizing_ and _Theme rules_.
+Type a configured card with `satisfies MetabaseCard`. The installed SDK declarations decide what's legal. Search `node_modules/@metabase/embedding-sdk-react/dist/index.d.ts` for `export declare type MetabaseCard`, the relevant `*VisualizationSettings` type, and each setting key, and read their JSDoc. For the chart types, read the `visualization` union of `MetabaseCard`. Never read the whole file, set settings from memory, invent prop names, cast through `any`, or call internal query-resolution helpers. If the SDK says a prop doesn't exist, believe it. `semantic-layer/references/visualization-settings.md` lists the setting families and how to look them up. Sizing a question and theming it are in `setup/setup.md`, _SDK component sizing_ and _Theme rules_.
 
 ```tsx
 import { StaticQuestion, type MetabaseCard } from "@metabase/embedding-sdk-react";
@@ -443,7 +448,7 @@ function TotalAmountChart() {
 
 For the chart alone, without the toolbar: `<InteractiveQuestion card={{ query }}><InteractiveQuestion.QuestionVisualization height="500px" /></InteractiveQuestion>`.
 
-- A `table` with two breakouts and one aggregation renders as a pivot. Pass `visualizationSettings: { "table.pivot": false }` for one row per group.
+- A `table` with two breakouts and one aggregation renders as a pivot when one of the breakouts has at most 16 distinct values. Pass `visualizationSettings: { "table.pivot": false }` for one row per group.
 - Set a column's header with `column_settings: { '["name","approvers"]': { column_title: "Approvers" } }`, keyed by its result column name.
 - A component that wraps `useMetabaseQueryObject` destructures and renders `error`. Reading only `{ query }` makes a failed query look like endless loading. Type its definition prop as `typeof SomeQuery`, or a union for several, never `DefinedQuery`.
 - If TypeScript reports duplicate opaque `DatasetQuery` symbols between `useMetabaseQueryObject` and `MetabaseCard`, update the SDK package. Don't cast.
@@ -509,7 +514,7 @@ const orderFilters = useMemo(
 
 - Search the touched files for `useMetabaseQuery(`, `useMetabaseQueryObject(`, and `useAction(`. The first argument must be an identifier imported from `queries/` or `actions/`, or a choice between such identifiers. A `{`, a `defineQuery(`, a `defineAction(`, or a spread there is wrong even when it compiles. The second argument of a query hook is the dynamic object, written at the call or memoized (`as const` keeps a memoized `aggregations` a non-empty tuple).
 - Confirm that every definition the app renders sits in `queries/` or `actions/` beside `package.json` and has its entity ID, and that `write-resources`, `check-resources`, and `build` ran after the last change.
-- Check that every panel has three states besides its data: a spinner or skeleton while loading, its `error`, and an empty state when a query returns no rows.
+- Check that every panel has three states besides its data: a spinner or skeleton until data arrives (for `useMetabaseQuery`, while `data` is `null` without an `error`), its `error`, and an empty state when a query returns no rows.
 - Open the preview with every panel mounted, and read the diagnostics feed: in `npm run dev`, a query error is also an `error` entry there.
 - Trace every rendered value to a returned row property, schema field, measure, or deterministic transform.
 - Search the touched files for `row[0]`, `row[1]`, `row.orderedAt`, `row.orderDate`, `as unknown as`, `DisplayRow`, `<select`, `type="date"`, `new Date(`, `margin`, `rate`, `score`, `percent`, `%`, `* 100`, and `.toFixed`. Fix positional rows, guessed result keys, entity `<select>` filters, native date inputs in date-range filters, UTC-parsed date labels, and unsupported readings of business fields. An action form's `"Date"` parameter keeps its `type="date"` input (`actions/actions.md`).

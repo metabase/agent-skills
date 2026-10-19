@@ -32,7 +32,7 @@ The guides build on these rules and don't repeat them.
 - All work happens in the connected repository: the app is `data_apps/<slug>/`, and its collection is YAML under `collections/data_apps/`. Never a standalone project, a nested `git clone`, or `git init`.
 - Every query the app runs is a `defineQuery(...)` named export in the root-level `queries/` directory, and every action a `defineAction(...)` named export in root-level `actions/`, both beside `package.json` and never under `src/`. Filter-option, KPI, and helper queries are queries too.
 - Pass the export itself to `useMetabaseQuery`, `useMetabaseQueryObject`, or `useAction`: never an inline object, a spread copy, an entity ID, a raw id, a schema entry, or a hand-built `{ source: { type: "card", id } }`. `Property 'definedWithDefineQuery' is missing` (or `'definedWithDefineAction'`) means the hook got one of those. Move it into `queries/` or `actions/` and import it. Never cast it, and never wrap it in `defineQuery(...)` at the call site: that compiles, but nothing backs it in production.
-- Every definition carries an entity ID that names its file in the app's collection: `savedQuestionEntityId` on a query, `copiedActionEntityId` on an action. Generate new ones with `npx representations generate-entity-id` (`--count <n>` for several). Keep it through renames and refactors. Never invent one, copy one to another definition, keep a source's ID on its copy, or remove one while its file exists.
+- Every definition carries an entity ID that names its file in the app's collection: `savedQuestionEntityId` on a query, `copiedActionEntityId` on an action. Generate new ones with `npx @metabase/representations generate-entity-id` (`--count <n>` for several). Use the scoped name: an unscoped `npx representations` outside the app's installed dependencies fetches an unrelated package. Keep it through renames and refactors. Never invent one, copy one to another definition, keep a source's ID on its copy, or remove one while its file exists.
 - Metabase generates these files. Never write or edit them by hand, and never copy them from another app, the repository's other YAML, git history, or your own API calls:
 
   | File | Written by |
@@ -51,14 +51,14 @@ The guides build on these rules and don't repeat them.
 
 ### The sandbox
 
-- The bundle runs inside a Near Membrane sandbox, the same in `npm run dev` as in Metabase. The sandbox blocks raw `fetch` and XHR to Metabase and to any origin not in `allowed_hosts`. It also blocks storage, `alert`/`confirm`/`prompt`, `window.open` and `history`, the clipboard, and global key and clipboard listeners. Read and write Metabase only through the data-app hooks, and use the replacements in `setup/setup.md`, _Blocked APIs_.
+- The bundle runs inside a Near Membrane sandbox, the same in `npm run dev` as in Metabase. Raw `fetch` reaches only the external origins in `allowed_hosts`, never Metabase, and XHR and `WebSocket` are always blocked. The sandbox also blocks storage, `alert`/`confirm`/`prompt`, `window.open` and `history`, the clipboard, and global key and clipboard listeners. Read and write Metabase only through the data-app hooks, and use the replacements in `setup/setup.md`, _Blocked APIs_.
 - Runtime failures, such as sandbox blocks, CSP refusals, failed queries, and uncaught errors, reach neither the terminal nor `tsc`. After any change you can't verify by reading the code, read them from the dev preview's diagnostics feed (`setup/setup.md`, _Reading the diagnostics feed_).
 
 ### What the app shows
 
 - When Metabase can display a chart or table, render it with `StaticQuestion` or `InteractiveQuestion`. Build your own only when Metabase can't display it, or when the user asks for a custom one (`semantic-layer/semantic-layer.md`, _Rendering_ under _Rules_).
 - Show only values Metabase returned, or deterministic transforms of them. No mock data, sample arrays, or invented KPIs, trends, labels, or statuses.
-- While a hook's `isLoading` is true, render a spinner or skeleton. Once it's false with no rows, render a clear empty state. Never an empty slot, a stale value, or "No data" while loading.
+- Render a spinner or skeleton until a query's data arrives, and a clear empty state only for a result with no rows. `isLoading` alone can't tell them apart (`semantic-layer/semantic-layer.md`, _Queries_ under _Rules_). Never an empty slot, a stale value, or "No data" while loading.
 - An app with tabs or another top-level screen switcher opens on its first, leftmost tab, shown as selected, never on a blank page or a "nothing selected" state. Load the app fresh to check.
 - A date-range filter uses `DateRangePopover` from `@metabase/embedding-sdk-react/data-app`, or `DateRangeCalendar` inline. No date-picker dependency, no `<input type="date">`, and no `new Date("YYYY-MM-DD")` for its label (`semantic-layer/semantic-layer.md`, _Filters_ under _Rules_).
 
