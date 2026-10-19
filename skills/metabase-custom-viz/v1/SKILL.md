@@ -3,7 +3,6 @@ name: metabase-custom-viz
 description: Build, change, debug, and package Metabase custom visualizations — React plugins made with `@metabase/custom-viz` and uploaded to Metabase as a `.tgz`. Use when the user asks to create a custom visualization or chart type for Metabase, scaffold one with `npx @metabase/custom-viz init`, change its look, settings, drills or tooltips, fix it when it renders wrong or the host console shows `blocked API call` or `blocked createElement`, connect it to a local Metabase, or package it for upload.
 metadata:
   version: v1
-  sdk: "@metabase/custom-viz ^2"
 ---
 
 # Metabase custom visualizations
