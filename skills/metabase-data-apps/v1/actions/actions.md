@@ -1,93 +1,115 @@
-# Triggering actions from a Metabase data app
+# Run Metabase actions from a data app
 
-A Metabase **action** is a saved, parameterized SQL write against the data warehouse — an `INSERT`, `UPDATE`, or `DELETE`. Actions are configured ahead of time on the Metabase instance, with their parameters and permissions already set. A data app's job is to **invoke** an action with the right parameters when the user does something — clicking a button, submitting a form, confirming a destructive prompt.
+A Metabase **action** is a saved, parameterized SQL write against the data warehouse: an `INSERT`, `UPDATE`, or `DELETE`, configured on the instance with its parameters and permissions. A data app **invokes** one with the right parameters when the user clicks a button, submits a form, or confirms a destructive prompt.
 
-## The mental model
+## What's in the schema
 
-- Every action the app can run appears in the schema as `schema.actions.<actionName>`, with `type: "query"`.
-- Each action publishes a `parameters` list. Each parameter has a `slug` (the key the Data App sends), a `jsType` (`"string"` / `"number"` / `"Date"` / `"boolean"` / `"unknown"`), and an optional `required` flag.
-- Use `action.parameters` to know which fields to render and submit. The result reports `result["rows-affected"]`; use it for lightweight confirmation, then refresh the table/question/query data the page already shows.
+The schema is the complete catalog of the actions the app can run. Each is `schema.actions.<actionName>`, with `type: "query"` and a `parameters` list. Each parameter has a `slug` (the key the app sends), a `displayName` (for labels, never a key), a `jsType` (`"string"`, `"number"`, `"Date"`, `"boolean"`, or `"unknown"`), and an optional `required` flag. Slugs are whatever the action's author named the SQL parameters, so read them from the schema.
 
-## What's in the schema (and what isn't)
+List `schema.actions` before writing any action code. An action that isn't there doesn't exist for the app. Never fake the call. When the app needs a write the schema lacks, draft a query action without a model (`mb skills get data-action`; an action created from a model in the Metabase UI belongs to that model and is never listed). Show the user its SQL and parameters, and if they say yes, run `mb data-action create`. An action runs only on a database whose **Data actions** toggle is on: Admin > Databases > <database>, or `mb db set-data-actions <db-id> true` in an `mb` whose `mb db --help` lists that command. Then regenerate the schema.
 
-Before writing any action-invoking code, enumerate what's available under `schema.actions`. The schema is your **complete** catalog of the actions the app can run. Anything not present doesn't exist as far as the Data App is concerned: when the app needs a write the schema lacks, draft a query action without a model (`mb skills get data-action`; an action created from a model in the Metabase UI belongs to that model and is never listed), show the user its SQL and parameters, and on their yes run `mb data-action create`. An action runs only on a database whose **Data actions** toggle is on (Admin → Databases → <database>, or `mb db set-data-actions <db-id> true`). Then regenerate the schema.
+## The definition and the hook
 
-## The hook
+```ts
+// actions/people.action.ts
+import { defineAction } from "@metabase/embedding-sdk-react/data-app";
+import schema from "../src/metabase.data";
+
+export const CreatePerson = defineAction({
+  copiedActionEntityId: "<from npx @metabase/representations generate-entity-id>",
+  action: schema.actions.createPerson,
+});
+```
+
+A production build runs the action's copy in the app's collection, which `npm run write-resources` writes, as in `semantic-layer/semantic-layer.md`, _Write every query and action into the app's collection_. Read that section before running it: it covers how the command fails and how to fix what `check-resources` reports.
 
 ```ts
 import { useAction } from "@metabase/embedding-sdk-react/data-app";
+import { CreatePerson } from "../../actions/people.action";
 
-const { execute, isExecuting, result, error, reset } = useAction(MyAction);
+const { execute, isExecuting, result, error, reset } = useAction(CreatePerson);
 ```
 
-- **Import it from `@metabase/embedding-sdk-react/data-app`.** That entry's `useAction` is the data-app form: it accepts a `defineAction(...)` export or `null` and nothing else. The main entry's `useAction` is the general SDK hook, which also takes plain objects and raw ids, so it cannot enforce the definition at compile time; in a data app, a raw id still fails at runtime with "was passed to `useAction` as a raw id".
-- **The argument** is the `defineAction(...)` export itself, declared in the app's root-level `actions/` directory (one `<topic>.action.ts` file per topic, beside `package.json`, never under `src/`) — pass `MyAction`, not `MyAction.copiedActionEntityId`. The hook accepts nothing else in a data app: an inline `{ action: ... }` object, the schema entry, or a spread copy of a definition fails to compile with `Property 'definedWithDefineAction' is missing`. Fix that by adding the export to `actions/`, not with a cast and not by calling `defineAction(...)` at the hook, which compiles but never gets a copy. A production build then runs the copy its `copiedActionEntityId` names in the app's own collection, under the repo's `collections/data_apps/`; the dev preview keeps running the authored action, so an app works before its resources exist. Writing those copies is covered by _Write every query and action into the app's collection_ in `semantic-layer/semantic-layer.md`. Do **not** pass `schema.actions.<action>` or its `.id`: the entry is a compile error, and a data app refuses the raw id at runtime with "was passed to `useAction` as a raw id".
-- **Don't write the generics.** The definition carries its schema entry, so the hook infers both the parameters object and the discriminated `result` from it: `parameters[]` becomes a keyed object (`required: true` entries are required keys, each value typed from its `jsType`), and `type: "query"` makes the kind `"sql"`. The raw-id form exists only on the SDK's `useAction` from the main entry, where `useAction<TParameters, TKind>(42)` needs them spelled out since an id describes nothing; a data app never names an action by id.
-- **`execute(parameters)`** — triggers the action. Parameters object is keyed by parameter `slug`; parameters declared `required: true` are required keys, everything else optional. Returns the response body on success AND throws on failure (the error is also written to `error` state for render-time consumers). Resolves to `null` (without making a request) when `actionId` is `null` or the SDK is not yet initialized — guard the call site if those cases are reachable.
-- **No `enabled` / `options` argument.** The hook only ever runs when `execute(...)` is called, so a gate option would be redundant. Skip the action by branching in the event handler:
-  ```ts
-  const onClick = async () => {
-    if (!user.canEdit) return;
-    await execute({ id: orderId, discount });
-  };
-  ```
-- **`isExecuting`** — `true` between the call and its resolution. Drive button `disabled` from this so the user can't double-click into duplicate requests.
-- **`result`** — the response body, discriminated by `TKind` (or the `AnyActionResult` union when `TKind` is omitted). `null` before the first call and after `reset()`. Use it for lightweight confirmation (`result?.["rows-affected"]`), then refresh surrounding data — see *After an action runs*.
-- **`error`** — the last thrown error, typed `ActionExecuteError | null`. Read fields directly with no cast: `error?.data?.message`, `error?.status`, `error?.isCancelled`.
-- **`reset()`** — clears `result` and `error` back to `null`. Useful after the user acknowledges success or dismisses an error.
+- **Import `useAction` from `@metabase/embedding-sdk-react/data-app`.** That entry's hook takes only a `defineAction(...)` export, or `null`. The main entry's `useAction` is the general SDK hook: it also takes plain objects and raw ids, so the definition check never runs. In a data app, a raw id still fails at runtime with "was passed to `useAction` as a raw id".
+- **Write no generics.** The definition carries its schema entry, so the hook infers `execute`'s parameters object (keyed by `slug`, with `required: true` entries as required keys, each typed from its `jsType`) and the type of `result`.
+- **`execute(parameters)`** runs the action. It resolves to the response body on success, and on failure it both throws and sets `error`. It resolves to `null`, without making a request, when the action is `null` or the SDK hasn't initialized, so guard the call site if either can happen. The hook never runs on mount and takes no `enabled` option: to skip the action, return early in the event handler.
+- **`isExecuting`** is `true` from the call until it settles. Drive the trigger's `disabled` from it, and show a spinner in the button, so a double click can't send duplicate requests.
+- **`result`** is the response body, `null` before the first call and after `reset()`. Use `result?.["rows-affected"]` for a lightweight confirmation, then refresh the data on screen.
+- **`error`** is the last failure, typed `ActionExecuteError | null`, with the shape `{ status?, data: { message?, errors? }, isCancelled }`. Read its fields directly, without a cast.
+- **`reset()`** clears `result` and `error`, such as after the user dismisses a message.
 
-**The hook does NOT auto-fire on mount.** Actions only run when the Data App calls `execute(...)` explicitly.
-
-## Canonical usage — a form that creates a row
+## A form that writes a row
 
 ```tsx
 import { useAction } from "@metabase/embedding-sdk-react/data-app";
+import { useState, type FormEvent } from "react";
 
 import { CreatePerson } from "../../actions/people.action";
 
-function AddPersonForm({ onCreated }: { onCreated: () => void }) {
-  const { useState } = React;
-  const { execute, isExecuting, error, reset } = useAction(CreatePerson);
-
+export function AddPersonForm({ onCreated }: { onCreated: () => Promise<void> }) {
+  const { execute, isExecuting, error } = useAction(CreatePerson);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [isFormValid, setIsFormValid] = useState(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     try {
-      await execute({ name, email });   // typed: keys match parameter slugs
+      await execute({ name, email }); // keys are the parameter slugs
       setName("");
       setEmail("");
-      onCreated();                      // ← let the parent refresh dependent data
+      setIsFormValid(false);
+      await onCreated(); // the parent refetches what the action changed
     } catch {
-      // error is captured into hook state for render-time display
+      // the failure is also in `error`, rendered below
     }
   }
 
   return (
-    <form onSubmit={onSubmit}>
-      <input value={name} onChange={(e) => setName(e.target.value)} />
-      <input value={email} onChange={(e) => setEmail(e.target.value)} />
-      <button type="submit" disabled={isExecuting || !name || !email}>
+    // both parameters are `required: true` in this action's schema entry
+    <form
+      onSubmit={onSubmit}
+      onChange={(event) => setIsFormValid(event.currentTarget.checkValidity())}
+    >
+      <input type="text" required value={name} onChange={(e) => setName(e.target.value)} />
+      <input type="text" required value={email} onChange={(e) => setEmail(e.target.value)} />
+      <button type="submit" disabled={isExecuting || !isFormValid}>
         {isExecuting ? "Saving…" : "Add"}
       </button>
+      {error ? (
+        <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+          {error.data.message ?? "Action failed."}
+        </pre>
+      ) : null}
     </form>
   );
 }
 ```
 
-## Showing the error message
+## Map the parameters to inputs
 
-When `execute(...)` fails, surface both error layers. The hook's `error` is typed `ActionExecuteError | null` — shape `{ status?, data: { message?, errors? }, isCancelled }`. `error.data.message` is the whole-request failure. `error.data.errors` is a per-field validation map keyed by parameter slug (`{ <slug>: <message> }`), or `{}` for whole-request failures — which is every failure of the SQL itself. Read both directly, no cast:
+Pick each input's `type` from the parameter's `jsType`, never from its slug: a slug called `phone` or `email` with `jsType: "string"` is still `type="text"`.
+
+| `jsType` | Input |
+| --- | --- |
+| `"string"` | `<input type="text">` |
+| `"number"` | `<input type="number">` |
+| `"boolean"` | `<input type="checkbox">`, or a `Switch` or `Checkbox` component |
+| `"Date"` | `<input type="date">`, or `"datetime-local"` when a time is expected |
+| `"unknown"` | `<input type="text">`, coerced at the call site |
+
+Values in `execute({ … })` match their `jsType`. A `"number"` parameter wants a `number`, but `<input>.value` is always a string, so read `.valueAsNumber` or coerce with `Number(...)`. Coerce booleans the same way.
+
+## Validate only what the schema says
+
+The schema's validation contract is `parameter.required`, plus `jsType` for coercion, which matches Metabase's own action form. Set `required={parameter.required}` on each input, and nothing more. No length, range, or format checks, and no `required` or `type="email"` because a slug is called `email`. Anything stricter comes back from the backend as an error after submit. Disable the submit button from the browser's own verdict, `form.checkValidity()`, as above, never from hand-rolled checks such as `!name || !email`.
+
+## Show the error message
+
+Render both layers of `error`. `error.data.message` is the whole-request failure, which covers every failure of the SQL itself. `error.data.errors`, when present, maps a parameter slug to its validation message. Query actions usually leave it out, so read it as `error?.data.errors ?? {}`. Render the message in a `<pre>`, or any element with `white-space: pre-wrap`: driver errors often span several lines, and a `<span>` collapses them.
 
 ```tsx
 const fieldErrors = error?.data.errors ?? {};
-
-{error ? (
-  <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
-    {error.data.message ?? "Action failed."}
-  </pre>
-) : null}
 
 {action.parameters.map((parameter) => {
   const fieldError = fieldErrors[parameter.slug];
@@ -95,6 +117,7 @@ const fieldErrors = error?.data.errors ?? {};
     <label key={parameter.slug}>
       {parameter.displayName}
       <input
+        required={parameter.required}
         aria-invalid={Boolean(fieldError)}
         style={{ borderColor: fieldError ? "#dc2626" : undefined }}
       />
@@ -104,94 +127,22 @@ const fieldErrors = error?.data.errors ?? {};
 })}
 ```
 
-Use `<pre>` (or any element with `white-space: pre-wrap`) — the messages contain newlines that matter (driver errors include the SQL on its own line). A `<span>` collapses them into one wall of text.
+A failing query action comes back with status 500, and an `error.data.message` that wraps the driver's own text: `Error executing Action: Error executing write query: <the driver's message>`. Render it as it is. Never replace it with "Failed", "Something went wrong", or `String(error)`, and never paraphrase it into something friendlier: the raw message is the only fix-it information the user has. When a field has its own message in `error.data.errors`, show it beside that field too.
 
-Example: submitting a 9-character value into a `CHARACTER(2)` column produces
+## Refresh after the action
 
-```
-Value too long for column "STATE CHARACTER(2)": "'dadasdasd' (9)";
-SQL statement:
-UPDATE "PUBLIC"."PEOPLE" SET … WHERE "PUBLIC"."PEOPLE"."ID" = 1 [22001-214]
-```
+After an action succeeds, refresh every piece of data on screen that it could have changed. Without a refresh, the list keeps the old rows and the tile the old count, with no warning. The refresh is the `refetch` that `useMetabaseQuery` returns beside `data`: `await execute(...)`, then `await Promise.all([ordersQuery.refetch(), totalsQuery.refetch()])`.
 
-That whole string is `error.data.message`. Render it as-is.
+- Run the data hooks in a component above the trigger, and pass the refresh down. A hook in the same component as the trigger, or below it, can't be wired to it.
+- Await the refresh, so the form doesn't clear and the modal doesn't close before the fresh data arrives.
+- Never prepend `result` to a local list instead of refreshing. Server-filled values, such as generated IDs, timestamps, and computed or joined columns, differ from any guess.
 
-**Don't:**
+## Debugging
 
-- Render `"Failed"` / `"Something went wrong"` / `String(error)` instead of `error.data.message` — the user loses the only fix-it info they have.
-- Render only `error.data.message` for validation failures — `error.data.errors[parameter.slug]` is often the actionable "which field and why" detail.
-- Paraphrase the message into a "friendlier" version. The raw H2/Postgres/SQL error is more actionable than any rewrite.
+When an action seems to succeed but the screen doesn't update, or a call fails:
 
-## After an action runs — keeping the UI honest
-
-When an action succeeds, the data the user sees may be stale. Without an explicit refresh, the list still shows the old rows; the stat tile still shows the old count; the row the user just edited still shows its old values. The action worked, but the UI lies — and there is no warning.
-
-The rule is simple and absolute: **after an action resolves successfully, every piece of data on the screen that the action could have changed must be refreshed.** The refresh is the `refetch` that `useMetabaseQuery` returns beside `data`, `isLoading`, and `error` (`refetch: () => Promise<void>`): `await execute(...)`, then `await Promise.all([ordersQuery.refetch(), totalsQuery.refetch()])`.
-
-## Mapping parameters
-
-Each `parameters[]` entry on a schema action exposes `slug`, `displayName`, `jsType`, and optionally `required`. The Data App's job:
-
-- **Object keys in `execute({ … })` match the parameter `slug` strings.** Use them as literal string keys — the shape the hook derives from the definition rejects typos at compile time, but only when the argument is the `defineAction(...)` export (not a bare id).
-- **Pick the right input `type` from `jsType`** so the browser provides the correct UX and built-in coercion. The agent never invents the input type from the slug name (a slug called `"phone"` is still `jsType: "string"` → `type="text"`).
-
-  | `jsType` | Input element |
-  | --- | --- |
-  | `"string"` | `<input type="text" …>` |
-  | `"number"` | `<input type="number" …>` |
-  | `"boolean"` | `<input type="checkbox" …>` (or a Mantine `Switch`/`Checkbox`) |
-  | `"Date"` | `<input type="date" …>` (or `"datetime-local"` if a time component is expected) |
-  | `"unknown"` | `<input type="text" …>` — best effort, coerce at the call site |
-
-- **Value types in `execute({ … })` match `jsType`.** A `jsType: "number"` parameter wants a `number`, not a string. With `type="number"` the input emits a number for `.valueAsNumber`, but `<input>.value` is still a string — coerce at the call site (`Number(input)`) if you're reading the latter.
-- **`required: true` parameters cannot be omitted.** Reflected in the TS type: required keys are required.
-- **`displayName`** is for labels; never use it as a key.
-
-Slugs are whatever the action's author named the SQL parameters in Metabase; the schema is the source of truth.
-
-## Form-side validation — match the main app
-
-The schema exposes `parameter.required` (and `jsType` for type coercion). That's the full validation contract today, matching Metabase's built-in action-execute form. **No length checks, no min/max, no format checks** — anything more granular comes back as a BE error after submit (see *Showing the error message*).
-
-**Schema is the ONLY source of truth.** Read `parameter.required` and wire it — nothing else. Don't add `required` because a field is named `"email"`, don't cap a "name" at 100 chars on a hunch, don't set `type="email"` from the slug. If the schema is silent, the field is unconstrained.
-
-**Disable the submit button while the form is invalid.** Drive it from the browser's native verdict so `required` is the only rule in play:
-
-```tsx
-const [isFormValid, setIsFormValid] = useState(false);
-const onFormChange = (e: React.FormEvent<HTMLFormElement>) =>
-  setIsFormValid(e.currentTarget.checkValidity());
-
-<form onSubmit={...} onChange={onFormChange}>
-  <input required={parameter.required} />
-  <button type="submit" disabled={isExecuting || !isFormValid}>Create</button>
-</form>
-```
-
-No hand-rolled `!name || !email` checks.
-
-## Debugging Checklist
-
-When an action appears to succeed but the screen doesn't update, or a call fails with a 400:
-
-1. Log `result`, `error`, and `isExecuting` after `await execute(...)` to confirm the request actually went through and succeeded.
-2. Confirm `useAction` was called with the `defineAction(...)` export imported from `actions/`. Passing the schema entry, an inline object, or a spread copy is a compile error; passing its `.id` compiles but leaves `execute` untyped and fails at runtime with "was passed to `useAction` as a raw id". Calling `defineAction(...)` inside the component compiles too, but it has no copy in the app's collection, so a deployed app throws "This action has no copy". The same error means a definition in `actions/` lacks its `copiedActionEntityId`.
-3. Log the object passed to `execute({ ... })`. Every key must match a parameter `slug` from `schema.actions.<action>.parameters`; every value must match its declared `jsType`.
-4. List every data view on the screen that reads the rows the action writes. Confirm each one's data hook is mounted ABOVE the action trigger so its refresh callback can be passed down.
-5. Confirm the refresh callback is called AFTER `await execute(...)` AND that the refresh itself is awaited. When multiple refreshes apply, confirm they're awaited together (`Promise.all`).
-6. If the schema doesn't list an action you expect, the action isn't defined on the instance or the schema file is stale. Regenerate the schema.
-
-## Common Mistakes
-
-- Importing `useAction` from `@metabase/embedding-sdk-react` instead of `@metabase/embedding-sdk-react/data-app`. The main entry's hook is the general SDK one and accepts anything, so the definition check never runs.
-- Declaring the action anywhere but root-level `actions/`: inline at the hook, wrapped in `defineAction(...)` inside a component, or under `src/actions/`. Only definitions in `actions/` are checked against the app's collection files.
-- Passing `schema.actions.<action>.id` to `useAction` instead of the `defineAction(...)` export. `execute` then accepts any `Record<string, unknown>`, typos like `{ wrongKey: 1 }` slip through, and a data app refuses the raw id at runtime with "was passed to `useAction` as a raw id".
-- Forgetting to refresh after a successful action. The UI keeps rendering stale data with no error or warning.
-- Rendering `"Failed"` / `"Something went wrong"` / `String(error)` instead of the real backend message. Always extract `error.data.message` / `error.data.errors` (the diagnostic the user needs is in there) and render it verbatim — see *Showing the error message*.
-- Calling the refresh callback without `await`ing it. The modal dismisses or the form clears before fresh data arrives, leaving the user staring at the stale view for a beat.
-- Loading data INSIDE the same component that triggers the action. The hook is below the trigger, so its refresh callback can't be wired up. Lift the data hook to a parent and hand its refresh callback down to the trigger.
-- Passing raw `<input>` strings as parameter values when the slug's `jsType` is `"number"` or `"boolean"`. Coerce at the call site.
-- Letting the trigger fire while a previous request is in flight. Drive `disabled={isExecuting}` from the hook.
-- Prepending the action's `result` directly to a local list to skip the refresh. Server-filled defaults (auto-IDs, timestamps, computed columns, derived join columns) diverge from any client-side guess.
-- Inventing an action because the user asked for behavior the instance doesn't expose. The schema is the catalog of what exists; surface the gap, don't fake the call.
-- Reaching for `fetch("/api/action/...")` directly. The sandbox blocks raw network calls to the Metabase origin (raw `fetch`/XHR work only for external `allowed_hosts` declared in `data_app.yaml`); the only path to actions is `useAction`.
+1. Log `result`, `error`, and `isExecuting` after `await execute(...)` to confirm the request went through.
+2. Confirm that `useAction` got the `defineAction(...)` export from `actions/`. Its `.id` is a type error with the `/data-app` hook. The main entry's hook accepts it untyped, and then fails at runtime with "was passed to `useAction` as a raw id". "This action has no copy" means the definition was made inside a component, or a definition in `actions/` lacks its `copiedActionEntityId`.
+3. Log the object passed to `execute`. Every key must be a parameter `slug` from `schema.actions.<action>.parameters`, and every value must match its `jsType`.
+4. List every view on screen that reads the rows the action writes. Confirm that each one's hook sits above the trigger, and that its `refetch` is awaited after `execute`, all of them together in `Promise.all`.
+5. If the schema doesn't list an action you expect, either the action isn't defined on the instance or the schema file is stale. Regenerate the schema.
