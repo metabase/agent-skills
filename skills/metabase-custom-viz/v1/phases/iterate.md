@@ -31,6 +31,8 @@ Read on demand, before the edit that needs it:
 4. Change alters the data shape, settings, opt-outs or colors → update
    `.claude/build-statement.md`.
 5. Rename request → Renaming.
+6. The user asks for a check, or `src/index.tsx` has changes you did
+   not make (`operations.md`, User edits) → return `verify`.
 
 Rules:
 
@@ -42,5 +44,5 @@ Rules:
 - Never run `npm run build`.
 
 Return: `misbehavior: <symptom>` when the user reports a bug or quotes an
-error — do not fix it here; `done` when the user signals done ("ship
+error — do not fix it here; `verify` per step 6; `done` when the user signals done ("ship
 it", "looks good").

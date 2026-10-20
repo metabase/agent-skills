@@ -59,6 +59,8 @@ Then read `references/project.md` and `references/operations.md`.
   it to read and follow that file. Never write `src/index.tsx` yourself:
   build needs a fresh context holding only the build statement and its
   references.
+- `phases/verify.md` — a subagent, spawned like build; read-only. It
+  reviews the code fresh, without this session's view of it
 - `phases/iterate.md` — you
 - `phases/debug.md` — you
 - `phases/ship.md` — you
@@ -101,12 +103,21 @@ Route:
 refine → build → iterate. Build returns open questions → ask the user,
 fold the answers into `.claude/build-statement.md`, re-run build.
 
+## Verify
+
+Run verify. `clean` → back to the caller. Findings → show them to the
+user; never fix them unasked: the code may be the user's. Ask: fix them
+(debug, one finding per symptom), keep editing (iterate), or go on as
+is.
+
 ## Ship
 
-Run Checks (`project.md`). Failures → fix them first (debug). Then run
-ship.
+Run Checks (`project.md`). Failures → fix them first (debug). Then
+**Verify**, always: the user may have edited `src/index.tsx` in their
+editor. Fixed findings → **Ship** again. Then run ship.
 
 ## Phase exits
 
-- iterate returns `misbehavior` → debug; `done` → **Ship**
+- iterate returns `misbehavior` → debug; `verify` → **Verify**, then
+  iterate; `done` → **Ship**
 - debug returns → iterate
