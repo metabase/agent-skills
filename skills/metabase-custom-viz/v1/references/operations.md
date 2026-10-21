@@ -36,12 +36,21 @@ docker run -d -p 3000:3000 \
   metabase/metabase-enterprise
 ```
 
+`<metabase>` is the instance origin, e.g. `http://localhost:3000`.
+Take it from, first match wins: a question URL the user gave; the
+`metabase` MCP server URL (`claude mcp get metabase`, drop the
+`/api/metabase-mcp` path). Known → every `<metabase>` path you give
+the user is a full clickable URL. Unknown → give the menu path instead
+(e.g. Admin → Custom visualizations → Development), never a
+`<metabase>` placeholder.
+
 Dev mode:
 
 1. Open `<metabase>/admin/settings/custom-visualizations/development`
    and set the dev server URL to `http://localhost:5174`
    (`http://host.docker.internal:5174` when Metabase runs in Docker).
-2. Open a question matching the data shape and pick the viz in the
+2. Open a question matching the data shape (the question from refine
+   known → its URL, `<metabase>/question/<id>`) and pick the viz in the
    visualization picker, under Custom visualizations.
 
 Live check, for the user once the viz shows: hover a mark, then move

@@ -19,6 +19,10 @@ catalog).
      Metabase theme colors (recommended: follow the instance palette)
      or their own. Text, background and gridlines always follow the
      theme
+   The request is a chart image → read the chart type, marks, layout
+   and colors from it; build never sees the image, so all of it goes
+   into the statement. The data shape still comes from a question or
+   the user, never from the image alone.
 2. Never ask about the `project.md` Defaults. Never ask for plan
    approval.
 3. Own colors → collect the base colors, derive hover, light and dark
