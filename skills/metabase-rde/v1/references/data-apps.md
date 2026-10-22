@@ -30,7 +30,7 @@ Follow the CLI's skills, each read when the work reaches it:
 
 | The step | Skill |
 | --- | --- |
-| Create the app, scaffold, preview, build, upload the bundle (`set-bundle`), turn it on or off | `data-app` |
+| Create the app, scaffold, preview, build, upload the bundle (`set-bundle`), turn it off | `data-app` |
 | Questions, `src/metabase.ts`, the read hooks, charts | `data-app-data` |
 | Filter controls and date ranges | `data-app-filters` |
 | A write: a form, an update, a delete | `data-app-actions` |
@@ -42,12 +42,12 @@ A data action runs only where its database's **Data actions** toggle is on (Admi
 
 STATE.md `environment` decides.
 
-- **Production**, one instance: `mb data-app set-bundle` makes the new bundle live at once. Turning the app on (`mb data-app set-enabled <slug> true`) shows it to its viewers, so ask first; until then it opens only in Data Studio → Data apps → the app → Overview, and `/apps/<slug>` says not found, admins included. Assigning groups is the user's (Data Studio → Data apps → the app → Permissions). With `remote_sync: …, read-only`, Metabase refuses to create, bundle, update or delete an app (only turning it on or off works), so the app can't be built on this instance: say so. With read-write, the app's collection and bundle reach git with the next export, a sync step like any other; commit its source after that export, as in staging.
+- **Production**, one instance: `mb data-app set-bundle` makes the new bundle live at once. A new app is on from the start, open to admins; it reaches viewers once the user assigns their groups (Data Studio → Data apps → the app → Permissions). Turning it off (`mb data-app set-enabled <slug> false`) is the user's call; an app turned off opens only in Data Studio → Data apps → the app → Overview. With `remote_sync: …, read-only`, Metabase refuses to create, bundle, update or delete an app (only turning it on or off works), so the app can't be built on this instance: say so. With read-write, the app's collection and bundle reach git with the next export, a sync step like any other; commit its source after that export, as in staging.
 - **Staging**: build and check the app on the development instance, then move it with remote sync; never rebuild it on production. Remote sync carries the app with its bundle (`data_apps/<slug>/`) and its collection with the questions and actions in it.
   - With STATE.md `remote_sync: none`, the app can't reach production. Ask whether to set remote sync up (`rde init --only git-sync`, a sync step) or leave the app on the development instance; this is the one case where rde raises remote sync unprompted, because the user asked for an app. An export needs `remote-sync-type` read-write.
   - The app and the Library content it reads go on the same job branch (`remote-sync.md`, "Staging"), so the reviewer merges them together. Production's import does not check that a question's tables are published there, so without that content the app reads around production's Library.
   - Once the app is done, commit its source on that branch, after the export: when `git status` shows `dist/index.js` modified, `git restore` it (a build recreates it); then `git fetch`, `git switch <branch>`, `git pull --ff-only`, `git add data_apps/<slug>`, commit, and push. The export never touches the source, so no stash is needed. The push moves the branch past the instance's last export, so import it next (`mb git-sync import`, a sync step, whatever a cached `has-remote-changes` says), or the next export ends in `conflict`. Never edit or commit `data_app.yaml` or `dist/index.js`, which the export writes; when a fresh `npm run build` changes `dist/index.js`, the uploaded bundle is stale: set the bundle and export again. A pull that can't fast-forward is a stop: report both histories, never merge or force.
   - Every export is a sync step, asked first (`remote-sync.md`, "Ask before every sync step"). "Not now" leaves the app on the development instance only: say so in the hand-back.
-  - After the merge, production imports the branch. The first import creates the app turned on, open to admins only until groups are assigned, which is the user's; later imports keep its on/off state.
+  - After the merge, production imports the branch. The first import creates the app on, open to admins until the user assigns groups; later imports keep its on/off state.
 
 The hand-back names the app's URL and, when something was synced, what, to which branch, and at which commit.
