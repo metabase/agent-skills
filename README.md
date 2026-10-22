@@ -44,17 +44,11 @@ Drives a Metabase instance from the terminal via the official `mb` CLI — every
 
 This skill is a thin discovery stub; the workflow content lives in [`@metabase/cli`](https://www.npmjs.com/package/@metabase/cli) and is served at runtime by `mb skills get`. Install the CLI (`npm i -g @metabase/cli`) and the skill resolves the rest. The same skill is also available as a Claude Code plugin direct from the CLI repo (`/plugin marketplace add metabase/mb-cli` + `/plugin install metabase-cli@metabase`); one install path is enough.
 
-### Data apps
-
-[metabase-data-apps](./skills/metabase-data-apps/v1/SKILL.md)
-
-Build Metabase data apps: scaffold one, add routing and actions, query tables and metrics through the semantic layer, and migrate an app to a newer contract version. It's one skill with a guide per task, and an agent reads only the guides its task needs. Each breaking change gets a new version folder (`v1`, `v2`, ...). A plain install skips it; install it with the command on the **Data apps** page of your Metabase's admin settings, which names the version your Metabase needs.
-
 ### Data engineering router
 
 [metabase-rde](./skills/metabase-rde/v1/SKILL.md)
 
-An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which finds the remote-sync repository, the Metabase URL, and the API key an rde machine already holds, then hands the build to the [`metabase-data-apps`](./skills/metabase-data-apps/v1/SKILL.md) skill. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic. `rde init` installs it with `metabase-data-apps`.
+An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which limits what the app reads to the Library and, in staging, ships it through remote sync, then hands the build to the `mb` CLI's data-app skills. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic, data apps included.
 
 ### Database metadata
 
