@@ -51,6 +51,7 @@ Metabase only imports YAML from these top-level directories; anything outside is
 - `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`, `data-actions/`, `data_apps/`.
 - `databases/` — the `segments/` and `measures/` subdirectories under each table, and each Library-published table's metadata.
 - `python_libraries/` (also accepted as `python-libraries/`).
+- `glossary/` — glossary terms (not covered by the spec).
 - `transforms/` — contains `transform_jobs/` and `transform_tags/`.
 - `actions/` — legacy location for actions, still read on import. New exports write an action in its collection's directory, beside that collection's cards, not in an `actions/` subdirectory.
 - `data_apps/<slug>/` — a data app's `data_app.yaml` and its built bundle. The app's collection, with its cards and actions, is under `collections/data_apps/`.
