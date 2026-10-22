@@ -1,6 +1,6 @@
 # metabase-rde
 
-A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`; a data app goes through `references/data-apps.md` to the `metabase-data-apps` skill.
+A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`; a data app goes through `references/data-apps.md` to the `mb` CLI's data-app skills.
 
 The skill owns judgment and method, matched to the conventions the company already has. Metabase mechanics come from the CLI's bundled skills, read one section at a time when a step names one.
 
