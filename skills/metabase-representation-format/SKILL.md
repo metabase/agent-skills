@@ -48,7 +48,7 @@ On disk, cards nested under a dashboard or document live in a subfolder next to 
 
 Metabase only imports YAML from these top-level directories; anything outside is ignored:
 
-- `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`, `data-actions/`, `data_apps/`.
+- `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`, `data_actions/`, `data_apps/`.
 - `databases/` — the `segments/` and `measures/` subdirectories under each table, and each Library-published table's metadata.
 - `python_libraries/` (also accepted as `python-libraries/`).
 - `glossary/` — glossary terms (not covered by the spec).
