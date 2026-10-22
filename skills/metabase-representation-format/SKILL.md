@@ -13,11 +13,11 @@ The format is defined by a spec bundled alongside this file as `spec.md` (upstre
 
 ## Entities
 
-The format defines 13 entity types.
+The format defines 14 entity types.
 
 | Entity | SerDes Model | Description |
 |--------|-------------|-------------|
-| **Collection** | `Collection` | Folder-like container for organizing content. Hierarchy via `parent_id`. Namespaces: `null` (main), `"snippets"`, `"transforms"`, `"data-apps"`. |
+| **Collection** | `Collection` | Folder-like container for organizing content. Hierarchy via `parent_id`. Namespaces: `null` (main), `"snippets"`, `"transforms"`, `"data-actions"`, `"data-apps"`. |
 | **Card** | `Card` | Question, model, or metric. Holds an MBQL or native `dataset_query`. Display types: table, bar, line, pie, scalar, etc. Card types: `"question"`, `"model"`, `"metric"`. |
 | **Dashboard** | `Dashboard` | Grid layout (24 columns) of cards with filter parameters and optional tabs. Contains `dashcards` array for card placement and `parameters` array for filter controls. |
 | **Document** | `Document` | Rich text page using ProseMirror AST. Can embed cards via `cardEmbed` nodes and link to entities via `smartLink` nodes. |
@@ -27,8 +27,9 @@ The format defines 13 entity types.
 | **Transform** | `Transform` | Materializes query or Python script results into a database table. Source is either MBQL/native query or Python script. |
 | **TransformTag** | `TransformTag` | Label for categorizing transforms. Built-in types: `"hourly"`, `"daily"`, `"weekly"`, `"monthly"`, or `null` for custom. |
 | **TransformJob** | `TransformJob` | Scheduled job (cron) that executes transforms matching specific tags. |
+| **TransformTest** | `TransformTest` | Runs a transform against test `inputs` and checks its output against `expectations`. Stored next to its transform: `collections/transforms/{transform_slug}/{test_slug}.yaml`. |
 | **PythonLibrary** | `PythonLibrary` | Shared Python source file available to Python-based transforms. |
-| **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL); `"implicit"` and `model_id` are deprecated. Lives in a collection via `collection_id`, like a card. Data apps run only query actions without a `model_id`. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
+| **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL); `"implicit"` and `model_id` are deprecated. Without a `model_id` it lives in the `data-actions` namespace (its root or a data actions collection) or in a data app's collection, set by `collection_id`; data apps run only those. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
 | **Data App** | `DataApp` | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (with `serdes/meta` `[{model: DataApp, id: <entity_id>, label: <slug>}]`, and `slug` equal to the directory name), its built bundle beside it, and a root Collection of the `data-apps` namespace under `collections/data_apps/` holding the Cards and Actions it runs. |
 
 ## Ownership and hierarchy
@@ -47,8 +48,8 @@ On disk, cards nested under a dashboard or document live in a subfolder next to 
 
 Metabase only imports YAML from these top-level directories; anything outside is ignored:
 
-- `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`, `data_apps/`.
-- `databases/` — **only** the `segments/` and `measures/` subdirectories under each table are imported.
+- `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`, `data-actions/`, `data_apps/`.
+- `databases/` — the `segments/` and `measures/` subdirectories under each table, and each Library-published table's metadata.
 - `python_libraries/` (also accepted as `python-libraries/`).
 - `transforms/` — contains `transform_jobs/` and `transform_tags/`.
 - `actions/` — legacy location for actions, still read on import. New exports write an action in its collection's directory, beside that collection's cards, not in an `actions/` subdirectory.
