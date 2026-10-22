@@ -6,7 +6,7 @@ Which kind of definition a number needs, the metadata chain, and how definitions
 
 | Kind | Stands for |
 | --- | --- |
-| Model | the starting object only where people start from a join; metrics only on it (`source-card`); the Library is not required for a curated table |
+| Model | the starting object only where people start from a join; metrics only on it (`source-card`), except a metric a data app reads (STATE.md `apps`), which is never on a model: widen the table with a transform instead; the Library is not required for a curated table |
 | Metric | the published number: one aggregation, its definitional filter, its time dimension |
 | Measure | the formula, once, on one table (v59+) |
 | Segment | a slicing filter, on one table |

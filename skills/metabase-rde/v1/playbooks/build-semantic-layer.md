@@ -42,7 +42,7 @@ Read STATE.md; every Models row a definition needs has `table_id` and rows; a mi
 
 ## 2. One starting object per table
 
-Per `semantic-layer-design.md`: the curated table (Library or not), no model over it; a model only where people start from a join, metrics only. `[DECIDED, reversible]`.
+Per `semantic-layer-design.md`: the curated table (Library or not), no model over it; a model only where people start from a join, metrics only, and never under a metric a data app reads. `[DECIDED, reversible]`.
 
 ## 3. Metadata chain
 

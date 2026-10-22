@@ -1,6 +1,6 @@
 ---
 name: metabase-representation-format
-description: Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms, actions, and data apps' resources). Use when the user needs to create, edit, understand, or validate Metabase representation YAML files, or when working with Metabase serialization/deserialization (serdes). Covers entity schemas, MBQL and native queries, visualization settings, parameters, and folder structure.
+description: Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms, actions, and data apps). Use when the user needs to create, edit, understand, or validate Metabase representation YAML files, or when working with Metabase serialization/deserialization (serdes). Covers entity schemas, MBQL and native queries, visualization settings, parameters, and folder structure.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -30,7 +30,7 @@ The format defines 14 entity types.
 | **TransformTest** | `TransformTest` | Runs a transform against test `inputs` and checks its output against `expectations`. Stored next to its transform: `collections/transforms/{transform_slug}/{test_slug}.yaml`. |
 | **PythonLibrary** | `PythonLibrary` | Shared Python source file available to Python-based transforms. |
 | **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL); `"implicit"` and `model_id` are deprecated. Without a `model_id` it lives in the `data-actions` namespace (its root or a data actions collection) or in a data app's collection, set by `collection_id`; data apps run only those. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
-| **Data App** | `DataApp` | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (with `serdes/meta` `[{model: DataApp, id: <entity_id>, label: <slug>}]`, and `slug` equal to the directory name), its built bundle beside it, and a root Collection of the `data-apps` namespace under `collections/data_apps/` holding the Cards and Actions it runs. |
+| **Data App** | `DataApp` | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (with `serdes/meta` `[{model: DataApp}]`, and `slug` equal to the directory name), its built bundle beside it, and a root Collection of the `data-apps` namespace under `collections/data_apps/` holding the Cards and Actions it runs. |
 
 ## Ownership and hierarchy
 
@@ -57,13 +57,11 @@ Metabase only imports YAML from these top-level directories; anything outside is
 
 ## `serdes/meta`
 
-Every entity carries a top-level `serdes/meta` array that encodes its identity path. Each entry is `{id, model, label?}` — `label` is the slugified name and is present on entities keyed by NanoID. Example:
+Every entity carries a top-level `serdes/meta` array with a single entry naming its `model`; Metabase derives the identity from the entity's own fields (`entity_id`, or `name` and `table_id` for a Field). Older exports carry the full identity path instead (`{id, model, label?}` per entry), which Metabase still imports. Example:
 
 ```yaml
 serdes/meta:
-- id: NDzkGoTCdRcaRyt7GOepg
-  label: my_entity_name
-  model: Card
+- model: Card
 ```
 
 `validate-schema` reads `serdes/meta` to determine which entity type each file represents. The full rules (including nested entities and composite identity paths) are in `spec.md`.

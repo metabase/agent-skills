@@ -2220,7 +2220,7 @@ A collection is a folder-like container for organizing cards, dashboards, and ot
 | `archived` | boolean | No | Whether archived (default: `false`) |
 | `archived_directly` | boolean | No | Archived directly vs. inherited |
 | `type` | string | No | `null`, `"instance-analytics"`, `"trash"`, `"tenant-specific-root-collection"`, or a Library type: `"library"`, `"library-data"`, `"library-metrics"`, `"library-dashboards"` |
-| `namespace` | string | No | `null`, `"transforms"`, `"snippets"`, `"data-apps"`, `"shared-tenant-collection"`, or `"tenant-specific"` |
+| `namespace` | string | No | `null`, `"transforms"`, `"snippets"`, `"data-actions"`, `"data-apps"`, `"shared-tenant-collection"`, or `"tenant-specific"` |
 | `authority_level` | string | No | `null` or `"official"` |
 | `parent_id` | string | No | Collection FK (entity_id of parent). **Must** be set for subcollections; `null`/omitted = root-level collection |
 | `personal_owner_id` | string | No | User FK (email) for personal collections |
@@ -2342,7 +2342,7 @@ serdes/meta:
 
 An action writes to a database. A **query** action runs parameterized native SQL; without a model it lives in the data actions namespace (its root, exported under `collections/data-actions/`, or a data actions collection) or in a data app's collection, set by `collection_id`, and its permissions follow that collection. An **implicit** action creates, updates, or deletes a row of a model card's table. Implicit actions, and attaching any action to a model (`model_id`), are **deprecated**: they remain only for actions made before actions had their own collection. Author query actions without a `model_id`.
 
-Actions are exported with their collection, like cards: `collections/main/{collection path}/{slug}.yaml`, or `collections/main/{slug}.yaml` in the root collection. Older exports kept them under a top-level `actions/` directory, which import still reads. Exactly one of the nested `implicit` and `query` arrays holds the action's definition, the one its `type` names; the other is empty.
+An action is exported with its collection, like a card, under that collection's namespace folder (`collections/main/…`, `collections/data-actions/…`, `collections/data_apps/…`); the data actions root is `collections/data-actions/{slug}.yaml`. Older exports kept them under a top-level `actions/` directory, which import still reads. Exactly one of the nested `implicit` and `query` arrays holds the action's definition, the one its `type` names; the other is empty.
 
 ### Schema
 
@@ -3199,7 +3199,7 @@ collections/
 | `allowed_hosts` | array | No | Origins the app may call with `fetch`: a scheme and host, with an optional `*.` subdomain wildcard and port, and no path (e.g., `https://api.example.com`, `https://*.internal.example.com`). Every other origin is blocked |
 | `serdes/meta` | array | Yes | Identity path with `model: DataApp` |
 
-### Resources
+### The app's collection
 
 The app's collection holds the questions and query actions the app runs; the app's viewers are granted access to this collection only. Each file is an ordinary [Collection](#collection), [Card](#card), or [Action](#action). Metabase enforces these rules through the API, the CLI, or a load: the collection's when an app takes it and on every later change, and those of its cards and actions on every write to a `data-apps` collection.
 

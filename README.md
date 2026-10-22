@@ -48,7 +48,7 @@ This skill is a thin discovery stub; the workflow content lives in [`@metabase/c
 
 [metabase-rde](./skills/metabase-rde/v1/SKILL.md)
 
-An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which limits what the app reads to the Library and ships it through remote sync, then hands the build to the `mb` CLI's data-app skills. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic, data apps included.
+An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which limits what the app reads to the Library and, in staging, ships it through remote sync, then hands the build to the `mb` CLI's data-app skills. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic, data apps included.
 
 ### Database metadata
 
