@@ -18,7 +18,7 @@ An app's questions read only the Library: tables published to its Data collectio
 
 ## 3. The project
 
-Put the app's project in `./apps/<slug>` under the working directory unless the user names another place, never in the working tree of the remote-sync repository: Metabase receives only the built bundle, and remote sync carries that bundle itself (section 5). The source is the user's to keep under git or not.
+Scaffold the app's project into `data_apps/<slug>/` of the remote-sync repository's working tree (`contentRepository` in `rde status --json`), the folder where an export writes the app's `data_app.yaml` and bundle. The app runs only from the bundle, but the folder keeps its source with it: an export leaves the source alone and an import ignores it. The template's `.gitignore` keeps `node_modules/`, `dist/`, and `.env.local` out of git. Without a remote-sync repository, use `./apps/<slug>` under the working directory.
 
 The dev preview needs an admin API key in the project's `.env.local`. The `data-app` skill writes one with `mb api-key create`: note its id, never print the key, and delete it at handoff with `mb api-key delete <id> --yes`. It is an admin key, so the preview sees every table: say so when the app is meant for a narrower audience.
 
@@ -42,10 +42,11 @@ A data action runs only where its database's **Data actions** toggle is on (Admi
 
 STATE.md `environment` decides.
 
-- **Production**, one instance: `mb data-app set-bundle` makes the new bundle live at once. Turning the app on (`mb data-app set-enabled <slug> true`) shows it to its viewers, so ask first. Assigning groups is the user's (Admin → Settings → Data apps → the app → Groups). When `remote_sync` is set, the app's collection and bundle reach git with the next export, a sync step like any other.
+- **Production**, one instance: `mb data-app set-bundle` makes the new bundle live at once. Turning the app on (`mb data-app set-enabled <slug> true`) shows it to its viewers, so ask first. Assigning groups is the user's (Admin → Settings → Data apps → the app → Groups). When `remote_sync` is set, the app's collection and bundle reach git with the next export, a sync step like any other; commit its source after that export, as in staging.
 - **Staging**: build and check the app on the development instance, then move it with remote sync; never rebuild it on production. Remote sync carries the app with its bundle (`data_apps/<slug>/`) and its collection with the questions and actions in it.
   - With STATE.md `remote_sync: none`, the app can't reach production. Ask whether to set remote sync up (`rde init --only git-sync`, a sync step) or leave the app on the development instance; this is the one case where rde raises remote sync unprompted, because the user asked for an app. An export needs `remote-sync-type` read-write.
   - The app and the Library content it reads go on the same job branch (`remote-sync.md`, "Staging"), so the reviewer merges them together. Production's import does not check that a question's tables are published there, so without that content the app reads around production's Library.
+  - Once the app is done, commit its source on that branch, after the export: `git pull --ff-only` (stash first when the tree is dirty), then commit only `data_apps/<slug>/` and push. Never edit or commit the files the export wrote. A pull that can't fast-forward is a stop: report both histories, never merge or force.
   - Every export is a sync step, asked first (`remote-sync.md`, "Ask before every sync step"). "Not now" leaves the app on the development instance only: say so in the hand-back.
   - After the merge, production imports the branch. Turning the app on there and assigning its groups is the user's.
 
