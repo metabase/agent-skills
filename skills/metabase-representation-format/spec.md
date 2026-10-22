@@ -162,7 +162,7 @@ export-root/
 - Collection hierarchy is reflected in directory nesting within a namespace.
 - A collection's definition file (`{slug}.yaml`) is placed **outside** its folder, as a sibling: e.g., `main/my_collection.yaml` defines the collection whose contents live in `main/my_collection/`.
 - All entity types within a collection (cards, dashboards, documents, etc.) are stored flat in the same folder — no type-specific subdirectories.
-- Collections are partitioned by namespace: `main/` for regular content, `snippets/` for SQL snippets, `transforms/` for transforms.
+- Collections are partitioned by namespace: `main/` for regular content, `snippets/` for SQL snippets, `transforms/` for transforms, `data_apps/` for data apps' collections.
 
 ### Entity Ownership and Containers
 
@@ -3085,7 +3085,7 @@ collections/
 
 `{app_slug}` — the directory's name — is the app's slug, the manifest's `slug`, used verbatim as its URL: lowercase letters and numbers separated by single dashes (`sales-dashboard`), and neither `repo-status` nor `sandbox-host`, which collide with Metabase's own routes.
 
-`{collection_slug}` is the collection's name as Metabase slugs it (`data_app__order_desk` for `Data App: Order Desk`). As everywhere under `collections/`, the layout is how Metabase exports the content; a pull finds the app's files by their content: the collection whose `entity_id` the manifest's `collection` names, and the cards and actions whose `collection_id` is it. Other YAML under `data_apps/{app_slug}/` is the app's own and is ignored, as are files that aren't YAML and dotfiles.
+`{collection_slug}` is the collection's name as Metabase slugs it (`data_app__order_desk` for `Data App: order-desk`); Metabase names the collection after the app's slug. As everywhere under `collections/`, the layout is how Metabase exports the content; a pull finds the app's files by their content: the collection whose `entity_id` the manifest's `collection` names, and the cards and actions whose `collection_id` is it. Other YAML under `data_apps/{app_slug}/` is the app's own and is ignored, as are files that aren't YAML and dotfiles.
 
 ### Manifest
 
@@ -3108,7 +3108,7 @@ collections/
 The app's collection holds the questions and query actions the app runs; the app's viewers are granted access to this collection only. Each file is an ordinary [Collection](#collection), [Card](#card), or [Action](#action). Metabase enforces these rules through the API, the CLI, or a load: the collection's when an app takes it and on every later change, and those of its cards and actions on every write to a `data-apps` collection.
 
 - **The collection** has `namespace: data-apps` and is a root collection: no `parent_id`, `type`, `authority_level`, `personal_owner_id`, or `archive_operation_id`, and not archived or a sample. It may be remote-synced. It belongs to one app only, and holds only cards and actions: no collection, dashboard, or document.
-- **Cards** in it are a `question` or `metric` with a `dataset_query` on a database, not in a dashboard or document, and not archived, public, or embedded. The query is MBQL, not native, and has no source card. Every table it reads is published to the Library: its source table, its joins, the tables it reaches through a foreign key, the tables behind its segments and measures, and the tables of its remapped columns. A load does not check the tables; the next change to the card's query or settings does. Its `metric` aggregations name metrics in the Library's Metrics collection, and its other references, such as a parameter's value source, name only cards in the app's collection.
+- **Cards** in it are a `question` or `metric` with a `dataset_query` on a database, not in a dashboard or document, and not archived, public, or embedded. The query is MBQL, not native, and has no source card. Every table it reads is published to the Library: its source table, its joins, the tables it reaches through a foreign key, the tables behind its segments and measures, and the tables of its remapped columns. A load does not check the tables; the next update that touches the card's query, settings, parameters, type, collection or sharing does. Its `metric` aggregations name metrics in the Library's Metrics collection, and its other references, such as a parameter's value source, name only cards in the app's collection.
 - **Actions** in it are `query` actions that belong to no model, are not archived or public, take no parameter values from a card, and read no card outside the app's collection.
 
 The app's collection is remote-synced content like the rest of the repository: a pull loads the files that changed, deletes a card or action whose file is gone, and puts back what was changed in Metabase; an export writes the collection and what it holds under `collections/data_apps/`, like any collection of a namespace. A file that breaks these rules fails the pull at that file; files loaded before it stay loaded. A file whose `entity_id` belongs to a card or action elsewhere moves it into the app's collection, as a pull moves any synced entity.
@@ -3136,7 +3136,7 @@ serdes/meta:
 **`collections/data_apps/data_app__order_desk.yaml`:**
 
 ```yaml
-name: "Data App: Order Desk"
+name: "Data App: order-desk"
 namespace: data-apps
 entity_id: dApPcOlLeCtIoN0ExAmP1
 serdes/meta:
