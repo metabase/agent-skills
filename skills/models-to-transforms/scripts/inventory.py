@@ -601,7 +601,7 @@ def collect_api(mbc, args, failures):
                 if len(rows) >= 1000:
                     capped.append(did)
                 model_ids += [r["id"] for r in rows]
-        if AUDIT_DB_ID in targets or not args.db_ids:  # search hides the analytics namespace
+        if AUDIT_DB_ID in dbs and (AUDIT_DB_ID in targets or not args.db_ids):  # search hides the analytics namespace; skip when the instance has no audit DB
             try:
                 rows, _ = mbc.list_all("card", "list", "--filter", "database", "--model-id", str(AUDIT_DB_ID), "--fields", "id,type,archived")
                 model_ids += [r["id"] for r in rows if r.get("type") == "model" and (args.include_archived or not r.get("archived"))]
