@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 Metabase represents user-created content as a tree of YAML files. Each file is one entity (a collection, card, dashboard, etc.). The format is **portable** across Metabase instances: numeric database IDs are replaced with human-readable names and entity IDs.
 
-The format is defined by a spec bundled alongside this file as `spec.md` (upstream source: the `@metabase/representations` npm package). The same package ships a CLI (`npx @metabase/representations validate-schema`) that validates a tree of YAML files against the format.
+The format is defined by a spec that the `@metabase/representations` npm package ships (see _Reading the spec_). The same package ships a CLI (`npx @metabase/representations validate-schema`) that validates a tree of YAML files against the format.
 
 ## Entities
 
@@ -29,7 +29,7 @@ The format defines 14 entity types.
 | **TransformJob** | `TransformJob` | Scheduled job (cron) that executes transforms matching specific tags. |
 | **TransformTest** | `TransformTest` | Runs a transform against test `inputs` and checks its output against `expectations`. Stored next to its transform: `collections/transforms/{transform_slug}/{test_slug}.yaml`. |
 | **PythonLibrary** | `PythonLibrary` | Shared Python source file available to Python-based transforms. |
-| **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL); `"implicit"` and `model_id` are deprecated. Without a `model_id` it lives in the `data-actions` namespace (its root or a data actions collection) or in a data app's collection, set by `collection_id`; data apps run only those. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
+| **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL) or `"implicit"` (one row of the table its `implicit` entry names); `model_id` is deprecated. Without a `model_id` it lives in the `data-actions` namespace (its root or a data actions collection) or in a data app's collection, set by `collection_id`; data apps run only those. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
 | **Data App** | `DataApp` | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (with `serdes/meta` `[{model: DataApp}]`, and `slug` equal to the directory name), its built bundle beside it, and a root Collection of the `data-apps` namespace under `collections/data_apps/` holding the Cards and Actions it runs. |
 
 ## Ownership and hierarchy
@@ -65,17 +65,19 @@ serdes/meta:
 - model: Card
 ```
 
-`validate-schema` reads `serdes/meta` to determine which entity type each file represents. The full rules (including nested entities and composite identity paths) are in `spec.md`.
+`validate-schema` reads `serdes/meta` to determine which entity type each file represents. The full rules (including nested entities and composite identity paths) are in the spec.
 
 ## Reading the spec
 
-This skill ships with a local snapshot of the spec as `spec.md` alongside `SKILL.md`.
+Extract the current spec from the package into a temporary file, and read it from there:
 
-Beyond the per-entity shapes summarized in this SKILL, `spec.md` also covers: MBQL query form (stages, field references, joins, expressions, aggregations, filter/expression operators, temporal bucketing, binning), native queries and template tags (`text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`), visualization settings, click behavior, dashboard/card parameters, and the data app layout (`data_apps/<slug>/data_app.yaml` and the app's collection under `collections/data_apps/`). Reach for `spec.md` whenever edits touch any of those.
+```sh
+npx @metabase/representations@latest extract-spec --file "${TMPDIR:-/tmp}/metabase-representation-spec.md"
+```
 
-**Read on demand, not eagerly.** Open `spec.md` only when you are about to read or modify content files for the entities listed above — e.g. the user asks to edit a card, add a dashcard, tweak a transform, or similar work that implies YAML edits. Do not open it at session start or for tasks unrelated to representation YAML.
+Beyond the per-entity shapes summarized in this SKILL, the spec also covers: MBQL query form (stages, field references, joins, expressions, aggregations, filter/expression operators, temporal bucketing, binning), native queries and template tags (`text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`), visualization settings, click behavior, dashboard/card parameters, and the data app layout (`data_apps/<slug>/data_app.yaml` and the app's collection under `collections/data_apps/`). Reach for it whenever edits touch any of those.
 
-If the bundled copy looks out of date with the upstream package, the skill's own `README.md` documents how to refresh it with `extract-spec`.
+**Read on demand, not eagerly.** Extract and open the spec only when you are about to read or modify content files for the entities listed above — e.g. the user asks to edit a card, add a dashcard, tweak a transform, or similar work that implies YAML edits. Do not extract it at session start or for tasks unrelated to representation YAML. Extract it once per session; it is long, so search it for the section you need rather than reading it whole.
 
 ## Validating
 
