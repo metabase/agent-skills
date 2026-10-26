@@ -26,8 +26,10 @@ input and the paths above.
    `npx @metabase/custom-viz@latest init <name>`, and work in `<name>/`.
 2. `node_modules/` missing → `npm install`.
 3. `<version>` is `version` in
-   `node_modules/@metabase/custom-viz/package.json`. Its major is not 2 →
-   tell the user this skill targets `@metabase/custom-viz` 2.x and stop.
+   `node_modules/@metabase/custom-viz/package.json`. Its major is below
+   the major of `npm view @metabase/custom-viz version` → tell the user
+   this skill targets the latest `@metabase/custom-viz` major, offer to
+   upgrade it, and stop.
 4. Metabase source: the host rules (sandbox, colors, column types) live
    in the public Metabase repo. `<ref>` is `custom-viz-v<version>`, the
    tag the installed SDK was released from. Download each file
