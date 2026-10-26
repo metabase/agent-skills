@@ -27,14 +27,10 @@ needs the dev server stopped (Ctrl+C in its terminal).
 Requirements: Metabase with a Pro or Enterprise token. Dev mode also
 needs it started with `MB_CUSTOM_VIZ_PLUGIN_DEV_MODE_ENABLED=true`,
 which only works on a Metabase the user runs themselves (Metabase Cloud
-can't load a dev server). No such instance → offer a local one:
-
-```
-docker run -d -p 3000:3000 \
-  -e MB_CUSTOM_VIZ_PLUGIN_DEV_MODE_ENABLED=true \
-  -e MB_PREMIUM_EMBEDDING_TOKEN=<token> \
-  metabase/metabase-enterprise
-```
+can't load a dev server). No such instance → tell the user to run one
+on a version within `metabase.version` in `metabase-plugin.json`, with
+`MB_CUSTOM_VIZ_PLUGIN_DEV_MODE_ENABLED=true` and
+`MB_PREMIUM_EMBEDDING_TOKEN=<token>`.
 
 `<metabase>` is the instance origin, e.g. `http://localhost:3000`.
 Take it from, first match wins: a question URL the user gave; the
@@ -48,7 +44,9 @@ Dev mode:
 
 1. Open `<metabase>/admin/settings/custom-visualizations/development`
    and set the dev server URL to `http://localhost:5174`
-   (`http://host.docker.internal:5174` when Metabase runs in Docker).
+   (`http://host.docker.internal:5174` when Metabase runs in Docker; on
+   Linux the container needs
+   `--add-host=host.docker.internal:host-gateway`).
 2. Open a question matching the data shape (the question from refine
    known → its URL, `<metabase>/question/<id>`) and pick the viz in the
    visualization picker, under Custom visualizations.
