@@ -66,7 +66,8 @@ people who explore the table, though.
 | `broken` | inactive source table, or a missing upstream card |
 | `review: an upstream card could not be read` | permissions or an API error; it is not treated as missing |
 | `archive: unused` | stale (not used in `--stale-days`, default 180; never used *and* older than that), no active dependents, and no direct use (dashcards, alerts, subscriptions, filter sources, sandboxes, actions in any state, action buttons). It is suffixed "(verify)" when some of those counts are unknown |
-| `after-upstream: re-classify in wave k` / `blocked: upstream model(s) … will not be migrated` | card-based with model upstreams. Blocked when any upstream is excluded, blocked, broken or a purge candidate |
+| `swap-to-upstream-table: the table that replaces model N` / `create-transform: reads the tables that replace models …` | card-based with model upstreams, classified through its own shape over them (`upstream_shape`: `wrapper` when it only selects, orders or limits over one upstream, else `derived`). The table is the one the plan gives the upstream |
+| `blocked: upstream model(s) … will not be migrated` | card-based, when any upstream is excluded, blocked, broken or a purge candidate |
 | `review: LIMIT wrapper` | a wrapper with `LIMIT`: a swap would return every row |
 | `swap-to-existing-table` | any wrapper with a target (table, SQL, upload-based, transform-output), and a card-based wrapper of a saved question that wraps one table (`via saved question`) |
 | `verify-source-table` | an `sql-table-wrapper` whose relation Metabase doesn't know: sync the schema, or check the SQL |
@@ -96,9 +97,11 @@ Flags worth reading:
 ## Waves
 
 `wave` is the longest chain of model→model references below the model, counting models reached through saved questions.
-Wave 0 reads tables or only saved questions. Migrate wave 0 and swap it, then **re-run the inventory** before wave 1:
-the swap rewrote the wave-1 models onto tables, so their class changes. A wrapper of a swapped wrapper becomes a
-`table-wrapper`, and a derived one becomes `derived-mbql` or `derived-sql`.
+Wave 0 reads tables or only saved questions. Every wave is planned up front: a wave-*k* model is classified through
+the tables the plan gives its upstreams (`upstream_shape`), so the plan names its target before anything runs. After
+wave *k*'s swaps, **re-run the inventory** for wave *k+1* as a check: the swaps rewrote those models onto tables, so
+the script now classifies them mechanically (a wrapper of a swapped wrapper becomes a `table-wrapper`, a derived one
+`derived-mbql` or `derived-sql`), and the result must match the plan.
 
 ## Queries for later phases (app-DB path)
 

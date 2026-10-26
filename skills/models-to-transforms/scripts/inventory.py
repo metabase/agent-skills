@@ -397,8 +397,9 @@ def classify(m, tables, resolve_native, cards_meta, dbs):
         only = next(iter(refs)) if len(refs) == 1 else None
         up = kinds.get(only) if only else None
         native_wrap = st0.get("kind") == "native" and len(norm["stages"]) == 1 and CARD_SELECT_RE.match(strip_sql(st0.get("native")))
-        if up and up.get("type") not in ("model", None) and up.get("wrapper_table") and (native_wrap or (
-                mbql_wrapper(norm) and st0.get("source_card") == only)):
+        wraps_one = bool(only) and bool(native_wrap or (mbql_wrapper(norm) and st0.get("source_card") == only))
+        m["upstream_shape"] = "wrapper" if wraps_one else "derived"  # the model's own shape over its upstream card(s)
+        if up and up.get("type") not in ("model", None) and up.get("wrapper_table") and wraps_one:
             target = up["wrapper_table"]
             notes.append(f"wraps saved question {only}, itself a wrapper of table {target}")
     elif st0.get("kind") == "native" and len(norm["stages"]) == 1:
@@ -580,8 +581,12 @@ def propose(models, stale_days, now, extras_known):
                 m["action"] = f"blocked: upstream model(s) {dead} will not be migrated"
             elif not m["db_transforms_ok"] and not all(u and str(u["action"]).startswith("swap") for u in ups):
                 m["action"] = f"blocked: {m['db_transforms_reason']}"
+            elif m.get("upstream_shape") == "wrapper" and len(m["upstream_models"]) == 1:
+                m["action"] = f"swap-to-upstream-table: the table that replaces model {m['upstream_models'][0]} (wave {m['wave']})"
             else:
-                m["action"] = f"after-upstream: re-classify in wave {m['wave']}"
+                m["action"] = f"create-transform: reads the tables that replace models {m['upstream_models']} (wave {m['wave']})"
+                if m.get("required_params_without_default"):
+                    m["flags"].add("required-parameter-without-default (make optional before materializing)")
         m["flags"] = sorted(m["flags"])
 
 
@@ -1114,7 +1119,7 @@ def collect_app_db(mbc, args, failures):
 # ----------------------------------------------------------------------------------------------- output
 CSV_COLS = ["id", "entity_id", "name", "archived", "class", "action", "wave", "target_table_id", "target_table", "target_published",
             "target_collection_id", "target_data_layer", "n_missing_on_target", "n_fk_gaps", "metadata_diffs", "database_id",
-            "db_transforms_ok", "db_transforms_reason", "query_type", "fmt", "n_stages", "ops", "card_refs", "upstream_models",
+            "db_transforms_ok", "db_transforms_reason", "query_type", "fmt", "n_stages", "ops", "card_refs", "upstream_models", "upstream_shape",
             "has_snippet", "has_params", "native_parse_confidence", "collection_id", "collection_path", "collection_type",
             "in_personal_collection", "collection_remote_synced", "card_remote_synced", "creator_email", "created_at",
             "last_used_at", "days_since_used", "view_count", "display", "verified", "persisted", "cache_ttl", "cache_strategy",
@@ -1161,14 +1166,14 @@ def write_outputs(models, dbs, caveats, failures, out):
         lines.append(f"- **{len(failures)} items could not be read** (see failures.csv): resolve them before classifying")
     lines += ["", "## By class", "", "| class | what it is | models |", "|---|---|---|"] + [f"| {k} | {CLASS_DESC.get(k, '')} | {v} |" for k, v in sorted(C(m["class"] for m in models).items())]
     lines += ["", "## By proposed action", "", "| action | models |", "|---|---|"] + [f"| {k} | {v} |" for k, v in C(head(m["action"]) for m in models).most_common()]
-    lines += ["", "## By database", "", "| db | name | transforms | models | swap | transform | after-upstream | archive | blocked |", "|---|---|---|---|---|---|---|---|---|"]
+    lines += ["", "## By database", "", "| db | name | transforms | models | swap | transform | archive | blocked |", "|---|---|---|---|---|---|---|---|"]
     per_db = collections.defaultdict(list)
     for m in models:
         per_db[m["database_id"]].append(m)
     for d, ms in sorted(per_db.items(), key=lambda kv: -len(kv[1])):
         a = C(head(m["action"]) for m in ms)
-        lines.append(f"| {d} | {(dbs.get(d) or {}).get('name')} | {ms[0]['db_transforms_reason']} | {len(ms)} | {a['swap-to-existing-table']} | "
-                     f"{a['create-transform']} | {a['after-upstream']} | {a['archive']} | {a['blocked']} |")
+        lines.append(f"| {d} | {(dbs.get(d) or {}).get('name')} | {ms[0]['db_transforms_reason']} | {len(ms)} | "
+                     f"{a['swap-to-existing-table'] + a['swap-to-upstream-table']} | {a['create-transform']} | {a['archive']} | {a['blocked']} |")
     swaps = [m for m in models if str(m["action"]).startswith("swap")]
     lines += ["", "## Swap readiness (predicted `check-replace-source` outcome)", "",
               f"- {len(swaps)} models propose a swap onto an existing table",
@@ -1177,7 +1182,7 @@ def write_outputs(models, dbs, caveats, failures, out):
               f"- {sum(1 for m in swaps if m.get('metadata_diffs'))} have column metadata that differs from the table (display names, semantic types, descriptions change for dependents): promote or accept",
               f"- {sum(1 for m in swaps if not m.get('target_published'))} target tables are not published yet",
               f"- {sum(1 for m in models if 'limit-wrapper' in (m.get('flags') or []))} wrappers have a LIMIT (a swap would return every row): review"]
-    lines += ["", "## Waves", "", "Wave 0 reads tables or saved questions only; wave k is built on wave k-1 models and is re-classified once they are swapped.", "",
+    lines += ["", "## Waves", "", "Wave 0 reads tables or saved questions only; wave k is built on wave k-1 models and is classified through the tables that replace them (`upstream_shape`), so every wave is planned up front.", "",
               " · ".join(f"wave {k}: {v} models" for k, v in sorted(C(m["wave"] for m in models).items()))]
     num = lambda m, k: int(m.get(k) or 0) > 0
     feat = [("verified", lambda m: m.get("verified")), ("persisted", lambda m: m.get("persisted")),

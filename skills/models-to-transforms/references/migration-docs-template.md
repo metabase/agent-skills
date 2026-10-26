@@ -56,6 +56,7 @@ See user-changes.md. In short: <freshness>, <bookmarks>, <links>, <action button
 - **Freshness:** <live | persisted hourly | cached N h> → <refreshed by job at …>
 - **Pull requests:** #<n> <title>, #<n> <title>
 - **Swap:** replacement run <run_id>, <status>, <n> entities rewritten (<q> questions, <d> dashboards, <m> metrics, …), <date>
+- **Dependents, before → after:** each by name, what it read and what it reads now, and whether its results are the same (the plan's `changes.csv` rows, with the outcome filled in)
 - **Fixed by hand:** <dashcards replaced on dashboards …>, <filters re-sourced …>, <links/URLs rewritten …>, <alerts recreated …>, <actions re-homed …>, <metric dimensions re-targeted …>
 - **Lost / not migratable:** <bookmarks (n holders)>, <model index>, <verification → replacement question verified?>, <upload UI → use `mb upload append <table-id>`>
 - **Metadata:** <display names/semantic types promoted to the table | table metadata kept; n columns now show different names>

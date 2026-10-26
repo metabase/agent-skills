@@ -81,8 +81,8 @@ parameters. Snapshot them first: archiving resets them, and unarchiving doesn't 
 An alert can't be moved to another card, and a re-created alert is owned by **you**. It would then run with an admin's
 permissions and email results that sandboxed or limited recipients could never see.
 
-1. Show the recipient list in the approval request. Creating the new alert emails every recipient "you were added";
-   archiving the model later emails them that the old one was deleted.
+1. List the recipients in the plan, under what people will notice. Creating the new alert emails every recipient
+   "you were added"; archiving the model later emails them that the old one was deleted.
 2. Re-create it (same condition, schedule and recipients) on a replacement question, then immediately
    `PUT /api/notification/:id {"creator_id": <original creator>}` (superuser only) so it runs as before.
 3. If the original creator is inactive or lacks view-data on T, don't re-create it. List it for its owner instead.
@@ -156,7 +156,7 @@ Record each of these in the docs and tell the people affected.
 ## Permissions
 
 Nothing about access is inherited, synced or checked by the swap. In every mode, set it on the instance, **before** the
-swap, with approval.
+swap, exactly as the plan's access section says.
 
 **What changes for people:**
 
@@ -176,7 +176,7 @@ swap, with approval.
   Otherwise keep the model, or build per-role transforms (ask).
 - Alerts and subscriptions run as their creator, so creators need view-data on T.
 
-**Recipe** (all through the helper; snapshot first, show the delta, get approval) [unverified: rehearse first]:
+**Recipe** (all through the helper; snapshot first; the delta is the one in the plan) [unverified: rehearse first]:
 
 1. Snapshot `GET /api/permissions/graph/db/<db>` and `GET /api/collection/graph`.
 2. **Ad-hoc access:** for each group that could read the model's collection, grant read on T's Library collection with

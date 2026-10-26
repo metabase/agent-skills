@@ -177,17 +177,23 @@ rehearsal instance, open it so the dimensions re-seed, re-curate, and export.
 
 After a merge, watch `mb git-sync status --profile <p> --json` (`current_task.status`, `current_task.error_message`,
 `current_task.conflicts`, `is_dirty`) and `mb git-sync has-remote-changes --json` (`local_version` vs `remote_version`).
-A `conflict` or `error` blocks **all** further imports from the branch, so resolve it before anything else.
+When the instance doesn't auto-import, run the import yourself: `mb git-sync import --profile <p>` (the tracked
+branch, no `--branch`, no `--force`), and wait for it. Never hand that command to the user. A `conflict` or `error`
+blocks **all** further imports from the branch, so resolve it before anything else; it is a stop rule.
 
 ## Pull requests (read-only sync)
 
-Per wave, batched by Library folder or transforms folder. Title each by what it carries and for which models, and name
-its branch the same way within the house style: the user must see what they are merging from the title alone.
+As few as the dependencies allow, all named in the plan with who merges each: usually three for the whole migration,
+whatever the number of waves. Split one by Library folder or transforms folder only when a house rule or the review
+load demands it. Title each by what it carries and for which models, and name its branch the same way within the
+house style: the user must see what they are merging from the title alone.
 
-1. **The transforms pull request** ("Add transforms for Charges, Scored Issues and 8 more models"): transform YAML, plus
-   new transforms folders, tags and tests. After the merge and import, run each transform once on the instance
-   (`mb transform run <id> --sync`, with approval) and verify the rows.
-2. **The publish pull request** ("Publish 10 tables in the Library and carry the models' column metadata"):
+1. **The transforms pull request** ("Add transforms for Charges, Scored Issues and 8 more models"): the transform YAML
+   of every wave, plus new transforms folders, tags and tests. A later wave's transform reads the table an earlier
+   wave's transform will create; as SQL, that reference is plain text and imports fine. After the merge and import,
+   run each transform once on the instance (`mb transform run <id> --sync`), in wave order, and verify the rows.
+2. **The publish pull request** ("Publish 17 tables in the Library and carry the models' column metadata"), opened once
+   every new table exists:
    - TableUserSettings and FieldUserSettings for the new tables, and for existing tables that are becoming published
      replacements;
    - FK and entity-key fixes;
@@ -195,8 +201,8 @@ its branch the same way within the house style: the user must see what they are 
    - synced dependents rewritten;
    - metric dimension blocks.
 
-   A wave of wrappers only needs this one.
-3. **Instance-side cut-over** (SKILL.md § "Cut over"), then the docs.
+   A migration of wrappers only needs this one.
+3. **Instance-side cut-over** (SKILL.md § "Cut over"), all waves in order, then **the docs pull request**.
 4. If models themselves are synced: leaving git means a **hard delete** on every instance that imports the branch. A
    read-only instance can't move or archive a synced card, and moving a card out of sync scope on a read-write instance
    also removes its file. So keep synced models synced and unarchived until the purge date. Then, after the full purge
@@ -248,6 +254,6 @@ Follow the repo's house style, which you can read from recent merged PRs. Includ
 - a table of *Model (id) | Replaced by | Library folder | Schedule (tag → job) | Owner*;
 - how the SQL or MBQL differs from the model (dropped `ORDER BY`, explicit columns, inlined upstream);
 - verification: row counts, checksums, metric values before and after, and what you did **not** test;
-- what merging does (on an auto-importing instance, the import is the deploy) and the post-merge steps: which
-  transforms you'll run, which jobs you'll create, how to check the import;
+- what merging does (on an auto-importing instance, the import is the deploy) and the post-merge steps, all yours:
+  which transforms you'll run, which jobs you'll create, how you'll check the import. The reader has nothing to run;
 - the attribution line the repo uses.

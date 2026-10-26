@@ -12,7 +12,8 @@ Load `mb skills get transform` for the CLI body shapes, and `mb skills get trans
 - **Writable schema.** The warehouse user, or the writable connection, needs create/drop/write on the target schema,
   and `CREATE SCHEMA` if the schema is new.
   - Prefer a schema that existing transforms already write to: look at `transform list` targets, or successful runs.
-  - A database with no transforms yet is unproven. Run a tiny test transform there first, on a rehearsal instance or with approval.
+  - A database with no transforms yet is unproven. Run a tiny test transform there first, on a rehearsal instance, or
+    on the target when the plan says so.
   - Ask before writing into a database that is itself a Metabase application DB, or into a production OLTP database.
 - **Fresh target name.** All of these must hold:
   - `mb table list --db-id <db> --term <name> --include-transform-targets` returns nothing;
@@ -26,7 +27,9 @@ Load `mb skills get transform` for the CLI body shapes, and `mb skills get trans
 
   Use snake_case, keep within the engine's identifier limit (Postgres: 63 bytes), and follow the house convention.
 - **No card references.** Rewrite the model's query to read only tables:
-  - **A card-based model that reads a model:** wait until the upstream model is swapped; its query then reads the table.
+  - **A card-based model that reads a model:** replace the reference with the table the plan gives that model, even
+    when that table doesn't exist yet (the transform runs after the upstream's). Write it as SQL: the reference is
+    text, whereas an MBQL `source-table` for a table that doesn't exist at import time is [unverified].
   - **A card-based model that reads a saved question** (not a model, so not part of the migration): inline it. Get its SQL with
     `mb card get <q> --fields dataset_query`, then `mb query --file … --compile`, and paste it as a CTE.
   - **Snippets:** inline their text, or keep the snippet if it is synced and stable.

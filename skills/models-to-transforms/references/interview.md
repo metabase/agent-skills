@@ -3,7 +3,9 @@
 Ask only what the inventory can't answer, and always propose an answer. Use AskUserQuestion for policies, at most four
 per call, with your recommendation as the first option and "(Recommended)" in its label. For anything per-model, write
 `decisions.csv` with your proposal on every row, flag the rows that need a human, and ask the user to review just those.
-Record every answer in `plan.md`, under "Decisions", each named by its subject (never `D3`).
+Record every answer in `plan.md`, under "Decisions", each named by its subject (never `D3`). Ask everything here,
+before the plan: the user's yes to the plan is the last approval until the purge, so nothing may be left for "when
+we get there".
 
 Ask in roughly this order, because later answers depend on earlier ones.
 
@@ -15,7 +17,7 @@ Ask in roughly this order, because later answers depend on earlier ones.
 | Include models in **personal collections**? | yes if they have active dependents, otherwise archive-candidate |
 | Include **archived models that still feed active content**? (run the inventory with `--include-archived`) | yes, swap them (`swap-archived-feeder`). Their dependents rely on them silently. Already-archived models with nothing depending on them are `purge-candidate`s: purge them with the rest |
 | **Archive candidates** (unused ≥ N days, no active dependents, no direct use): archive without migrating? Which N? | yes, N = 180. Show the count and the top ones by past views |
-| How coarse may **production write approvals** be: per run, per wave, per kind of change? | per wave, with the exact list of runs shown |
+| Who **merges the pull requests** (with remote sync)? | the user, from each pull request's page, when you say it's ready: on an auto-importing instance the merge is the production deploy, and the repo's reviewers see it. Or you, once the checks pass, if the user would rather not be asked again. Where there is no pull-request page (a bare remote), merging is a push, and it's yours. Either way, the user runs no command, and the plan is the only approval |
 | Which profile is the target, and is there a rehearsal (read-write) instance? Does it share the production warehouse? | from `mb auth list`. Ask: never assume |
 | Which **other instances import the same branch**, and do they share the warehouse? | ask. For each one, list the jobs on the tags you plan to use. Either disable them there, or use a new tag with a job only on the target |
 
@@ -29,7 +31,7 @@ Ask in roughly this order, because later answers depend on earlier ones.
 | **Owner** of the transforms (scheduled runs execute as the owner) | the user, if they are an admin; never an API-key user. Confirm the email exists on the instance |
 | **Schedule** per model or group | from the evidence in `transforms-and-scheduling.md`. Always show the evidence; ask when the model was live, or when the upstream load time is unknown |
 | **Incremental?** | no, unless the table is large and append-only with a clear checkpoint |
-| Databases **not to write to** (Metabase app DBs, production OLTP, test databases) | the default is still a transform (never "convert to a saved question"). For the instance's own app DB, propose a dedicated schema (e.g. `mb_transforms`) and confirm it once. For a database no transform has written to, prove a writable schema with a tiny test transform (rehearsal, or with approval) before authoring the rest. Test databases: archive their models if unused |
+| Databases **not to write to** (Metabase app DBs, production OLTP, test databases) | the default is still a transform (never "convert to a saved question"). For the instance's own app DB, propose a dedicated schema (e.g. `mb_transforms`) and confirm it once. For a database no transform has written to, prove a writable schema with a tiny test transform (on rehearsal, or on the target as a plan item) before authoring the rest. Test databases: archive their models if unused |
 | A model that **builds on another transform's output** | new transform on the same tag as the upstream (default) / extend the upstream transform (needs its owner's OK) / swap onto the upstream table if all columns exist |
 | Models on databases **without transform support** | keep as a model for now, or archive if unused. Never silently drop them |
 | **Column names**: keep the model's exact names, or clean them up? | keep exact. Cleaning means hand-rewriting every dependent's refs |

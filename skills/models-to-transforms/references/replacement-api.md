@@ -125,7 +125,7 @@ H="node <skill>/scripts/mb_rest.mjs --profile <p>"
 $H GET "/api/ee/replacement/runs?is-active=true"          # must be []
 $H POST /api/ee/replacement/check-replace-source --body-file check.json   # read-only POST, allowed without a flag
 $H POST /api/ee/replacement/replace-source --body-file swap.json \
-   --allow-write "POST /api/ee/replacement/replace-source"            # only after the user approved this run
+   --allow-write "POST /api/ee/replacement/replace-source"            # only for a run the approved plan lists
 # poll every 5–10 s until is_active is null; then read status + message
 $H GET /api/ee/replacement/runs/<run_id>
 ```
@@ -156,7 +156,7 @@ migration still works; you do the rewriting the swap would have done. Run the in
 then come from query text: `card list --filter using_model` on the API path (unarchived cards only), or a regex scan of
 `report_card.dataset_query` on the app-DB path, which includes archived cards.
 
-For each dependent card of M, in a snapshot-then-write loop with approval:
+For each dependent card of M, in a snapshot-then-write loop, as the plan lists them:
 
 1. Read it: `mb card get <id> --fields dataset_query,visualization_settings,parameters --max-bytes 0`.
 2. **MBQL:** in the stage that read M (stage 0, or a join), replace `source-card: M` with `source-table: T`. Turn that
