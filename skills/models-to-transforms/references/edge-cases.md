@@ -33,17 +33,17 @@ Four operations change what's attached to a model:
 | Upload append/replace UI | – | gone | gone | gone (model-only UI) |
 | Documents: smart links / embeds | embeds are document-owned card copies and get swapped; **smart links aren't** | archived link | broken | open as a question |
 | Explorations using M | – | – | cascade-deleted | – |
-| Remote-synced M | – | its file is removed at the next export (mode B); 400 "Used by remote synced content" if synced content still uses it | import hard-deletes cards missing from git | – |
+| Remote-synced M | – | its file is removed at the next export (read-write sync); 400 "Used by remote synced content" if synced content still uses it | import hard-deletes cards missing from git | – |
 
 There's **no automatic Trash purge**: archived models stay restorable until someone deletes them.
 
-## Fixing the leftovers (Phase 6, step 5)
+## Fixing the leftovers (cut-over, step 5)
 
 Work in this order. Each fix happens *before* the model is archived.
 
 ### 1. Dashcards that show the model, or use it as a series
 
-Create a **replacement question** on T. A T1 wrapper gets `source-table T` with the same `fields` and `order-by`; a new
+Create a **replacement question** on T. A table wrapper gets `source-table T` with the same `fields` and `order-by`; a new
 transform gets just `source-table T`. Copy the old card's display and `visualization_settings`. Column-settings keys stay
 valid when names match. Put it in the model's collection, or make it a dashboard question; ask which.
 

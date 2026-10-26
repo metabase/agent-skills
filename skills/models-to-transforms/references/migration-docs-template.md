@@ -37,30 +37,30 @@ or replaced by a transform that materializes its query.
 | Excluded (Metabase-managed) | … |
 
 ## Pull requests
-- #<n> <title>: transforms for wave 0 (<k> transforms)
-- #<n> <title>: published tables and FK metadata for wave 0
+- #<n> <its title, e.g. "Add transforms for Charges, Scored Issues and 8 more models">: wave 0, <k> transforms
+- #<n> <its title, e.g. "Publish 10 tables in the Library and carry the models' column metadata">: wave 0
 
 ## What changed for people
 See user-changes.md. In short: <freshness>, <bookmarks>, <links>, <action buttons>, <access>.
 
 ## Decisions
-<every interview answer: policy, choice, who decided, when>
+<every interview answer, named by its subject: policy, choice, who decided, when>
 ```
 
 ## Per-model record (in `waves/wave-k.md`)
 
 ```markdown
 ### <Model name> (card <id>, <entity_id>)
-- **Was:** <class> model in <collection path>, created by <creator>, <views> views, last used <date>
+- **Was:** <what it was, in words: "a 1:1 wrapper of `dbt_models.account`" | "a SQL model joining deals and accounts"> in <collection path>, created by <creator>, <views> views, last used <date>
 - **Now:** <schema.table> (table <id>), published in Library › <folder>; <existing table | transform "<name>" (id <id>), tag `<tag>` → job "<job>" (<cron>, <tz>), owner <email>>
 - **Freshness:** <live | persisted hourly | cached N h> → <refreshed by job at …>
-- **PRs:** #<n>, #<n>
+- **Pull requests:** #<n> <title>, #<n> <title>
 - **Swap:** replacement run <run_id>, <status>, <n> entities rewritten (<q> questions, <d> dashboards, <m> metrics, …), <date>
 - **Fixed by hand:** <dashcards replaced on dashboards …>, <filters re-sourced …>, <links/URLs rewritten …>, <alerts recreated …>, <actions re-homed …>, <metric dimensions re-targeted …>
 - **Lost / not migratable:** <bookmarks (n holders)>, <model index>, <verification → replacement question verified?>, <upload UI → use `mb upload append <table-id>`>
 - **Metadata:** <display names/semantic types promoted to the table | table metadata kept; n columns now show different names>
 - **Verification:** <row-count/checksum results, dependents spot-checked>
-- **Archived:** <timestamp> · **Purge after:** <date> · **Snapshot:** ./.scratch/model-migration/snapshots/<wave>/<id>/
+- **Archived:** <timestamp> · **Purge after:** <date> · **Snapshot:** ./.scratch/model-migration/snapshots/wave-<k>/<id>/
 ```
 
 ## user-changes.md (plain language)

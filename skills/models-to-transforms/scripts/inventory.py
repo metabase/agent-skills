@@ -27,6 +27,16 @@ import argparse, collections, concurrent.futures as cf, csv, datetime as dt, io,
 csv.field_size_limit(sys.maxsize)
 
 AUDIT_DB_ID = 13371337  # Metabase's built-in usage-analytics database; GET /api/database hides it
+CLASS_DESC = {  # the `class` column; describe the model in words when talking to the user
+    "table-wrapper": "MBQL on one table: only fields, order-by, limit",
+    "sql-table-wrapper": "native SELECT * or a plain column list FROM one table",
+    "upload-based": "built on an uploaded CSV table",
+    "derived-mbql": "MBQL with joins, filters, expressions, aggregations or stages",
+    "derived-sql": "any other native SQL",
+    "card-based": "reads another card (source-card, join, {{#id}})",
+    "transform-output-wrapper": "wrapper of a table that is already a transform's output",
+    "unknown": "the query could not be parsed",
+}
 WRAPPER_OPS = {"fields", "order-by", "limit"}
 IGNORED_KEYS = {"lib/type", "lib/options", "lib/stage-metadata", "source-metadata", "parameters", "lib/uuid",
                 "source-table", "source-card", "source-query", "native", "template-tags"}
@@ -373,7 +383,7 @@ def classify(m, tables, resolve_native, cards_meta, dbs):
         flags.add("card-tag-only-in-comment (drop the stale tag before materializing)")
     target = None
     if refs:
-        cls = "T6"
+        cls = "card-based"
         kinds = {r: cards_meta.get(r) for r in refs}
         if any(k is None for k in kinds.values()):
             flags.add("upstream-card-missing")
@@ -413,16 +423,16 @@ def classify(m, tables, resolve_native, cards_meta, dbs):
             if any(n.startswith("LIMIT") for n in pnotes):
                 flags.add("limit-wrapper")
             if target is None:
-                cls, conf = "T2", "unresolved"
+                cls, conf = "sql-table-wrapper", "unresolved"
                 flags.add("source-table-not-in-metabase-metadata")
             else:
                 tb = tables.get(target, {})
-                cls = "T3" if truthy(tb.get("is_upload")) else ("T7" if tb.get("transform_id") or truthy(tb.get("transform_target")) else "T2")
+                cls = "upload-based" if truthy(tb.get("is_upload")) else ("transform-output-wrapper" if tb.get("transform_id") or truthy(tb.get("transform_target")) else "sql-table-wrapper")
             m["native_parse_confidence"] = conf
         else:
-            cls = "T5"
+            cls = "derived-sql"
     elif st0.get("kind") == "native":
-        cls = "T5"   # native stage wrapped by MBQL stages: derived
+        cls = "derived-sql"   # native stage wrapped by MBQL stages: derived
     elif st0.get("kind") == "mbql":
         tid = st0.get("source_table")
         tb = tables.get(tid, {})
@@ -437,13 +447,13 @@ def classify(m, tables, resolve_native, cards_meta, dbs):
         if not wrapper and tb.get("coerced"):
             flags.add("source has coerced columns (" + ",".join(tb["coerced"][:5]) + "): cast them in the transform")
         if truthy(tb.get("is_upload")):
-            cls, target = "T3", (tid if wrapper else None)
+            cls, target = "upload-based", (tid if wrapper else None)
         elif wrapper and (tb.get("transform_id") or truthy(tb.get("transform_target"))):
-            cls, target = "T7", tid
+            cls, target = "transform-output-wrapper", tid
         elif wrapper:
-            cls, target = "T1", tid
+            cls, target = "table-wrapper", tid
         else:
-            cls = "T4"
+            cls = "derived-mbql"
     else:
         cls = "unknown"
     src = tables.get(target) if target else (tables.get(st0.get("source_table")) if st0.get("kind") == "mbql" else None)
@@ -498,7 +508,7 @@ def propose(models, stale_days, now, extras_known):
     for m in models:
         if m.get("target_table_id"):
             shared[m["target_table_id"]].append(m["id"])
-    for m in models:  # first pass: everything except T6 waiting on upstreams
+    for m in models:  # first pass: everything except card-based models waiting on upstreams
         m["flags"] = set(m["flags"])
         if any(u not in by_id for u in m.get("upstream_models") or []):
             m["flags"].add("upstream-model-outside-this-run")
@@ -536,18 +546,18 @@ def propose(models, stale_days, now, extras_known):
             m["action"] = "review: an upstream card could not be read"
         elif unused:
             m["action"] = "archive: unused" + (" (direct-use counts incomplete: verify)" if (unknown_direct or not extras_known) else "")
-        elif m["class"] == "T6" and m["wave"] > 0 and not m.get("target_table_id"):
+        elif m["class"] == "card-based" and m["wave"] > 0 and not m.get("target_table_id"):
             m["action"] = None  # decided below, once upstream actions are known
         elif m.get("target_table_id") and "limit-wrapper" in m["flags"]:
             m["action"] = "review: LIMIT wrapper (a swap returns every row of the table)"
         elif m.get("target_table_id"):
-            m["action"] = "swap-to-existing-table" + (" (via saved question)" if m["class"] == "T6" else "")
-        elif m["class"] == "T2":
+            m["action"] = "swap-to-existing-table" + (" (via saved question)" if m["class"] == "card-based" else "")
+        elif m["class"] == "sql-table-wrapper":
             m["action"] = "verify-source-table (sync it or fix the parse)"
         elif "used-as-sandbox-card (rebuild the policy before anything else)" in m["flags"]:
             m["action"] = "blocked: sandbox card (rebuild the policy first)"
         elif m["db_transforms_ok"]:
-            m["action"] = "create-transform" + (" (inline the upstream saved question)" if m["class"] == "T6" else "")
+            m["action"] = "create-transform" + (" (inline the upstream saved question)" if m["class"] == "card-based" else "")
             if m.get("required_params_without_default"):
                 m["flags"].add("required-parameter-without-default (make optional before materializing)")
         else:
@@ -562,7 +572,7 @@ def propose(models, stale_days, now, extras_known):
                     if um and um.get("archived") and str(um.get("action")).startswith("purge-candidate"):
                         um["action"] = f"wait: archived model {m['id']} built on it still serves live content"
                         changed = True
-    for m in sorted(models, key=lambda x: x["wave"]):  # second pass: T6 waiting on upstream models
+    for m in sorted(models, key=lambda x: x["wave"]):  # second pass: card-based models waiting on upstream models
         if m["action"] is None:
             ups = [by_id.get(u) for u in m["upstream_models"]]
             dead = [u for u in m["upstream_models"] if u in by_id and str(by_id[u]["action"]).startswith(("exclude", "blocked", "broken", "purge"))]
@@ -1149,7 +1159,7 @@ def write_outputs(models, dbs, caveats, failures, out):
     lines += [f"- {c}" for c in caveats]
     if failures:
         lines.append(f"- **{len(failures)} items could not be read** (see failures.csv): resolve them before classifying")
-    lines += ["", "## By class", "", "| class | models |", "|---|---|"] + [f"| {k} | {v} |" for k, v in sorted(C(m["class"] for m in models).items())]
+    lines += ["", "## By class", "", "| class | what it is | models |", "|---|---|---|"] + [f"| {k} | {CLASS_DESC.get(k, '')} | {v} |" for k, v in sorted(C(m["class"] for m in models).items())]
     lines += ["", "## By proposed action", "", "| action | models |", "|---|---|"] + [f"| {k} | {v} |" for k, v in C(head(m["action"]) for m in models).most_common()]
     lines += ["", "## By database", "", "| db | name | transforms | models | swap | transform | after-upstream | archive | blocked |", "|---|---|---|---|---|---|---|---|---|"]
     per_db = collections.defaultdict(list)
@@ -1167,7 +1177,8 @@ def write_outputs(models, dbs, caveats, failures, out):
               f"- {sum(1 for m in swaps if m.get('metadata_diffs'))} have column metadata that differs from the table (display names, semantic types, descriptions change for dependents): promote or accept",
               f"- {sum(1 for m in swaps if not m.get('target_published'))} target tables are not published yet",
               f"- {sum(1 for m in models if 'limit-wrapper' in (m.get('flags') or []))} wrappers have a LIMIT (a swap would return every row): review"]
-    lines += ["", "## Waves (model-on-model depth)", "", " · ".join(f"wave {k}: {v}" for k, v in sorted(C(m["wave"] for m in models).items()))]
+    lines += ["", "## Waves", "", "Wave 0 reads tables or saved questions only; wave k is built on wave k-1 models and is re-classified once they are swapped.", "",
+              " · ".join(f"wave {k}: {v} models" for k, v in sorted(C(m["wave"] for m in models).items()))]
     num = lambda m, k: int(m.get(k) or 0) > 0
     feat = [("verified", lambda m: m.get("verified")), ("persisted", lambda m: m.get("persisted")),
             ("cache policy on the model", lambda m: bool(m.get("cache_strategy")) or bool(m.get("cache_ttl"))),

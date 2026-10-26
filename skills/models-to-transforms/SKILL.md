@@ -29,8 +29,9 @@ instance. Anything marked **[unverified]** needs a test on a rehearsal instance 
 These exist because the operations are bulk, production-wide and mostly irreversible.
 
 - **Stay read-only until the plan is approved.** Inventory, classification and planning need no writes. Before each
-  write batch on a shared instance, show the exact command or request body and get a yes. Ask once, up front, how
-  coarse approvals may be (per model, per wave, per kind of change), and never widen that yourself.
+  write batch on a shared instance, show the exact command or request body, say in plain words what it does and what
+  the user has to do next (see "What the user reads"), and get a yes. Ask once, up front, how coarse approvals may be
+  (per model, per wave, per kind of change), and never widen that yourself.
 - **Never merge, approve or auto-merge a PR yourself.** On an instance that auto-imports from git, merging *is* the
   production deploy. The user merges. You then watch the import (`mb git-sync status`) before any instance-side step.
 - **Archive; never hard-delete before the grace period ends.** A hard delete cascades to dashcards, chart series,
@@ -57,7 +58,38 @@ These exist because the operations are bulk, production-wide and mostly irrevers
 - **Publishing is an access grant.** Every group that can read the target Library collection gets query-builder access
   to the whole table, plus any FK-remapped upstream tables the publish cascades to. Show who gains what before you publish.
 
-## Phase 0: Set up and detect the mode
+## What the user reads
+
+The user never reads this skill. They read your messages, the approval prompts, `plan.md`, `decisions.csv`, the pull
+requests, the branch and commit names, and the migration docs. All of it names things by what they are and what they
+do. The skill's shorthand (class slugs, "wave k", the section names here, any batch or decision numbering of your own)
+is for you and the CSV files; the user gets words.
+
+| Never write | Write |
+|---|---|
+| `W2`, `W0-2`, `PR 1`, `PR 2` | the pull request's title: "Add transforms for Charges, Scored Issues and 8 more models", "Publish 7 tables in the Library and carry the models' column metadata" |
+| `T5`, `derived-sql` | what the model is: "a 1:1 wrapper of `dbt_models.account`", "a SQL model that joins deals and accounts" |
+| `mode A` | what it means here: "your instance imports from git and is read-only, so transforms go in through a pull request" |
+| `Phase 5`, `step 3` | what happens: "build the tables", "re-point everything built on Contact", "archive the models" |
+| `D5`, `batch B` | the decision by its subject ("the column-metadata decision: the table wins conflicts"); the batch by its content ("the 8 models whose tables were published this morning") |
+| `w0`, `inventory_w1`, `library/w1-publish` | `wave-0`, `inventory-wave-1`, `model-migration/publish-wave-1-tables` (within the house style) |
+
+"Wave" is fine, spelled out and introduced by what it holds: "wave 0: the 39 models that read tables directly",
+"wave 1: the 11 models built on wave-0 models".
+
+Every request for a yes says, in this order:
+
+1. **What you will do**, concretely: the command or request body, and what it touches by name and count ("re-point the
+   13 questions, 2 dashboards and 2 metrics built on Contact onto `dbt_models.contact`").
+2. **What changes for people**, if anything: freshness, access, column names, links, buttons.
+3. **What the user has to do**, and when: merge a branch, confirm a date, unset a variable. "Nothing" is an answer.
+4. **What comes after** a yes, and how to undo it.
+
+Every hand-off (a branch or pull request for the user to merge) says what it contains, what to check, what merging
+does (on an instance that auto-imports, merging is the production deploy), and what you'll do once it's in. From the
+message alone, the user can answer "what am I agreeing to, and what do I have to do?".
+
+## Set up
 
 1. **Profiles and environment.**
    - Run `mb auth list --json --fields profile,url,status,user`. Ask which profile is the **target** and whether there
@@ -77,18 +109,20 @@ These exist because the operations are bulk, production-wide and mostly irrevers
 3. **Remote sync settings.** Run `node <skill>/scripts/mb_rest.mjs --profile <p> GET /api/session/properties` and read
    `remote-sync-enabled`, `remote-sync-type`, `remote-sync-branch`, `remote-sync-auto-import` and `remote-sync-transforms`.
    `mb setting get` returns null for defaults and for values set by env var, so don't rely on it. Then run
-   `mb git-sync status --json` and check whether the Library root is in `synced_collections`. That gives the **mode**:
-   - **A: read-only consumer of git.** Synced changes go in PRs. If `remote-sync-transforms` is false, transforms are
-     created on the instance (`mb transform create`) even in mode A. Never add transform YAML without an explicit decision:
-     the next import turns transform sync on for *all* transforms. If the Library isn't synced, publishing and metadata
-     happen on the instance.
-   - **B: read-write, exports to git.** Build on the instance, then `mb git-sync create-branch <b>` (or
+   `mb git-sync status --json` and check whether the Library root is in `synced_collections`. That tells you how the
+   instance relates to git, which decides where each change is made:
+   - **Read-only sync**: the instance imports from git and can't export. Synced changes go in pull requests. If
+     `remote-sync-transforms` is false, transforms are created on the instance (`mb transform create`) even here. Never
+     add transform YAML without an explicit decision: the next import turns transform sync on for *all* transforms. If
+     the Library isn't synced, publishing and metadata happen on the instance.
+   - **Read-write sync**: the instance exports to git. Build on the instance, then `mb git-sync create-branch <b>` (or
      `mb git-sync stash --new-branch <b> -m …`), `mb git-sync export-preflight`, `mb git-sync export -m "…"`, and open
-     the PR from `<b>`. Load `mb skills get git-sync`.
-   - **C: no remote sync.** Everything happens on the instance with `mb` and the helper. There is no PR; the docs are the record.
+     the pull request from `<b>`. Load `mb skills get git-sync`.
+   - **No remote sync**: everything happens on the instance with `mb` and the helper. There is no pull request; the
+     docs are the record.
 
    Ask which **other instances import the same branch**. They receive the transforms too, and the jobs on built-in tags run there.
-4. **Repo (modes A/B).** Ask for its path. `git fetch`, then branch from `origin/<remote-sync-branch>`: a stale checkout
+4. **Repo (with remote sync).** Ask for its path. `git fetch`, then branch from `origin/<remote-sync-branch>`: a stale checkout
    gives a wrong picture of what is synced. Learn the house style (branch names, PR title and body, how schedules and
    owners are described) from recent merged PRs. Stage explicit paths only.
 5. **App DB shortcut.** Some instances have their own application database connected as a data source. If so, inventory
@@ -110,7 +144,7 @@ Prefer `mb` verbs wherever one exists.
 
 ### Where each change is made
 
-| Change | Mode A (read-only) | Mode B (read-write) | Mode C (no sync) |
+| Change | Read-only sync | Read-write sync | No sync |
 |---|---|---|---|
 | Transforms, tags, tests | PR (if transform sync is on) | instance, then export | instance |
 | Transform jobs (schedules) | instance | instance | instance |
@@ -120,7 +154,7 @@ Prefer `mb` verbs wherever one exists.
 | Permissions, sandboxes, alerts, bookmarks | instance (never synced) | instance | instance |
 | Archive and purge of a synced model | PR deleting its file = hard delete; wait for the purge date | archive on instance, export at the purge date | n/a |
 
-## Phase 1: Inventory
+## Inventory
 
 Run `python3 <skill>/scripts/inventory.py --profile <p> --out ./.scratch/model-migration/inventory`.
 
@@ -136,19 +170,22 @@ Don't classify on a partial inventory. Tell the user plainly what the run couldn
 bookmarks, subscriptions and archived dependents. `references/inventory-and-classification.md` covers what each path
 sees and gives the gate SQL.
 
-## Phase 2: Classify and propose
+## Classify and propose
 
 The script assigns each model a **class** and a proposed **action**:
 
 | Class | Shape | Usual action |
 |---|---|---|
-| T1 | MBQL on one table, only `fields` / `order-by` / `limit` | swap to that table |
-| T2 | native `SELECT * / plain column list FROM one_table` | swap to that table (check the parse confidence) |
-| T3 | built on an uploaded CSV table | swap if it's a wrapper, else transform |
-| T4 | derived MBQL: joins, filters, expressions, aggregations, stages | new transform |
-| T5 | derived native SQL | new SQL transform |
-| T6 | reads another card (`source-card`, joins, `{{#id}}`) | waits for its upstream models (re-classify after their wave); with only saved-question upstreams, inline them, or swap through a wrapper question |
-| T7 | wrapper of a table that already is a transform's output | swap to that table |
+| `table-wrapper` | MBQL on one table, only `fields` / `order-by` / `limit` | swap to that table |
+| `sql-table-wrapper` | native `SELECT * / plain column list FROM one_table` | swap to that table (check the parse confidence) |
+| `upload-based` | built on an uploaded CSV table | swap if it's a wrapper, else transform |
+| `derived-mbql` | joins, filters, expressions, aggregations, stages | new transform |
+| `derived-sql` | any other native SQL | new SQL transform |
+| `card-based` | reads another card (`source-card`, joins, `{{#id}}`) | waits for its upstream models (re-classify after their wave); with only saved-question upstreams, inline them, or swap through a wrapper question |
+| `transform-output-wrapper` | wrapper of a table that already is a transform's output | swap to that table |
+
+The class is a CSV value. When you tell the user about a model, describe it instead: "a 1:1 wrapper of
+`dbt_models.account`", "a SQL model that joins deals and accounts".
 
 The action can instead be one of these:
 
@@ -175,7 +212,7 @@ audit, sample, DB routing) fall back to archiving, or to keeping the model, list
 Order the work in **waves** along the model→model DAG. Wave 0 holds models whose sources are tables or saved questions.
 Wave *k* runs after wave *k−1* is swapped.
 
-## Phase 3: Ask what the model can't tell you
+## Interview: ask what the model can't tell you
 
 Run the interview in `references/interview.md`. Propose a default for every question from the inventory, and ask only
 what is genuinely the user's call:
@@ -201,23 +238,25 @@ table is a snapshot. Derive the proposed schedule from evidence: model persisten
 model, the consumers' policies (`consumer_cache` in models.csv), the database policy, upstream transform schedules, and
 usage. State what you inferred and why (`references/transforms-and-scheduling.md`).
 
-## Phase 4: Write the plan and get it approved
+## Plan: write it and get it approved
 
 Write `./.scratch/model-migration/plan.md`. It holds:
 
-- scope and counts by class and action;
-- wave 0 in full, later waves as estimates;
-- the PRs and what each carries;
+- scope and counts: what the models are and what happens to each kind, in words;
+- wave 0 in full, later waves as estimates, each wave introduced by what it holds;
+- the pull requests, each by title and content, in the order the user will merge them;
 - the instance-side runs, with dependent counts;
+- what the user will be asked to do, step by step: what to merge, what to confirm, what to check, and what you do in
+  between;
 - what users will notice: freshness, access, bookmarks, links, action buttons, Metabot;
 - rollback;
 - open risks;
-- the decisions.
+- the decisions, each by its subject, with who decided.
 
-Every number must say what it counts: active vs. archived, direct vs. transitive. Don't start Phase 5 without an
-explicit go-ahead.
+Every number must say what it counts: active vs. archived, direct vs. transitive. Don't build anything without an
+explicit go-ahead, asked for in plain words: what you'll create, where, and what the user then has to do.
 
-## Phase 5: Make the tables exist and look right (per wave)
+## Build the tables (per wave)
 
 Before anything is re-pointed, every target table must:
 
@@ -236,46 +275,49 @@ don't gate a card→table swap, but add them for implicit joins and detail views
    approval. Never publish with a null collection. A new transform table gets database-level permissions only:
    table-level grants on the model's source table must be re-granted. The permission and sandbox recipes are in
    `references/edge-cases.md` § Permissions.
-2. **Existing tables** (T1/T2/T3/T7):
+2. **Existing tables** (every kind of wrapper: MBQL, SQL, upload-based, transform-output):
    - publish if not yet published;
    - set table metadata;
    - promote the model's column overrides where the user agreed. Edit existing metadata files in place and never
      overwrite them with minimal ones; never change `visibility_type` on a shared table;
    - add the FK semantics the model had.
-3. **New transforms** (T3-derived/T4/T5, and T6 once re-classified):
+3. **New transforms** (derived MBQL and SQL models, upload-based models with logic, and card-based models once re-classified):
    - author them from the model's own query, rewritten to read only tables;
    - give each a fresh target name, the agreed folder, a tag whose job is **active**, and an owner who can run it;
    - run it once, then compare it with the model;
    - then do the same metadata and publish steps as above. Pin it with a transform test where the engine supports one.
 
-Per mode (`references/git-sync-and-yaml.md` has YAML shapes and PR structure):
+Per sync setup (`references/git-sync-and-yaml.md` has YAML shapes and the pull requests):
 
-- **Mode A**:
-  1. PR 1 adds the transforms, tags and tests. The user merges it; you watch the import succeed.
+- **Read-only sync**:
+  1. A **transforms pull request** adds the transforms, tags and tests. Title it by what it carries ("Add transforms for
+     Charges, Scored Issues and 8 more models"). The user merges it; you watch the import succeed.
   2. Run each transform on the instance (`mb transform run <id> --sync`, with approval) and verify it.
-  3. PR 2 adds the publish metadata (TableUserSettings / FieldUserSettings YAML), FK fixes, synced dependents and metric
-     dimensions. Wrapper-only waves need only PR 2.
+  3. A **publish pull request** adds the publish metadata (TableUserSettings / FieldUserSettings YAML), FK fixes, synced
+     dependents and metric dimensions ("Publish 7 tables in the Library and carry the models' column metadata"). A wave
+     of wrappers only needs this one.
   4. Create jobs for new schedules on the instance.
-- **Mode B**: `mb transform create/run`, `table update`, `field update`, then publish into the agreed folder:
+- **Read-write sync**: `mb transform create/run`, `table update`, `field update`, then publish into the agreed folder:
   `POST /api/ee/data-studio/table/publish-tables {"table_ids":[…],"collection_id":<folder>}` through the helper. Or run
   `mb library publish` and then `mb table update <T> --body '{"collection_id":<folder>}'`; the first step briefly
-  exposes the table to everyone who can read Library > Data. Export to the feature branch and open the PR. Revert
-  serializer churn the change didn't cause.
-- **Mode C**: the same commands, with no PR.
+  exposes the table to everyone who can read Library > Data. Export to the feature branch and open the pull request.
+  Revert serializer churn the change didn't cause.
+- **No remote sync**: the same commands, with no pull request.
 
 **Watch the transform output column names.** The swap matches columns by exact, case-sensitive name. Redshift
 lower-cases, BigQuery escapes, and long aliases are truncated. After the first run, compare the output fields with the
 model's column keys. Read `references/transforms-and-scheduling.md` before authoring any transform.
 
-## Phase 6: Cut over, one model at a time, in wave order
+## Cut over, one model at a time, in wave order
 
 For each model (details in `references/replacement-api.md` and `references/edge-cases.md`):
 
 1. **Gate.** All of these must hold:
    - the target exists, is published, and has its permissions and sandboxes set;
    - no other replacement run is active;
-   - **mode A:** no remote-synced entity is in the model's closure (any `remote_sync_object` status but `removed`).
-     Synced dependents go in a PR first. **Mode B:** synced dependents may be swapped; review `mb git-sync dirty` afterwards;
+   - **read-only sync:** no remote-synced entity is in the model's closure (any `remote_sync_object` status but `removed`).
+     Synced dependents go in a pull request first. **Read-write sync:** synced dependents may be swapped; review
+     `mb git-sync dirty` afterwards;
    - the closure fits the 30-minute run limit;
    - text references with no dependency edge are listed for manual fixing;
    - the user approved this run, or its batch.
@@ -305,10 +347,11 @@ For each model (details in `references/replacement-api.md` and `references/edge-
    - Run `mb dependency broken table <T>` and compare `mb dependency breaking` with the pre-wave baseline.
    - Mark the model `swapped` in `state.json`.
 
-**Loop.** When every model in wave *k* is `swapped`, re-run the inventory (`--ids` for wave *k+1*), re-classify,
-append wave *k+1*'s transforms and PRs to `plan.md`, and get approval before starting Phase 5 for it.
+**Loop.** When every model in wave *k* is `swapped`, re-run the inventory (`--ids` for wave *k+1*, into
+`inventory-wave-<k+1>`), re-classify, append wave *k+1*'s transforms and pull requests to `plan.md`, and get approval
+before building its tables.
 
-## Phase 7: Write the migration docs
+## Write the migration docs
 
 Fill in `references/migration-docs-template.md`:
 
@@ -319,11 +362,12 @@ Fill in `references/migration-docs-template.md`:
 - rollback;
 - notification lists: bookmark holders, alert recipients, owners of affected dashboards, heavy viewers.
 
-In modes A and B, the docs go in a docs-only PR under a folder outside the serialized top-level directories (e.g.
-`docs/model-migration/`), opened after Phase 6 and updated after Phase 8 and after the purge. In mode C, put them where
-the user chose. Keep personal data such as emails out of git unless the user explicitly wants it there.
+With remote sync, the docs go in a docs-only pull request under a folder outside the serialized top-level directories
+(e.g. `docs/model-migration/`), opened after the cut-over and updated after the archive and after the purge. Without
+remote sync, put them where the user chose. Keep personal data such as emails out of git unless the user explicitly
+wants it there.
 
-## Phase 8: Remove the models
+## Archive, then purge
 
 1. **Pre-archive gate**, per model. Every item must read zero, or be explicitly accepted by the user, by name:
    - dependency edges from live entities;
@@ -338,9 +382,9 @@ the user chose. Keep personal data such as emails out of git unless the user exp
    - a public link or embedding.
 
    The SQL is in `references/inventory-and-classification.md`.
-2. **Synced models.** Archiving a synced model removes its file at the next export (mode B), and a PR that deletes the
-   file (mode A) hard-deletes it on every instance that imports the branch. There is no Trash on that path. So keep
-   synced models in place, unarchived, until the purge date, then handle them in step 5.
+2. **Synced models.** Archiving a synced model removes its file at the next export (read-write sync), and a pull
+   request that deletes the file (read-only sync) hard-deletes it on every instance that imports the branch. There is
+   no Trash on that path. So keep synced models in place, unarchived, until the purge date, then handle them in step 5.
 3. **Archive** unsynced models with `mb card archive <id>`, in batches the user approved. Archiving deletes the card's
    alerts (and emails recipients), resets filters that took values from it, hides its dashcards and bookmarks, and
    archives its actions. Their buttons keep working until the purge, which is why the gate comes first.
@@ -351,7 +395,8 @@ the user chose. Keep personal data such as emails out of git unless the user exp
      sandbox uses, or one whose actions still back buttons.
    - Right before each delete, snapshot it to `snapshots/purge/<id>/`: `mb card get --full`, actions in any state,
      dashcards including buttons and series, sandboxes, filter sources, subscriptions, bookmarks, and its sync status.
-   - Then run `DELETE /api/card/:id` through the helper (for synced models in mode A, the file-deleting PR), and record it in the docs.
+   - Then run `DELETE /api/card/:id` through the helper (for synced models on a read-only sync instance, the file-deleting
+     pull request), and record it in the docs.
 
 Already-archived models from `--include-archived`:
 
@@ -361,9 +406,10 @@ Already-archived models from `--include-archived`:
 
 ## Resuming and scale
 
-Expect hundreds of models. Batch PRs by wave and by Library or transforms folder, not one per model. Keep `state.json`
-current per model: class, action, wave, target table, PR, run ids, status, archive time and purge time. When
-re-invoked, read it first, and recompute only what may have changed: new models, new dependents, merged PRs.
+Expect hundreds of models. Batch pull requests by wave and by Library or transforms folder, not one per model, and
+title each by what it carries. Keep `state.json` current per model: class, action, wave, target table, pull request,
+run ids, status, archive time and purge time. When re-invoked, read it first, and recompute only what may have changed:
+new models, new dependents, merged pull requests.
 
 ## Don't
 

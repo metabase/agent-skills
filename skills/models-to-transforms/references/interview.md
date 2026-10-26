@@ -3,7 +3,7 @@
 Ask only what the inventory can't answer, and always propose an answer. Use AskUserQuestion for policies, at most four
 per call, with your recommendation as the first option and "(Recommended)" in its label. For anything per-model, write
 `decisions.csv` with your proposal on every row, flag the rows that need a human, and ask the user to review just those.
-Record every answer in `plan.md`, under "Decisions".
+Record every answer in `plan.md`, under "Decisions", each named by its subject (never `D3`).
 
 Ask in roughly this order, because later answers depend on earlier ones.
 
@@ -49,7 +49,7 @@ The published-tables docs list what a published table carries. Ask only for what
 | **Entity type** | let sync detect it; ask only when the model's purpose is obvious and the detected type is generic |
 | **Field metadata conflicts**: the model overrides display names, semantic types, descriptions, formatting or FK targets that differ from the table's | promote the overrides onto the table where the table's own value was never set by a person; flag conflicts, including those between several models on one table. Tell the user that table metadata is **global**, unlike model metadata |
 | **FK / entity-key semantics** the model had but the table lacks | add them: required for the swap check and for implicit joins. Point FK targets at published tables |
-| **Segments / measures** worth defining on the table (e.g. a model that was just a filter of a table) | offer it, when a T4 model is a single filter over a published table: a segment may serve better than a new transform |
+| **Segments / measures** worth defining on the table (e.g. a model that was just a filter of a table) | offer it, when a derived MBQL model is a single filter over a published table: a segment may serve better than a new transform |
 
 ## 4. Access
 
@@ -80,7 +80,7 @@ The published-tables docs list what a published table carries. Ask only for what
 
 | Question | Default |
 |---|---|
-| Where do the **migration docs** go: a folder in the PR, a separate doc, both? | modes A/B: `docs/model-migration/` (outside the serialized top-level dirs) in a docs-only PR, opened after Phase 6 and updated after Phase 8 and the purge; mode C: where the user picks. Notification lists stay outside git |
+| Where do the **migration docs** go: a folder in the PR, a separate doc, both? | with remote sync: `docs/model-migration/` (outside the serialized top-level dirs) in a docs-only pull request, opened after the cut-over and updated after the archive and the purge; without it: where the user picks. Notification lists stay outside git |
 | **Notify** users? How: list only, draft messages? | produce lists and draft messages. Sending is the user's job |
 | **Grace period** between archive and hard delete | 30 days. The user confirms the purge when it comes |
 | Keep any model on purpose (actions, indexes, blocked DBs)? | yes, list them as "kept" with the reason. "Remove all models" still means "all that can go" |
@@ -92,5 +92,5 @@ The published-tables docs list what a published table carries. Ask only for what
 - `result_metadata` overrides seed the field metadata. Diff them against the table's current field metadata and show
   only the differences.
 - A model persisted at instance cron X means its consumers already accept staleness of X.
-- A model on a table that is already a transform output (T7) inherits that transform's schedule. There's nothing to choose.
+- A model on a table that is already a transform output (a transform-output wrapper) inherits that transform's schedule. There's nothing to choose.
 - Several models over one table with no differences in metadata need one decision, not several.

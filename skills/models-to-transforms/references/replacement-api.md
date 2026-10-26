@@ -55,7 +55,7 @@ Common real-world failures, and their fixes:
 - **Transform output names differ from the model's keys.** Redshift lower-cases identifiers, BigQuery escapes non-alphanumerics,
   and aliases are truncated. See `transforms-and-scheduling.md`.
 - **Implicit-join columns** inside a "wrapper" model, such as `account__via__account_id__name`. The model is not really
-  a wrapper; classify it T4.
+  a wrapper; classify it as derived MBQL.
 
 ## What `replace-source` (card → table) rewrites
 
@@ -110,7 +110,7 @@ or a column was renamed.
 - **Remote sync.** The runner bypasses the read-only lock. Make sure the closure contains **no synced entity** before
   running it on a read-only instance: no `remote_sync_object` row with status other than `removed` (`create`, `update`
   and `delete` rows are synced content with local changes), and nothing in `synced_collections`. Synced dependents must
-  be rewritten in the PR first; once merged and imported, they no longer depend on M. On a read-write instance (mode B)
+  be rewritten in the PR first; once merged and imported, they no longer depend on M. On a read-write sync instance
   the swap may touch synced dependents. Their changes are tracked and ship with the next export; review `mb git-sync dirty`.
 - **Throughput.** About 500 transitive dependents took roughly a minute in practice. Estimate from the closure size,
   and warn about anything above a few thousand items.
@@ -170,4 +170,4 @@ For each dependent card of M, in a snapshot-then-write loop with approval:
    to T's fields. Use the read-modify-write in `edge-cases.md` § 1, which sends `tabs` too.
 6. Verify with exports (`verification-and-rollback.md`).
 
-Gates change accordingly. Phase 6 step 6 and the Phase 8 gate become: `using_model` returns 0, and the text scan returns 0.
+Gates change accordingly. The cut-over verification and the archive gate become: `using_model` returns 0, and the text scan returns 0.

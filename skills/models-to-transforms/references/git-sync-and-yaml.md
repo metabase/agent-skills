@@ -1,4 +1,4 @@
-# Remote sync, YAML shapes, and the PR
+# Remote sync, YAML shapes, and the pull requests
 
 If the `metabase-representation-format` skill is available, load it for the full serialization spec. This file covers
 only what the migration touches, and the traps.
@@ -179,13 +179,15 @@ After a merge, watch `mb git-sync status --profile <p> --json` (`current_task.st
 `current_task.conflicts`, `is_dirty`) and `mb git-sync has-remote-changes --json` (`local_version` vs `remote_version`).
 A `conflict` or `error` blocks **all** further imports from the branch, so resolve it before anything else.
 
-## PR structure (mode A)
+## Pull requests (read-only sync)
 
-Per wave, batched by Library folder or transforms folder:
+Per wave, batched by Library folder or transforms folder. Title each by what it carries and for which models, and name
+its branch the same way within the house style: the user must see what they are merging from the title alone.
 
-1. **PR "add transforms"**: transform YAML, plus new transforms folders, tags and tests. After the merge and import, run
-   each transform once on the instance (`mb transform run <id> --sync`, with approval) and verify the rows.
-2. **PR "publish"**:
+1. **The transforms pull request** ("Add transforms for Charges, Scored Issues and 8 more models"): transform YAML, plus
+   new transforms folders, tags and tests. After the merge and import, run each transform once on the instance
+   (`mb transform run <id> --sync`, with approval) and verify the rows.
+2. **The publish pull request** ("Publish 10 tables in the Library and carry the models' column metadata"):
    - TableUserSettings and FieldUserSettings for the new tables, and for existing tables that are becoming published
      replacements;
    - FK and entity-key fixes;
@@ -193,16 +195,17 @@ Per wave, batched by Library folder or transforms folder:
    - synced dependents rewritten;
    - metric dimension blocks.
 
-   Wrapper-only waves need just this PR.
-3. **Instance-side cut-over** (Phase 6), then the docs.
+   A wave of wrappers only needs this one.
+3. **Instance-side cut-over** (SKILL.md § "Cut over"), then the docs.
 4. If models themselves are synced: leaving git means a **hard delete** on every instance that imports the branch. A
    read-only instance can't move or archive a synced card, and moving a card out of sync scope on a read-write instance
    also removes its file. So keep synced models synced and unarchived until the purge date. Then, after the full purge
-   gate and pre-purge snapshot (SKILL.md Phase 8), open **PR "drop models"** to remove their files (mode A), or archive
-   and export (mode B). Setting `archived: true` in the YAML might import as "moved to Trash"; that is [unverified], so
-   test it on rehearsal before offering it.
+   gate and pre-purge snapshot (SKILL.md § "Archive, then purge"), open **a pull request that drops the models' files**
+   ("Remove 12 migrated models from git"; read-only sync), or archive and export (read-write sync). Setting
+   `archived: true` in the YAML might import as "moved to Trash"; that is [unverified], so test it on rehearsal before
+   offering it.
 
-Use a one-PR shape (transform plus publish together) only if the rehearsal instance proved that stub-table import works
+Use a one-pull-request shape (transform plus publish together) only if the rehearsal instance proved that stub-table import works
 on this version.
 
 ### Authoring routes
@@ -237,7 +240,7 @@ column aliases equal the model's keys exactly (quoted). Then hand-write the tran
   at. List the consumers' jobs on the tags you use (`mb transform-job list --full --profile <x>`). Either disable those
   jobs there, or use a new tag with a job only on the target.
 
-### PR body
+### Pull request body
 
 Follow the repo's house style, which you can read from recent merged PRs. Include:
 
@@ -245,5 +248,6 @@ Follow the repo's house style, which you can read from recent merged PRs. Includ
 - a table of *Model (id) | Replaced by | Library folder | Schedule (tag → job) | Owner*;
 - how the SQL or MBQL differs from the model (dropped `ORDER BY`, explicit columns, inlined upstream);
 - verification: row counts, checksums, metric values before and after, and what you did **not** test;
-- post-merge steps: which transforms to run, which jobs to create, how to check the import;
+- what merging does (on an auto-importing instance, the import is the deploy) and the post-merge steps: which
+  transforms you'll run, which jobs you'll create, how to check the import;
 - the attribution line the repo uses.

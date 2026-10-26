@@ -5,7 +5,7 @@ leave no revision. So the safety net is what you capture **before** each write.
 
 ## Snapshot before every write batch
 
-Write the snapshot to `./.scratch/model-migration/snapshots/<wave>/<model_id>/`:
+Write the snapshot to `./.scratch/model-migration/snapshots/wave-<k>/<model_id>/`:
 
 - **The model itself:** `mb card get <M> --full`, its actions in any state, its dashcards (with their dashboards'
   `tabs`), series, alerts, and the affected metrics' `dimensions` / `dimension_mappings`
@@ -75,7 +75,7 @@ done
 | A whole run must be undone | Restore each phase-2 entity from its revision or snapshot. Phase-1 ref normalization is functionally neutral; leave it |
 | A dashboard edit is wrong | `mb dashboard update <id>` with the snapshot's `dashcards`, `tabs` **and** `parameters`. All three are whole-array replacements |
 | An archived model is needed again | `mb card update <id> --body '{"archived":false}'`. Its bookmarks and dashcards reappear. Alerts deleted at archive time **don't come back**, and neither do filter value sources reset at archive time: restore `values_source_type` / `values_source_config` from the snapshot's dashboard and card `parameters`, and recreate the alerts (original creator, `edge-cases.md` § 4) |
-| A PR is wrong | **Before** that wave's first `replace-source` run: revert the merge commit and let the instance import it. Removing a transform's YAML deletes the transform but **not** its table. **After** cut-over, never revert a transforms or publish PR: that unpublishes tables, drops FK semantics that swapped dependents rely on, and stops refreshes of tables now in use. Fix forward with a new PR that corrects only the wrong file |
+| A pull request is wrong | **Before** that wave's first `replace-source` run: revert the merge commit and let the instance import it. Removing a transform's YAML deletes the transform but **not** its table. **After** cut-over, never revert a transforms or publish PR: that unpublishes tables, drops FK semantics that swapped dependents rely on, and stops refreshes of tables now in use. Fix forward with a new PR that corrects only the wrong file |
 | A hard-deleted model | gone, along with its revisions, verification and alerts. Only the pre-purge snapshot (`snapshots/purge/<id>/`) remains, which is why the purge waits for the grace period, re-runs the gate, and snapshots each model right before deleting it |
 
 Record every rollback in the migration docs.

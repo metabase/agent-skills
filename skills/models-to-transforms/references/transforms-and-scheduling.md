@@ -26,8 +26,8 @@ Load `mb skills get transform` for the CLI body shapes, and `mb skills get trans
 
   Use snake_case, keep within the engine's identifier limit (Postgres: 63 bytes), and follow the house convention.
 - **No card references.** Rewrite the model's query to read only tables:
-  - **T6 on a model:** wait until the upstream model is swapped; its query then reads the table.
-  - **T6 on a saved question** (not a model, so not part of the migration): inline it. Get its SQL with
+  - **A card-based model that reads a model:** wait until the upstream model is swapped; its query then reads the table.
+  - **A card-based model that reads a saved question** (not a model, so not part of the migration): inline it. Get its SQL with
     `mb card get <q> --fields dataset_query`, then `mb query --file … --compile`, and paste it as a CTE.
   - **Snippets:** inline their text, or keep the snippet if it is synced and stable.
 - **Parameters.** A native model with a required `{{variable}}` and no default can't be a transform. Make it optional

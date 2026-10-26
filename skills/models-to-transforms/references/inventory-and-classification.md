@@ -37,17 +37,18 @@ the run exits 3. Never classify on a partial inventory.
 
 ## Classes
 
-Rules are evaluated top to bottom.
+Rules are evaluated top to bottom. The `class` column holds these slugs; in anything the user reads, describe the
+model in words instead.
 
 | Class | Rule | Target table |
 |---|---|---|
-| **T6** model on card | any card reference, at any depth: `source-card`, `card__N`, `{{#N}}` outside SQL comments, `card` template tags. `upstream_models` lists the models reached directly or through saved questions | none yet. Exception: a wrapper of a saved question that itself wraps one table swaps straight to that table |
-| **T3** upload | the source table has `is_upload` | the table, if the model is a wrapper |
-| **T7** transform-output wrapper | wrapper shape, and the table has `transform_id` / `transform_target` | the table |
-| **T1** MBQL wrapper | one stage; `source-table`; other keys ⊆ {`fields`, `order-by`, `limit`}; no joins; no implicit-join (`source-field`) fields | the table |
-| **T2** native wrapper | one native stage: `SELECT * / t.* / plain column list FROM one_table`, optional `ORDER BY` / `LIMIT`. No joins, `WHERE`, `GROUP BY`, CTEs, snippets, parameters, literals, renames or ClickHouse `FINAL`. A `{{table}}` template tag also counts. The relation is resolved against active tables of the same database | the table. `native_parse_confidence` is `high` / `medium` / `low` (ambiguous name, or a schemaless match) / `unresolved` |
-| **T4** derived MBQL | any other MBQL | – |
-| **T5** derived native | any other SQL: renames, multi-stage queries over native SQL, expressions | – |
+| **card-based** | any card reference, at any depth: `source-card`, `card__N`, `{{#N}}` outside SQL comments, `card` template tags. `upstream_models` lists the models reached directly or through saved questions | none yet. Exception: a wrapper of a saved question that itself wraps one table swaps straight to that table |
+| **upload-based** | the source table has `is_upload` | the table, if the model is a wrapper |
+| **transform-output-wrapper** | wrapper shape, and the table has `transform_id` / `transform_target` | the table |
+| **table-wrapper** (MBQL) | one stage; `source-table`; other keys ⊆ {`fields`, `order-by`, `limit`}; no joins; no implicit-join (`source-field`) fields | the table |
+| **sql-table-wrapper** | one native stage: `SELECT * / t.* / plain column list FROM one_table`, optional `ORDER BY` / `LIMIT`. No joins, `WHERE`, `GROUP BY`, CTEs, snippets, parameters, literals, renames or ClickHouse `FINAL`. A `{{table}}` template tag also counts. The relation is resolved against active tables of the same database | the table. `native_parse_confidence` is `high` / `medium` / `low` (ambiguous name, or a schemaless match) / `unresolved` |
+| **derived-mbql** | any other MBQL | – |
+| **derived-sql** | any other SQL: renames, multi-stage queries over native SQL, expressions | – |
 
 A `fields` subset on a wrapper is fine for the swap, because extra table columns are allowed. They do become visible to
 people who explore the table, though.
@@ -65,12 +66,12 @@ people who explore the table, though.
 | `broken` | inactive source table, or a missing upstream card |
 | `review: an upstream card could not be read` | permissions or an API error; it is not treated as missing |
 | `archive: unused` | stale (not used in `--stale-days`, default 180; never used *and* older than that), no active dependents, and no direct use (dashcards, alerts, subscriptions, filter sources, sandboxes, actions in any state, action buttons). It is suffixed "(verify)" when some of those counts are unknown |
-| `after-upstream: re-classify in wave k` / `blocked: upstream model(s) … will not be migrated` | T6 with model upstreams. Blocked when any upstream is excluded, blocked, broken or a purge candidate |
+| `after-upstream: re-classify in wave k` / `blocked: upstream model(s) … will not be migrated` | card-based with model upstreams. Blocked when any upstream is excluded, blocked, broken or a purge candidate |
 | `review: LIMIT wrapper` | a wrapper with `LIMIT`: a swap would return every row |
-| `swap-to-existing-table` | T1/T2/T3/T7 with a target, and wrapper-of-wrapper T6 (`via saved question`) |
-| `verify-source-table` | a T2 whose relation Metabase doesn't know: sync the schema, or check the SQL |
+| `swap-to-existing-table` | any wrapper with a target (table, SQL, upload-based, transform-output), and a card-based wrapper of a saved question that wraps one table (`via saved question`) |
+| `verify-source-table` | an `sql-table-wrapper` whose relation Metabase doesn't know: sync the schema, or check the SQL |
 | `blocked: sandbox card` | the model backs a sandbox policy; rebuild the policy first |
-| `create-transform` | T3-derived/T4/T5, and T6 whose only upstreams are saved questions (inline them) |
+| `create-transform` | `derived-mbql`, `derived-sql`, upload-based models with logic, and card-based models whose only upstreams are saved questions (inline them) |
 | `blocked: <reason>` | no `transforms/table`, an audit or sample DB, or DB routing. The instance's own app DB is **not** blocked: it gets `create-transform` with a confirm-the-schema flag |
 
 Flags worth reading:
@@ -96,8 +97,8 @@ Flags worth reading:
 
 `wave` is the longest chain of model→model references below the model, counting models reached through saved questions.
 Wave 0 reads tables or only saved questions. Migrate wave 0 and swap it, then **re-run the inventory** before wave 1:
-the swap rewrote the wave-1 models onto tables, so their class changes. A wrapper of a swapped wrapper becomes T1, and a
-derived one becomes T4/T5.
+the swap rewrote the wave-1 models onto tables, so their class changes. A wrapper of a swapped wrapper becomes a
+`table-wrapper`, and a derived one becomes `derived-mbql` or `derived-sql`.
 
 ## Queries for later phases (app-DB path)
 
@@ -116,7 +117,7 @@ with recursive closure(t, id) as (
 select t, count(*) from closure group by t;
 ```
 
-**Synced entities in the closure:** for a mode-A swap this must return 0 rows.
+**Synced entities in the closure:** on a read-only sync instance, a swap needs this to return 0 rows.
 
 ```sql
 with recursive closure(t, id) as ( /* as above */ )
@@ -145,8 +146,8 @@ union all select 'dashboard', id from report_dashboard where description ~ ('/mo
 
 Also check documents (`document.document::text`) on versions that have them.
 
-**Pre-archive and purge gate** (Phase 8). Each count must be 0, or accepted by the user by name. The columns marked
-"info" don't block.
+**Pre-archive and purge gate** (SKILL.md § "Archive, then purge"). Each count must be 0, or accepted by the user by
+name. The columns marked "info" don't block.
 
 ```sql
 select
