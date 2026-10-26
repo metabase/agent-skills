@@ -493,7 +493,7 @@ def db_transform_support(db):
     return ok, "ok (by engine)" if ok else f"engine {db.get('engine')} has no query transforms"
 
 
-def propose(models, stale_days, now, extras_known):
+def propose(models, stale_days, now, extras_known, recent_days=90):
     by_id = {m["id"]: m for m in models}
 
     def depth(mid, seen=()):
@@ -588,6 +588,25 @@ def propose(models, stale_days, now, extras_known):
                 if m.get("required_params_without_default"):
                     m["flags"].add("required-parameter-without-default (make optional before materializing)")
         m["flags"] = sorted(m["flags"])
+    migrating = ("swap-to-existing-table", "swap-to-upstream-table", "create-transform", "after-upstream")
+    for m in models:  # a verified question named after the model, reading its table, for models people open directly
+        reasons = []
+        if int(m.get("n_bookmarks") or 0):
+            reasons.append(f"bookmarked by {m['n_bookmarks']}")
+        if m.get("n_recent_views") is not None:
+            if int(m["n_recent_views"]):
+                reasons.append(f"opened {m['n_recent_views']} times by {m.get('n_recent_viewers')} people in {recent_days} days")
+        elif m.get("days_since_used") is not None and m["days_since_used"] <= recent_days:
+            reasons.append(f"used in the last {recent_days} days (query runs: direct opens aren't visible on the API path)")
+        if m.get("verified"):
+            reasons.append("verified")
+        if m.get("official_collection"):
+            reasons.append("in an official collection")
+        if int(m.get("n_dashcards") or 0) or int(m.get("n_series") or 0):
+            reasons.append("shown on dashboards")
+        if int(m.get("n_filter_sources") or 0):
+            reasons.append("feeds filter values")
+        m["stand_in_question"] = "; ".join(reasons) if str(m.get("action")).startswith(migrating) and reasons else ""
 
 
 # ----------------------------------------------------------------------------------------------- API path
@@ -699,6 +718,8 @@ def collect_api(mbc, args, failures):
              "in_personal_collection": (not root) and (truthy(coll.get("is_personal")) or bool(coll.get("personal_owner_id"))
                                                        or any(a.get("personal_owner_id") for a in anc)),
              "collection_remote_synced": truthy(coll.get("is_remote_synced")), "creator_email": (c.get("creator") or {}).get("email"),
+             "official_collection": (not root) and coll.get("authority_level") == "official",
+             "n_recent_views": None, "n_recent_viewers": None,
              "last_used_at": c.get("last_used_at"), "created_at": c.get("created_at"), "view_count": c.get("view_count"),
              "display": c.get("display"), "verified": verified, "persisted": truthy(c.get("persisted")), "cache_ttl": c.get("cache_ttl"),
              "is_public": bool(c.get("public_uuid")), "embedding": truthy(c.get("enable_embedding")),
@@ -917,6 +938,7 @@ def collect_app_db(mbc, args, failures):
     q = lambda name, sql: mbc.sql(db, sql, name)
     colls = {as_int(r["id"]): r for r in q("collections", "select id, name, location, type, personal_owner_id, "
                                          + ("is_remote_synced" if "is_remote_synced" in have["collection"] else "false as is_remote_synced")
+                                         + (", authority_level" if "authority_level" in have["collection"] else ", null as authority_level")
                                          + " from collection")}
     dbs = {as_int(r["id"]): r for r in q("dbs", "select id, name, engine, is_audit, is_sample from metabase_database")}
     for r in dbs.values():
@@ -996,6 +1018,11 @@ def collect_app_db(mbc, args, failures):
             continue
         for r in q(k, sql):
             counts[as_int(r["id"])][k] = as_int(r["n"])
+    if "view_log" in have:  # people opening the model itself (not runs through its dependents)
+        for r in q("recent_views", f"""
+            select model_id id, count(*) n, count(distinct user_id) u from view_log
+            where model = 'card' and model_id in ({idlist}) and timestamp > now() - interval '{int(args.recent_days)} days' group by 1"""):
+            counts[as_int(r["id"])]["n_recent_views"], counts[as_int(r["id"])]["n_recent_viewers"] = as_int(r["n"]), as_int(r["u"])
     db_policy = {}
     if "cache_config" in have:
         for r in q("cache", f"select model_id id, strategy, config from cache_config where model = 'question' and model_id in ({idlist})"):
@@ -1077,6 +1104,9 @@ def collect_app_db(mbc, args, failures):
              "collection_type": (colls.get(cid) or {}).get("type"),
              "in_personal_collection": any((colls.get(i) or {}).get("personal_owner_id") for i in chain(cid)),
              "collection_remote_synced": truthy((colls.get(cid) or {}).get("is_remote_synced")),
+             "official_collection": (colls.get(cid) or {}).get("authority_level") == "official",
+             "n_recent_views": c.get("n_recent_views", 0 if "view_log" in have else None),
+             "n_recent_viewers": c.get("n_recent_viewers", 0 if "view_log" in have else None),
              "card_remote_synced": bool(c.get("card_remote_synced")), "creator_email": r.get("creator_email"),
              "last_used_at": r.get("last_used_at"), "created_at": r.get("created_at"), "view_count": as_int(r.get("view_count")),
              "display": r.get("display"), "verified": bool(c.get("verified")), "persisted": bool(c.get("persisted")),
@@ -1127,7 +1157,7 @@ CSV_COLS = ["id", "entity_id", "name", "archived", "class", "action", "wave", "t
             "n_dep_questions", "n_dep_models", "n_dep_metrics", "n_dep_dashboards", "n_dep_transforms", "n_dep_other",
             "n_dashcards", "n_series", "n_filter_sources", "n_alerts", "n_subscriptions", "n_bookmarks", "n_actions",
             "n_actions_any_state", "n_implicit_actions", "n_action_buttons", "n_model_index", "n_sandboxes", "n_metabot_prompts",
-            "flags", "notes"]
+            "official_collection", "n_recent_views", "n_recent_viewers", "stand_in_question", "flags", "notes"]
 
 
 def write_outputs(models, dbs, caveats, failures, out):
@@ -1182,6 +1212,10 @@ def write_outputs(models, dbs, caveats, failures, out):
               f"- {sum(1 for m in swaps if m.get('metadata_diffs'))} have column metadata that differs from the table (display names, semantic types, descriptions change for dependents): promote or accept",
               f"- {sum(1 for m in swaps if not m.get('target_published'))} target tables are not published yet",
               f"- {sum(1 for m in models if 'limit-wrapper' in (m.get('flags') or []))} wrappers have a LIMIT (a swap would return every row): review"]
+    stand = [m for m in models if m.get("stand_in_question")]
+    lines += ["", "## Stand-in questions (verified, named after the model, reading its table)", "",
+              f"- {len(stand)} migrated models are opened directly (bookmarked, opened in the last 90 days, verified, in an official collection, on dashboards or feeding filter values) and get one",
+              f"- {sum(1 for m in models if str(m.get('action')).startswith(('swap-to', 'create-transform', 'after-upstream')) and not m.get('stand_in_question'))} migrated models get none: nobody opens them directly"]
     lines += ["", "## Waves", "", "Wave 0 reads tables or saved questions only; wave k is built on wave k-1 models and is classified through the tables that replace them (`upstream_shape`), so every wave is planned up front.", "",
               " · ".join(f"wave {k}: {v} models" for k, v in sorted(C(m["wave"] for m in models).items()))]
     num = lambda m, k: int(m.get(k) or 0) > 0
@@ -1219,6 +1253,7 @@ def main():
     ap.add_argument("--max-models", type=int, default=0)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--stale-days", type=int, default=180)
+    ap.add_argument("--recent-days", type=int, default=90, help="window for 'opened recently' when deciding stand-in questions")
     ap.add_argument("--extras", action="store_true", help="API path: also fetch actions, model indexes, cache config, alerts, sandboxes")
     ap.add_argument("--no-deps", action="store_true", help="instance without the dependencies feature: count dependents from query text")
     ap.add_argument("--allow-partial", action="store_true", help="exit 0 even when some models could not be read")
@@ -1240,7 +1275,7 @@ def main():
     mbc = Mb(args.profile, args.mb, os.path.join(args.out, "tmp"))
     failures = []
     models, dbs, caveats, complete = (collect_app_db if args.app_db else collect_api)(mbc, args, failures)
-    propose(models, args.stale_days, dt.datetime.now(dt.timezone.utc), complete)
+    propose(models, args.stale_days, dt.datetime.now(dt.timezone.utc), complete, args.recent_days)
     write_outputs(models, dbs, caveats, failures, args.out)
     print(json.dumps({"models": len(models), "unreadable": len(failures), "out": os.path.abspath(args.out),
                       "classes": collections.Counter(m["class"] for m in models), "caveats": caveats}, default=str))

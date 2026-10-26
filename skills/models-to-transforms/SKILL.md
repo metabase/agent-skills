@@ -271,7 +271,8 @@ you come back only for its stop rules and for the purge. It holds, in this order
 2. **The end state, model by model.** For each model: what it is now ("a SQL model that joins deals and accounts, in
    Sales, a live query; 14 questions and 2 dashboards are built on it") and what replaces it
    ("`mb_transforms.deals_with_accounts`, a transform refreshed daily at 07:00 UTC, published in Library › Sales,
-   owner …"). Then **every dependent by name**: what it reads now, what it will read, and what changes for it
+   owner …"), plus its stand-in question when people open it directly ("a verified question 'Account' in Revenue,
+   reading the table, for the 60 people who open it"). Then **every dependent by name**: what it reads now, what it will read, and what changes for it
    (nothing / these column names / freshness / its sort / the dashboard filter's values / its action button). Group
    by dashboard where that reads better. Above about 20 dependents on one model, keep one line per kind in the plan
    and put the full list in `changes.csv` next to it (one row per object: kind, id, name, where it lives, reads now,
@@ -390,10 +391,19 @@ For each model (details in `references/replacement-api.md` and `references/edge-
    - sandboxes.
 
    `references/edge-cases.md` has a recipe for each, including the dashboard `tabs` trap and how to keep a re-created
-   alert's permissions. A replacement question you create for any of these (one per model, named after it) gets the
-   verified badge as its last step (`mb card verify <id>`), because the model it stands in for was the trusted entry
-   point.
-6. **Verify.**
+   alert's permissions.
+6. **Stand-in question.** A model people open directly gets a **verified question named after it, reading its table**.
+   Directly means bookmarked, opened in the last 90 days, verified, in an official collection, on dashboards, or
+   feeding filter values; the inventory's `stand_in_question` column gives the reasons. That one card per model is also
+   the replacement for its dashcards, filter values, links and alerts. Its query:
+   - for a wrapper, `source-table` with the model's own fields and sort;
+   - for a transform, just `source-table` of the new table.
+
+   Put it in the model's collection, with the model's description, and give it the verified badge as the last step
+   (`mb card verify <id> --text "Stands in for the <name> model; reads <schema.table>"`). A model was the trusted
+   entry point, so its stand-in carries the badge, whether or not the model itself was verified. Unused models get no
+   stand-in.
+7. **Verify.**
    - Compare "after" results with the snapshot.
    - Confirm nothing references the model anymore. Stale editors can re-save an old version.
    - Run `mb dependency broken table <T>` and compare `mb dependency breaking` with the pre-wave baseline.

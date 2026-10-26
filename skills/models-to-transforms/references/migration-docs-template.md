@@ -70,7 +70,7 @@ Cover each of these that applies:
 
 - **Where the data lives now:** the Library folder, and a link to the table.
 - **Freshness:** "this used to be live; it now refreshes daily at 07:00 UTC".
-- **Bookmarks:** "your bookmark on <model> no longer shows; bookmark <replacement question or Library folder> instead".
+- **Bookmarks:** "your bookmark on <model> no longer shows; open the verified question '<model name>' in <collection> instead (or the table in the Library)".
   Tables themselves can't be bookmarked.
 - **Links:** old `/model/<id>` links show "not found". Here is where each one went.
 - **Dashboards:** cards that showed a model now show a question on the table. Action buttons were re-created, or removed (list which).

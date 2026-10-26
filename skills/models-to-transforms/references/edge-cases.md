@@ -43,7 +43,8 @@ Work in this order. Each fix happens *before* the model is archived.
 
 ### 1. Dashcards that show the model, or use it as a series
 
-Create a **replacement question** on T. A table wrapper gets `source-table T` with the same `fields` and `order-by`; a new
+Use the model's **stand-in question** (SKILL.md, cut-over step 6): one verified question per model, named after it, on T.
+Create it here if the model didn't get one for being opened directly. A table wrapper gets `source-table T` with the same `fields` and `order-by`; a new
 transform gets just `source-table T`. Copy the old card's display and `visualization_settings`. Column-settings keys stay
 valid when names match. Put it in the model's collection, or make it a dashboard question; ask which.
 
@@ -149,7 +150,7 @@ including the default time dimension.
 Record each of these in the docs and tell the people affected.
 
 - **Bookmarks.** Tables can't be bookmarked, and you can't bookmark on someone else's behalf. List the holders per
-  model, and point them to the replacement question, the table, or its Library folder.
+  model, and point them to its stand-in question (named after the model), the table, or its Library folder.
 - **Model indexes:** indexed-entity search is lost.
 - **Verification:** tables can't be verified; publishing to the Library is their trust signal. Every replacement
   question that stands in for a model gets the verified badge (§1).

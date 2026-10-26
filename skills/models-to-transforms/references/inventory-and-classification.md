@@ -75,6 +75,11 @@ people who explore the table, though.
 | `create-transform` | `derived-mbql`, `derived-sql`, upload-based models with logic, and card-based models whose only upstreams are saved questions (inline them) |
 | `blocked: <reason>` | no `transforms/table`, an audit or sample DB, or DB routing. The instance's own app DB is **not** blocked: it gets `create-transform` with a confirm-the-schema flag |
 
+`stand_in_question` (a column) lists why a migrated model gets a verified stand-in question named after it: bookmarked,
+opened in the last `--recent-days` (default 90; from `view_log` on the app-DB path, from recent query runs on the API
+path, which can't see direct opens), verified, in an official collection, shown on dashboards, or feeding filter
+values. Empty means nobody opens it directly, and it gets none.
+
 Flags worth reading:
 
 - `swap-check-fails: N model columns missing on the table`: predicts a `check-replace-source` failure (long or
