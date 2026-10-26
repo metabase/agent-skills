@@ -32,8 +32,10 @@ input and the paths above.
    upgrade it, and stop.
 4. Metabase source: the host rules (sandbox, colors, column types) live
    in the public Metabase repo. `<ref>` is `custom-viz-v<version>`, the
-   tag the installed SDK was released from. Download each file
-   below, keeping its path and overwriting an older copy, with `curl`
+   tag the installed SDK was released from.
+   `.claude/metabase-src/.ref` holds `<ref>` → the files are cached, skip
+   the download. Otherwise delete `.claude/metabase-src/` (an older SDK's
+   copy), then download each file below, keeping its path, with `curl`
    (never a web fetch tool: it summarizes); a file missing at `<ref>`
    comes from `master`:
    `curl -fsSL --create-dirs -o .claude/metabase-src/<path> https://raw.githubusercontent.com/metabase/metabase/<ref>/<path> || curl -fsSL --create-dirs -o .claude/metabase-src/<path> https://raw.githubusercontent.com/metabase/metabase/master/<path>`
@@ -44,6 +46,8 @@ input and the paths above.
    - `frontend/src/metabase/ui/colors/types/color-keys.ts`
    - `frontend/src/metabase/ui/colors/constants/accents.ts`
    - `frontend/src/metabase-lib/v1/types/utils/isa.ts`
+
+   Every file downloaded → write `<ref>` to `.claude/metabase-src/.ref`.
 
    `<mb>` is `.claude/metabase-src`. Add `.claude/metabase-src/` to the
    project `.gitignore` when the line is missing. Now read the four `scripts-sandbox`
