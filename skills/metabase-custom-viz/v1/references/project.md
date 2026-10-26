@@ -2,8 +2,8 @@
 
 ## Files
 
-- `src/index.tsx` — the entry: default-exports the
-  `CreateCustomVisualization` factory wrapped in `defineConfig`. You keep
+- `src/index.tsx` — the entry: default-exports `defineConfig` applied
+  to what the `CreateCustomVisualization` factory returns. You keep
   the whole viz in this file. Other `src/` files are user code (`operations.md`, User edits).
 - `public/assets/icon.svg` — the visualization picker icon. Single-color,
   `currentColor`, so it adapts to light/dark.
