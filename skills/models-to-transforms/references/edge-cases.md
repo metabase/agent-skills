@@ -47,6 +47,11 @@ Create a **replacement question** on T. A table wrapper gets `source-table T` wi
 transform gets just `source-table T`. Copy the old card's display and `visualization_settings`. Column-settings keys stay
 valid when names match. Put it in the model's collection, or make it a dashboard question; ask which.
 
+Name it after the model, and give it the **verified badge** once it's final:
+`mb card verify <id> --text "Stands in for the <model name> model; reads <schema.table>"`. A model was the curated
+entry point people trusted, so the question that takes its place should carry the badge, whether or not the model
+itself was verified. Verify last: any later edit to the question's query withdraws the badge.
+
 Swap it in with a careful read-modify-write. **`dashcards` and `tabs` are both whole-array replacements**: an omitted
 tab is deleted together with its dashcards, and a partial `parameters` array archives subscriptions that used a dropped
 parameter (and emails their creators).
@@ -146,8 +151,8 @@ Record each of these in the docs and tell the people affected.
 - **Bookmarks.** Tables can't be bookmarked, and you can't bookmark on someone else's behalf. List the holders per
   model, and point them to the replacement question, the table, or its Library folder.
 - **Model indexes:** indexed-entity search is lost.
-- **Verification:** tables can't be verified; publishing to the Library is the trust signal. Optionally verify the
-  replacement questions that stand in for verified models.
+- **Verification:** tables can't be verified; publishing to the Library is their trust signal. Every replacement
+  question that stands in for a model gets the verified badge (§1).
 - **List view display**, and the model detail page.
 - **Upload append/replace UI:** document `mb upload append|replace <table-id> --file <csv>`.
 - **Metabot prompts** on the model: list them. For Metabot's curated mode, a published table counts at visibility layer

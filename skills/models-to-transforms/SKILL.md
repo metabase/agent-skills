@@ -390,7 +390,9 @@ For each model (details in `references/replacement-api.md` and `references/edge-
    - sandboxes.
 
    `references/edge-cases.md` has a recipe for each, including the dashboard `tabs` trap and how to keep a re-created
-   alert's permissions.
+   alert's permissions. A replacement question you create for any of these (one per model, named after it) gets the
+   verified badge as its last step (`mb card verify <id>`), because the model it stands in for was the trusted entry
+   point.
 6. **Verify.**
    - Compare "after" results with the snapshot.
    - Confirm nothing references the model anymore. Stale editors can re-save an old version.

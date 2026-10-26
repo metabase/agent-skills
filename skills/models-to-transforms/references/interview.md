@@ -72,7 +72,7 @@ The published-tables docs list what a published table carries. Ask only for what
 | **Implicit actions and their buttons** | recreate them as query actions on the source table / table data editing / keep the model (it then isn't removed) |
 | **Model indexes** | accept the loss and notify / keep the model |
 | **Upload-backed models** | swap and document `mb upload append|replace` / keep the model if people append via the UI often |
-| **Verified models** | verify the replacement questions on dashboards / rely on Library publishing alone |
+| **Replacement questions** (for dashcards, filter values, links, alerts) | verified, as standing in for the model (the default, whether or not the model was verified) / left unverified |
 | **Alerts on the model** | recreate them on a replacement question with the **original creator** (`PUT /api/notification/:id {"creator_id": …}`), after showing recipients the two emails they'll get / let them go, with notice |
 | **Public links / embeds of the model** | create them on the replacement question and tell the owners / drop them |
 | **Bookmarks** | notify holders, with the new location / no notice |
