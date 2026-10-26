@@ -74,8 +74,8 @@ available → offer to connect it, or take a verbal description:
 1. In Metabase: Admin → AI → MCP → turn on **MCP server** (AI features
    must be on); Admin → Settings → General → **Site URL** is the address
    the user opens Metabase at.
-2. In a terminal in the project folder:
-   `claude mcp add metabase <metabase>/api/metabase-mcp --transport http`
+2. In a terminal:
+   `claude mcp add metabase <metabase>/api/metabase-mcp --transport http --scope user`
 3. Restart Claude Code, run `/mcp` → `metabase` → Authenticate, log in
    and approve in the browser.
 
