@@ -20,7 +20,7 @@ What a model carries, and whether a published table has an equivalent:
 | **Actions**: implicit create/update/delete, query actions, dashboard action buttons | **No.** Query actions can live without a model (data actions). Implicit actions need a model. Table data editing is the table-side feature |
 | **Model index** (search into individual records) | **No** equivalent |
 | **List view** display, model detail page | No |
-| **Verification** (badge, search boost) | No. Tables can't be verified; publishing to the Library is the trust signal |
+| **Verification** (badge, search boost) | Tables can't be verified; publishing to the Library is their trust signal. Questions can: a simple model that becomes a question in place gets verified ("Verify this question", `mb card verify <id>`), and any later edit to its query withdraws the badge |
 | Shown in Browse > Models, boosted in search and pickers | Published tables appear **first** in data pickers and in the Library nav |
 | **Upload append/replace UI** (models created by CSV upload) | No UI on the table. The API still works: `mb upload append|replace <table-id>` |
 | `{{#123-model}}` references from SQL | The table is referenced by name |

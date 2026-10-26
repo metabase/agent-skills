@@ -53,6 +53,7 @@ See user-changes.md. In short: <freshness>, <bookmarks>, <links>, <action button
 ### <Model name> (card <id>, <entity_id>)
 - **Was:** <what it was, in words: "a 1:1 wrapper of `dbt_models.account`" | "a SQL model joining deals and accounts"> in <collection path>, created by <creator>, <views> views, last used <date>
 - **Now:** <schema.table> (table <id>), published in Library › <folder>; <existing table | transform "<name>" (id <id>), tag `<tag>` → job "<job>" (<cron>, <tz>), owner <email>>
+  (a simple model instead: `- **Now:** the same card, converted to a question and verified on <date>; reads <schema.table>, still live; links rewritten from /model/<id> to /question/<id>`)
 - **Freshness:** <live | persisted hourly | cached N h> → <refreshed by job at …>
 - **Pull requests:** #<n> <title>, #<n> <title>
 - **Swap:** replacement run <run_id>, <status>, <n> entities rewritten (<q> questions, <d> dashboards, <m> metrics, …), <date>

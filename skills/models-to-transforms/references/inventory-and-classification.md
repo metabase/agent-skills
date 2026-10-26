@@ -69,6 +69,7 @@ people who explore the table, though.
 | `swap-to-upstream-table: the table that replaces model N` / `create-transform: reads the tables that replace models …` | card-based with model upstreams, classified through its own shape over them (`upstream_shape`: `wrapper` when it only selects, orders or limits over one upstream, else `derived`). The table is the one the plan gives the upstream |
 | `blocked: upstream model(s) … will not be migrated` | card-based, when any upstream is excluded, blocked, broken or a purge candidate |
 | `review: LIMIT wrapper` | a wrapper with `LIMIT`: a swap would return every row |
+| `convert-to-verified-question` | a derived MBQL model on one table with no joins, aggregation or breakout (fields, filters, expressions, sort and limit are fine), or one SELECT over one table with no JOIN, GROUP BY, window, CTE or aggregate. Card-based models whose own shape over a single upstream model is like that convert once that upstream's swap has re-pointed them. The card stays, becomes a question, and gets verified |
 | `swap-to-existing-table` | any wrapper with a target (table, SQL, upload-based, transform-output), and a card-based wrapper of a saved question that wraps one table (`via saved question`) |
 | `verify-source-table` | an `sql-table-wrapper` whose relation Metabase doesn't know: sync the schema, or check the SQL |
 | `blocked: sandbox card` | the model backs a sandbox policy; rebuild the policy first |

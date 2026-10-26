@@ -35,6 +35,7 @@ Ask in roughly this order, because later answers depend on earlier ones.
 | A model that **builds on another transform's output** | new transform on the same tag as the upstream (default) / extend the upstream transform (needs its owner's OK) / swap onto the upstream table if all columns exist |
 | Models on databases **without transform support** | keep as a model for now, or archive if unused. Never silently drop them |
 | **Column names**: keep the model's exact names, or clean them up? | keep exact. Cleaning means hand-rewriting every dependent's refs |
+| **Simple models** (one table, no joins or aggregation) | stay as the same card, converted to a question and verified ("Verify this question"), still live. A transform instead only when the user wants the result materialized (speed, a Library table of its own). Keep its collection, or move it into an official collection: ask once |
 | **Dedupe**: several models wrap the same table | swap all of them onto that table; merge their column-metadata wishes, and ask on conflicts |
 
 ## 3. Publishing and metadata
