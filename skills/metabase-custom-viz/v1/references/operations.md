@@ -83,7 +83,9 @@ available → offer to connect it, or take a verbal description:
 
 Change together: `"name"` in `metabase-plugin.json`, `"name"` in
 `package.json`, and `getName` in `src/index.tsx` when it returns a
-display name. Never rename the project directory yourself — it is the
+display name. Warn the user first: saved questions keep this viz's
+settings under `custom-viz:<old name>`, so they lose them after the
+rename. Never rename the project directory yourself — it is the
 session's working directory; tell the user to stop the dev server,
 rename it, and start the dev server again.
 
