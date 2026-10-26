@@ -116,7 +116,7 @@ is.
 
 Run Checks (`project.md`). Failures → fix them first (debug). Then
 **Verify**, always: the user may have edited `src/index.tsx` in their
-editor. Fixed findings → **Ship** again. Then run ship.
+editor. Fixed findings → start this **Ship** section over; clean → run `phases/ship.md`.
 
 ## Phase exits
 
