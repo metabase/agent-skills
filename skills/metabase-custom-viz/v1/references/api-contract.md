@@ -33,7 +33,8 @@ onClick({
   only.
 - `dimensions` drives the "filter by this dimension" actions. For a mark
   that aggregates several rows (a category arc, a band), pass only the
-  aggregating dimension.
+  aggregating dimension; `value` and `column` are optional there: no
+  single cell backs it.
 
 ## onHover → the tooltip
 
