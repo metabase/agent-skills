@@ -254,38 +254,6 @@ def mbql_wrapper(norm):
     return st["kind"] == "mbql" and not st["joins"] and st["ops"] <= WRAPPER_OPS and not has_implicit_join_fields(st)
 
 
-SIMPLE_MBQL_OPS = {"fields", "filters", "filter", "expressions", "order-by", "limit"}
-SIMPLE_SQL_REJECT = re.compile(r"\b(join|group\s+by|having|union|intersect|except|with|distinct|over|window|qualify|pivot|lateral|unnest)\b", re.I)
-AGG_FN = re.compile(r"\b(count|sum|avg|min|max|array_agg|string_agg|listagg|median|percentile_\w+|stddev\w*|variance)\s*\(", re.I)
-
-
-def simple_sql(sql):
-    """One SELECT over one FROM: no joins, grouping, aggregates, windows, CTEs, set operations or parameters."""
-    s = strip_sql(sql)
-    if not s or "{{" in s:
-        return False
-    bare = re.sub(r"'(?:[^']|'')*'", "''", re.sub(r'"[^"]*"|`[^`]*`|\[[^\]]*\]', " x ", s))
-    return not (SIMPLE_SQL_REJECT.search(bare) or AGG_FN.search(bare)
-                or len(re.findall(r"\bselect\b", bare, re.I)) != 1 or len(re.findall(r"\bfrom\b", bare, re.I)) != 1)
-
-
-def simple_single_table(norm, source_card=None):
-    """One table (or, with source_card, one upstream card), no joins and no aggregation, in MBQL or SQL.
-    Such a model can stay where it is as a verified question instead of becoming a transform."""
-    if len(norm["stages"]) != 1:
-        return False
-    st = norm["stages"][0]
-    if st["kind"] == "mbql":
-        src_ok = st.get("source_card") == source_card if source_card else bool(st.get("source_table"))
-        return src_ok and not st["joins"] and st["ops"] <= SIMPLE_MBQL_OPS
-    if st["kind"] == "native":
-        sql = st.get("native") or ""
-        if source_card:
-            sql = re.sub(rf"\{{\{{\s*#{source_card}[^}}]*\}}\}}", "upstream_table", sql)
-        return simple_sql(sql)
-    return False
-
-
 def parse_select_star(sql):
     """Return (relation parts, confidence, notes) for a native single-table wrapper, else None.
     Rejects joins, filters, grouping, CTEs, renames (`a AS b`), literals and expressions."""
@@ -352,12 +320,6 @@ def column_keys(result_metadata):
 def precheck_target(m, fields_by_table):
     """Predict check-replace-source failures and user-visible metadata changes for a swap onto m's target table."""
     t = m.get("target_table_id")
-    if not t and m.get("simple_question"):
-        lost = simple_conversion_losses(m, fields_by_table)
-        if lost:
-            m["metadata_diffs"] = f"lost-on-conversion:{lost}"
-            m["flags"] = sorted(set(m.get("flags") or []) | {f"questions built on it lose {lost} model column overrides when it becomes a question: promote them to the table or accept"})
-        return
     if not t or t not in fields_by_table:
         return
     fields = {f["name"]: f for f in fields_by_table[t] if truthy(f.get("active", True))}
@@ -384,31 +346,6 @@ def precheck_target(m, fields_by_table):
     if fk_gaps or fk_mismatch:
         flags.add("needs FK metadata on the table before the swap")
     m["flags"] = sorted(flags)
-
-
-def simple_conversion_losses(m, fields_by_table):
-    """Count the model's column overrides that dependents stop seeing once it is a question.
-    Model metadata (display name, semantic type, FK target, description) is merged into downstream queries only while
-    the card is a model. MBQL columns that come straight from the table fall back to the table's own metadata, so only
-    differences count; for SQL models every override is lost."""
-    cols = m.get("column_keys") or []
-    t = m.get("simple_source_table_id")
-    if m.get("query_type") == "native" or not t or t not in fields_by_table:
-        # Semantic types on SQL columns are mostly inferred from names, and are inferred again for a question:
-        # count only what a person set (descriptions, FK targets, display names other than the humanized name).
-        def custom_name(c):
-            dn, k = (c.get("display_name") or "").strip().lower(), c["key"].lower()
-            return dn and dn not in (k, k.replace("_", " "), re.sub(r"\s+", " ", k.replace("_", " ").replace(".", " ")).strip())
-        return sum(1 for c in cols if c.get("description") or c.get("fk_target_field_id") or custom_name(c))
-    fields = {f["name"]: f for f in fields_by_table[t] if truthy(f.get("active", True))}
-    lost = 0
-    for c in cols:
-        f = fields.get(c["key"])
-        if f is None:
-            continue  # computed column: the question keeps its own metadata for it
-        if any(c.get(a) and c.get(a) != f.get(a) for a in ("display_name", "semantic_type", "description")):
-            lost += 1
-    return lost
 
 
 # ----------------------------------------------------------------------------------------------- classification
@@ -461,8 +398,7 @@ def classify(m, tables, resolve_native, cards_meta, dbs):
         up = kinds.get(only) if only else None
         native_wrap = st0.get("kind") == "native" and len(norm["stages"]) == 1 and CARD_SELECT_RE.match(strip_sql(st0.get("native")))
         wraps_one = bool(only) and bool(native_wrap or (mbql_wrapper(norm) and st0.get("source_card") == only))
-        simple_over_one = bool(only) and not wraps_one and simple_single_table(norm, source_card=only)
-        m["upstream_shape"] = "wrapper" if wraps_one else ("simple" if simple_over_one else "derived")  # own shape over its upstream card(s)
+        m["upstream_shape"] = "wrapper" if wraps_one else "derived"  # the model's own shape over its upstream card(s)
         if up and up.get("type") not in ("model", None) and up.get("wrapper_table") and wraps_one:
             target = up["wrapper_table"]
             notes.append(f"wraps saved question {only}, itself a wrapper of table {target}")
@@ -521,18 +457,6 @@ def classify(m, tables, resolve_native, cards_meta, dbs):
             cls = "derived-mbql"
     else:
         cls = "unknown"
-    if (cls in ("derived-mbql", "derived-sql") or (cls == "upload-based" and not target)) and simple_single_table(norm):
-        m["simple_question"] = True
-        if st0.get("kind") == "mbql":
-            m["simple_source_table_id"] = st0.get("source_table")
-        else:
-            rel = re.findall(rf"\bfrom\s+({REL})", strip_sql(st0.get("native") or ""), re.I)
-            if rel:
-                m["simple_source_table_id"], _ = resolve_native(m["database_id"], [unquote(x) for x in re.findall(IDENT, rel[0])])
-    elif cls == "card-based" and m.get("upstream_shape") == "simple":
-        m["simple_question"] = True
-    if m.get("simple_question"):
-        flags.add("simple: one table, no joins or aggregation (can stay as a verified question)")
     src = tables.get(target) if target else (tables.get(st0.get("source_table")) if st0.get("kind") == "mbql" else None)
     if src is not None and not truthy(src.get("active", True)):
         flags.add("source-table-inactive")
@@ -631,16 +555,6 @@ def propose(models, stale_days, now, extras_known):
             m["action"] = "swap-to-existing-table" + (" (via saved question)" if m["class"] == "card-based" else "")
         elif m["class"] == "sql-table-wrapper":
             m["action"] = "verify-source-table (sync it or fix the parse)"
-        elif m.get("simple_question") and m["class"] != "card-based":
-            m["action"] = "convert-to-verified-question"
-            if int(m.get("n_actions_any_state") or 0) or int(m.get("n_action_buttons") or 0):
-                m["flags"].add("re-home its actions first: the type change deletes implicit actions and their buttons")
-            elif m.get("n_actions_any_state") is None:
-                m["flags"].add("actions not counted (use --extras): check them before converting")
-            if int(m.get("n_model_index") or 0):
-                m["flags"].add("its model index (record search) is dropped on conversion")
-            if m.get("display") == "list":
-                m["flags"].add("list display is model-only: pick a table display")
         elif "used-as-sandbox-card (rebuild the policy before anything else)" in m["flags"]:
             m["action"] = "blocked: sandbox card (rebuild the policy first)"
         elif m["db_transforms_ok"]:
@@ -665,11 +579,6 @@ def propose(models, stale_days, now, extras_known):
             dead = [u for u in m["upstream_models"] if u in by_id and str(by_id[u]["action"]).startswith(("exclude", "blocked", "broken", "purge"))]
             if dead:
                 m["action"] = f"blocked: upstream model(s) {dead} will not be migrated"
-            elif m.get("upstream_shape") == "simple" and len(m["upstream_models"]) == 1:
-                # the upstream's swap rewrites this model onto the upstream's table; then it stays as a verified question
-                m["action"] = f"convert-to-verified-question: once the swap of model {m['upstream_models'][0]} has re-pointed it (wave {m['wave']})"
-                if int(m.get("n_actions_any_state") or 0) or int(m.get("n_action_buttons") or 0):
-                    m["flags"].add("re-home its actions first: the type change deletes implicit actions and their buttons")
             elif not m["db_transforms_ok"] and not all(u and str(u["action"]).startswith("swap") for u in ups):
                 m["action"] = f"blocked: {m['db_transforms_reason']}"
             elif m.get("upstream_shape") == "wrapper" and len(m["upstream_models"]) == 1:
@@ -867,8 +776,7 @@ def collect_api(mbc, args, failures):
     for m in models:
         classify(m, tables, resolve_native, cards_meta, dbs)
     fields_by_table = {}
-    for t in {m.get("target_table_id") or m.get("simple_source_table_id") for m in models
-              if m.get("target_table_id") or m.get("simple_source_table_id")}:
+    for t in {m["target_table_id"] for m in models if m.get("target_table_id")}:
         try:
             fields_by_table[t] = mbc.list_all("table", "fields", str(t), "--fields",
                                               "id,name,active,semantic_type,fk_target_field_id,display_name,description")[0]
@@ -1187,8 +1095,7 @@ def collect_app_db(mbc, args, failures):
                  "n_sandboxes", "n_actions", "n_actions_any_state", "n_implicit_actions", "n_model_index", "n_metabot_prompts")}}
         classify(m, tables, resolve_native, cards_meta, dbs)
         models.append(m)
-    targets = sorted({m.get("target_table_id") or m.get("simple_source_table_id") for m in models
-                      if m.get("target_table_id") or m.get("simple_source_table_id")})
+    targets = sorted({m["target_table_id"] for m in models if m.get("target_table_id")})
     fields_by_table = collections.defaultdict(list)
     if targets:
         fus = "metabase_field_user_settings" in have
@@ -1275,11 +1182,6 @@ def write_outputs(models, dbs, caveats, failures, out):
               f"- {sum(1 for m in swaps if m.get('metadata_diffs'))} have column metadata that differs from the table (display names, semantic types, descriptions change for dependents): promote or accept",
               f"- {sum(1 for m in swaps if not m.get('target_published'))} target tables are not published yet",
               f"- {sum(1 for m in models if 'limit-wrapper' in (m.get('flags') or []))} wrappers have a LIMIT (a swap would return every row): review"]
-    conv = [m for m in models if str(m["action"]).startswith("convert-to-verified-question")]
-    lines += ["", "## Simple models that stay as verified questions", "",
-              f"- {len(conv)} models read one table with no joins or aggregation: converted in place and verified, no transform",
-              f"- {sum(1 for m in conv if any(f.startswith('re-home its actions') for f in m.get('flags') or []))} of them have actions or action buttons to re-home first",
-              f"- {sum(1 for m in conv if str(m.get('metadata_diffs') or '').startswith('lost-on-conversion'))} have column overrides that questions built on them would lose"]
     lines += ["", "## Waves", "", "Wave 0 reads tables or saved questions only; wave k is built on wave k-1 models and is classified through the tables that replace them (`upstream_shape`), so every wave is planned up front.", "",
               " · ".join(f"wave {k}: {v} models" for k, v in sorted(C(m["wave"] for m in models).items()))]
     num = lambda m, k: int(m.get(k) or 0) > 0

@@ -49,10 +49,8 @@ These exist because the operations are bulk, production-wide and mostly irrevers
   bookmarks, alerts, actions and action buttons, model indexes, filter-value links and **sandboxes**. When a sandbox
   card is deleted, its group silently gets *unrestricted* access to the table. Archived cards keep serving their
   dependents and can be restored.
-- **Convert a model to a question only on the verified-question path, and never use `POST /api/ee/replacement/replace-model-with-transform`.**
-  A simple model (one table, no joins or aggregation) stays where it is, as the same card, converted to a question and
-  verified (see "Simple models"). Everything else is replaced by a table. The type change hard-deletes the model's
-  dashboard action buttons and implicit actions, so re-home those first. The all-in-one endpoint skips
+- **Don't convert models to questions (`type: question`), and don't use `POST /api/ee/replacement/replace-model-with-transform`.**
+  The type change hard-deletes the model's dashboard action buttons and implicit actions. The all-in-one endpoint skips
   the compatibility check and the "target already exists" guard, publishes nothing, schedules nothing, and on a
   remote-synced instance creates a transform git doesn't know about, which blocks every import. Build the table first,
   swap with `replace-source`, then archive. `references/replacement-api.md` explains why.
@@ -197,8 +195,8 @@ The script assigns each model a **class** and a proposed **action**:
 | `table-wrapper` | MBQL on one table, only `fields` / `order-by` / `limit` | swap to that table |
 | `sql-table-wrapper` | native `SELECT * / plain column list FROM one_table` | swap to that table (check the parse confidence) |
 | `upload-based` | built on an uploaded CSV table | swap if it's a wrapper, else transform |
-| `derived-mbql` | joins, filters, expressions, aggregations, stages | a verified question in place when it reads one table with no joins or aggregation; otherwise a new transform |
-| `derived-sql` | any other native SQL | a verified question in place when it's one SELECT over one table with no joins or aggregation; otherwise a new SQL transform |
+| `derived-mbql` | joins, filters, expressions, aggregations, stages | new transform |
+| `derived-sql` | any other native SQL | new SQL transform |
 | `card-based` | reads another card (`source-card`, joins, `{{#id}}`) | classified through the tables that replace its upstream models: a wrapper of one upstream swaps onto that model's table (`swap-to-upstream-table`); anything else becomes a transform reading those tables. With only saved-question upstreams, inline them, or swap through a wrapper question |
 | `transform-output-wrapper` | wrapper of a table that already is a transform's output | swap to that table |
 
@@ -207,7 +205,6 @@ The class is a CSV value. When you tell the user about a model, describe it inst
 
 The action can instead be one of these:
 
-- `convert-to-verified-question` (a simple model: one table, no joins or aggregation; it stays as the same card);
 - `archive: unused` (no use for N days, no dependents, no direct use);
 - `exclude` (Metabase-managed usage analytics);
 - `broken`;
@@ -222,21 +219,11 @@ They also mark things to raise in the interview:
 - wrappers whose `ORDER BY` or `LIMIT` a swap drops;
 - a target database that is the instance's own app DB, or one no transform has written to yet.
 
-**End states.** Every model ends in one of four ways:
-
-- **A 1:1 wrapper** is swapped onto its table.
-- **A simple model** becomes a **verified question** in place. Simple means one table, no joins and no aggregation:
-  added columns, filters, column picks and a sort are fine. Example: `select *, cast(is_trialing as bool) … from one_table`.
-  It keeps its id, so everything built on it, its bookmarks, alerts and dashcards keep working with nothing re-pointed,
-  and it stays a live query.
-- **A model with real logic** (joins, aggregation, several stages) becomes a transform-backed table.
-- **An unused model** is archived.
-
-Nothing ends as a plain, unverified saved question. This holds for awkward cases too:
-- The instance's own app DB gets a transform into a dedicated schema the user confirms once.
-- A database no transform has written to gets a transform after you prove a writable schema.
-- Only databases that can't host transforms at all (no `transforms/table`, audit, sample, DB routing) fall back to a
-  verified question when the model is simple, else to archiving or keeping the model, listed with the reason.
+**There is no "convert to a saved question" end state.** A model with logic becomes a transform-backed table, a 1:1
+wrapper is swapped onto its table, and an unused model is archived. This holds for awkward cases too. The instance's
+own app DB gets a transform into a dedicated schema the user confirms once. A database no transform has written to gets
+a transform after you prove a writable schema. Only databases that can't host transforms at all (no `transforms/table`,
+audit, sample, DB routing) fall back to archiving, or to keeping the model, listed with the reason.
 
 Order the work in **waves** along the model→model DAG. Wave 0 holds models whose sources are tables or saved
 questions. Wave *k*'s transforms run after wave *k−1*'s tables exist, and its swaps after wave *k−1*'s. Every wave is
@@ -255,7 +242,6 @@ what is genuinely the user's call:
 - Library folder and table metadata (display name, description, owner, visibility layer);
 - metadata conflicts;
 - access;
-- simple models: a verified question in place (the default), or a transform when the user wants the table materialized;
 - what to do about actions, model indexes, uploads, verification, bookmarks, alerts, public links and dashcards that show the model;
 - databases not to write to;
 - column renames;
@@ -285,8 +271,7 @@ you come back only for its stop rules and for the purge. It holds, in this order
 2. **The end state, model by model.** For each model: what it is now ("a SQL model that joins deals and accounts, in
    Sales, a live query; 14 questions and 2 dashboards are built on it") and what replaces it
    ("`mb_transforms.deals_with_accounts`, a transform refreshed daily at 07:00 UTC, published in Library › Sales,
-   owner …"; or, for a simple model, "stays as the question 'Cloud Customers Monthly Usage' in Product › Cloud, now
-   verified, still live"). Then **every dependent by name**: what it reads now, what it will read, and what changes for it
+   owner …"). Then **every dependent by name**: what it reads now, what it will read, and what changes for it
    (nothing / these column names / freshness / its sort / the dashboard filter's values / its action button). Group
    by dashboard where that reads better. Above about 20 dependents on one model, keep one line per kind in the plan
    and put the full list in `changes.csv` next to it (one row per object: kind, id, name, where it lives, reads now,
@@ -372,37 +357,9 @@ Per sync setup (`references/git-sync-and-yaml.md` has YAML shapes and the pull r
 lower-cases, BigQuery escapes, and long aliases are truncated. After the first run, compare the output fields with the
 model's column keys. Read `references/transforms-and-scheduling.md` before authoring any transform.
 
-## Simple models: convert in place and verify
-
-A simple model keeps its card. Everything that points at it keeps working, so there is no swap. It becomes a question
-and gets the verified badge ("Verify this question"). Its source table is published in the Library like any other
-target, so people can also explore the table directly. For each one, in wave order:
-
-1. **Gate.**
-   - Its actions in any state, and their dashboard buttons, are re-homed (`references/edge-cases.md` § 5). The type
-     change deletes implicit actions and their buttons and archives query actions.
-   - The model column overrides that questions built on it would lose are handled as the plan says. The inventory
-     flags these: "questions built on it lose N model column overrides". For MBQL columns, promote the overrides onto the
-     table's field metadata (in the publish pull request when the Library is synced). For SQL columns, list them in the
-     docs: the converted question keeps them for itself, but its dependents no longer see them.
-   - A card-based model is converted only after its upstream model's swap has re-pointed it onto that model's table.
-     Check that its query now reads the table.
-   - Its model index (record search) and a list display are model-only. They're dropped, and the docs say so.
-2. **Snapshot** it: `mb card get <id> --full`, its dashcards and links, and a "before" export of it and a few dependents.
-3. **Convert.** Run `mb card update <id> --body '{"type":"question"}'`. For a synced card on a read-only instance, set
-   `type: question` in its YAML, in a pull request instead. Set `display` to `table` if it was `list`.
-4. **Fix links.** Rewrite `/model/<id>` URLs in link cards, click behaviors, text cards, descriptions and documents to
-   `/question/<id>`. A `/model/` URL shows "not found" on a question.
-5. **Verify it, last.** Run `mb card verify <id> --text "Replaces the <name> model; reads <schema.table>, live"`. Any
-   later edit to its query withdraws the badge, so verify after every change. If the plan moves it to an official
-   collection, move it before verifying.
-6. **Check.** Compare the "after" exports with the snapshot, run `mb dependency broken card <id>`, and mark it
-   `verified-question` in `state.json`. It is not archived.
-
 ## Cut over, one model at a time, in wave order
 
-For each model that gets a table (simple models were handled above; details in `references/replacement-api.md` and
-`references/edge-cases.md`):
+For each model (details in `references/replacement-api.md` and `references/edge-cases.md`):
 
 1. **Gate.** All of these must hold:
    - the target exists, is published, and has its permissions and sandboxes set;
@@ -463,8 +420,6 @@ remote sync, put them where the user chose. Keep personal data such as emails ou
 wants it there.
 
 ## Archive, then purge
-
-Models that became verified questions are not archived: the card stays.
 
 1. **Pre-archive gate**, per model. Every item must read zero, or be explicitly accepted by the user, by name:
    - dependency edges from live entities;
