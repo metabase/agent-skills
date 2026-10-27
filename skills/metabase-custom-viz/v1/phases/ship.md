@@ -2,7 +2,8 @@
 
 Executor: main agent.
 Input: none.
-Output: `<name>-<version>.tgz` and upload instructions.
+Output: `<plugin name>-<plugin version>.tgz` (`operations.md`) and
+upload instructions.
 
 Read: `references/operations.md`, `references/project.md`.
 

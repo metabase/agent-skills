@@ -19,8 +19,10 @@ lsof -ti :5174   # pid holding the port
 terminal in the project folder and keep it open. Down while the port is
 held → tell the user which process holds it (`lsof`).
 
-`npm run build` produces `<name>-<version>.tgz` in the project root and
-needs the dev server stopped (Ctrl+C in its terminal).
+`npm run build` produces `<plugin name>-<plugin version>.tgz` in the
+project root (`<plugin name>` is `"name"` in `metabase-plugin.json`,
+`<plugin version>` is `"version"` in `package.json`) and needs the dev
+server stopped (Ctrl+C in its terminal).
 
 ## Connecting Metabase
 
@@ -81,9 +83,11 @@ available → offer to connect it, or take a verbal description:
 
 Change together: `"name"` in `metabase-plugin.json`, `"name"` in
 `package.json`, and `getName` in `src/index.tsx` when it returns a
-display name. Warn the user first: saved questions keep this viz's
-settings under `custom-viz:<old name>`, so they lose them after the
-rename. Never rename the project directory yourself — it is the
+display name. Warn the user first: saved questions reference this viz
+as `custom:<old name>` and keep its settings under `custom:<old name>:`,
+so they never move to the renamed viz: they stay on the old plugin while
+it is installed and fall back to a default visualization once it is
+removed. Never rename the project directory yourself — it is the
 session's working directory; tell the user to stop the dev server,
 rename it, and start the dev server again.
 

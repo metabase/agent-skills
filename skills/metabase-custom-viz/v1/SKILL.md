@@ -22,8 +22,13 @@ input and the paths above.
 
 1. Project: the working directory has `metabase-plugin.json` and
    `@metabase/custom-viz` in `package.json` → use it. Otherwise take a
-   name from the request (ask only if there is none), run
-   `npx @metabase/custom-viz@latest init <name>`, and work in `<name>/`.
+   name from the request (ask only if there is none) as `<name>`, run
+   `npx @metabase/custom-viz@latest init "<name>"`, and work in the
+   directory it prints. `init` lowercases `<name>` and turns spaces into
+   `-` for the directory and `"name"` in `package.json` and
+   `metabase-plugin.json`; `<name>` as given becomes the display name.
+   Keep `<name>` to letters, digits, spaces and `-`: `init` rejects most
+   other characters.
 2. `node_modules/` missing → `npm install`.
 3. `<version>` is `version` in
    `node_modules/@metabase/custom-viz/package.json`. Its major is below

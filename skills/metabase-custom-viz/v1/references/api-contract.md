@@ -63,9 +63,9 @@ marked `@deprecated`, in these files and in `<sdk>/types/`. Newer hosts
 drop them and the viz renders black.
 
 Use the names two ways. In DOM and SVG styles, write the CSS variable
-`var(--mb-color-<name>)`: it follows the theme by itself. Where a literal
+`var(--mb-color-<color>)`: it follows the theme by itself. Where a literal
 value is needed (canvas libraries, color math), call
-`renderingContext.getColor("<name>")`. Any other name renders black:
+`renderingContext.getColor("<color>")`. Any other name renders black:
 `getColor` returns an unknown name unchanged, and an unknown variable
 resolves to nothing.
 
