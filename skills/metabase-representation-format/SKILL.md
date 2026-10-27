@@ -1,6 +1,6 @@
 ---
 name: metabase-representation-format
-description: Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms, actions, and data apps' resources). Use when the user needs to create, edit, understand, or validate Metabase representation YAML files, or when working with Metabase serialization/deserialization (serdes). Covers entity schemas, MBQL and native queries, visualization settings, parameters, and folder structure.
+description: Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms, actions, and data apps). Use when the user needs to create, edit, understand, or validate Metabase representation YAML files, or when working with Metabase serialization/deserialization (serdes). Covers entity schemas, MBQL and native queries, visualization settings, parameters, and folder structure.
 model: opus
 allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 ---
@@ -9,15 +9,15 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 Metabase represents user-created content as a tree of YAML files. Each file is one entity (a collection, card, dashboard, etc.). The format is **portable** across Metabase instances: numeric database IDs are replaced with human-readable names and entity IDs.
 
-The format is defined by a spec bundled alongside this file as `spec.md` (upstream source: the `@metabase/representations` npm package). The same package ships a CLI (`npx @metabase/representations validate-schema`) that validates a tree of YAML files against the format.
+The format is defined by a spec that the `@metabase/representations` npm package ships (see _Reading the spec_). The same package ships a CLI (`npx @metabase/representations validate-schema`) that validates a tree of YAML files against the format.
 
 ## Entities
 
-The format defines 13 entity types.
+The format defines 14 entity types.
 
 | Entity | SerDes Model | Description |
 |--------|-------------|-------------|
-| **Collection** | `Collection` | Folder-like container for organizing content. Hierarchy via `parent_id`. Namespaces: `null` (main), `"snippets"`, `"transforms"`. |
+| **Collection** | `Collection` | Folder-like container for organizing content. Hierarchy via `parent_id`. Namespaces: `null` (main), `"snippets"`, `"transforms"`, `"data-actions"`, `"data-apps"`. |
 | **Card** | `Card` | Question, model, or metric. Holds an MBQL or native `dataset_query`. Display types: table, bar, line, pie, scalar, etc. Card types: `"question"`, `"model"`, `"metric"`. |
 | **Dashboard** | `Dashboard` | Grid layout (24 columns) of cards with filter parameters and optional tabs. Contains `dashcards` array for card placement and `parameters` array for filter controls. |
 | **Document** | `Document` | Rich text page using ProseMirror AST. Can embed cards via `cardEmbed` nodes and link to entities via `smartLink` nodes. |
@@ -27,9 +27,10 @@ The format defines 13 entity types.
 | **Transform** | `Transform` | Materializes query or Python script results into a database table. Source is either MBQL/native query or Python script. |
 | **TransformTag** | `TransformTag` | Label for categorizing transforms. Built-in types: `"hourly"`, `"daily"`, `"weekly"`, `"monthly"`, or `null` for custom. |
 | **TransformJob** | `TransformJob` | Scheduled job (cron) that executes transforms matching specific tags. |
+| **TransformTest** | `TransformTest` | Runs a transform against test `inputs` and checks its output against `expectations`. Stored next to its transform: `collections/transforms/{transform_slug}/{test_slug}.yaml`. |
 | **PythonLibrary** | `PythonLibrary` | Shared Python source file available to Python-based transforms. |
-| **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL) or `"implicit"` (creates, updates, or deletes a row of a model's table; needs `model_id`). Lives in a collection via `collection_id`, like a card. A query action may belong to a model via `model_id` or to none; data apps run only query actions without one. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
-| **Data App** | `DataApp` | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (with `serdes/meta` `[{model: DataApp, id: <entity_id>, label: <slug>}]`, and `slug` equal to the directory name), a built bundle, and a `resources/` directory of the Collection, Cards, and Actions it owns. |
+| **Action** | `Action` | Writes to a database. `type` is `"query"` (parameterized native SQL) or `"implicit"` (one row of the table its `implicit` entry names); `model_id` is deprecated. Without a `model_id` it lives in the `data-actions` namespace (its root or a data actions collection) or in a data app's collection, set by `collection_id`; data apps run only those. Exactly one of the nested `query` and `implicit` arrays holds the definition its `type` names; the other is `[]`. |
+| **Data App** | `DataApp` | A custom React app that runs inside Metabase, in `data_apps/<slug>/`: a `data_app.yaml` manifest (with `serdes/meta` `[{model: DataApp}]`, and `slug` equal to the directory name), its built bundle beside it, and a root Collection of the `data-apps` namespace under `collections/data_apps/` holding the Cards and Actions it runs. |
 
 ## Ownership and hierarchy
 
@@ -47,35 +48,36 @@ On disk, cards nested under a dashboard or document live in a subfolder next to 
 
 Metabase only imports YAML from these top-level directories; anything outside is ignored:
 
-- `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`.
-- `databases/` — **only** the `segments/` and `measures/` subdirectories under each table are imported.
+- `collections/` — all user content (cards, dashboards, documents, actions, snippets, transforms, etc.), partitioned by namespace: `main/`, `snippets/`, `transforms/`, `data_actions/`, `data_apps/`.
+- `databases/` — the `segments/` and `measures/` subdirectories under each table, and each Library-published table's metadata.
 - `python_libraries/` (also accepted as `python-libraries/`).
+- `glossary/` — glossary terms (not covered by the spec).
 - `transforms/` — contains `transform_jobs/` and `transform_tags/`.
-- `actions/` — legacy location for actions, still read on import. New exports write an action in its collection's directory under `collections/main/`, beside that collection's cards (not in an `actions/` subdirectory; only a data app's `resources/` has one).
-- `data_apps/<slug>/resources/` — a data app's resources: its collection (`collection.yaml`), cards (`cards/`), and actions (`actions/`). Loaded when Metabase pulls the repository through remote sync, together with the app's `data_app.yaml`.
+- `actions/` — legacy location for actions, still read on import. New exports write an action in its collection's directory, beside that collection's cards, not in an `actions/` subdirectory.
+- `data_apps/<slug>/` — a data app's `data_app.yaml` and its built bundle. The app's collection, with its cards and actions, is under `collections/data_apps/`.
 
 ## `serdes/meta`
 
-Every entity carries a top-level `serdes/meta` array that encodes its identity path. Each entry is `{id, model, label?}` — `label` is the slugified name and is present on entities keyed by NanoID. Example:
+Every entity carries a top-level `serdes/meta` array with a single entry naming its `model`; Metabase derives the identity from the entity's own fields (`entity_id`, or `name` and `table_id` for a Field). Older exports carry the full identity path instead (`{id, model, label?}` per entry), which Metabase still imports. Example:
 
 ```yaml
 serdes/meta:
-- id: NDzkGoTCdRcaRyt7GOepg
-  label: my_entity_name
-  model: Card
+- model: Card
 ```
 
-`validate-schema` reads `serdes/meta` to determine which entity type each file represents. The full rules (including nested entities and composite identity paths) are in `spec.md`.
+`validate-schema` reads `serdes/meta` to determine which entity type each file represents. The full rules (including nested entities and composite identity paths) are in the spec.
 
 ## Reading the spec
 
-This skill ships with a local snapshot of the spec as `spec.md` alongside `SKILL.md`.
+Extract the current spec from the package into a temporary file, and read it from there:
 
-Beyond the per-entity shapes summarized in this SKILL, `spec.md` also covers: MBQL query form (stages, field references, joins, expressions, aggregations, filter/expression operators, temporal bucketing, binning), native queries and template tags (`text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`), visualization settings, click behavior, dashboard/card parameters, and the data app layout (`data_app.yaml` and `resources/`). Reach for `spec.md` whenever edits touch any of those.
+```sh
+npx @metabase/representations@latest extract-spec --file "${TMPDIR:-/tmp}/metabase-representation-spec.md"
+```
 
-**Read on demand, not eagerly.** Open `spec.md` only when you are about to read or modify content files for the entities listed above — e.g. the user asks to edit a card, add a dashcard, tweak a transform, or similar work that implies YAML edits. Do not open it at session start or for tasks unrelated to representation YAML.
+Beyond the per-entity shapes summarized in this SKILL, the spec also covers: MBQL query form (stages, field references, joins, expressions, aggregations, filter/expression operators, temporal bucketing, binning), native queries and template tags (`text`, `number`, `date`, `boolean`, `dimension`, `temporal-unit`, `card`, `snippet`, `table`), visualization settings, click behavior, dashboard/card parameters, and the data app layout (`data_apps/<slug>/data_app.yaml` and the app's collection under `collections/data_apps/`). Reach for it whenever edits touch any of those.
 
-If the bundled copy looks out of date with the upstream package, the skill's own `README.md` documents how to refresh it with `extract-spec`.
+**Read on demand, not eagerly.** Extract and open the spec only when you are about to read or modify content files for the entities listed above — e.g. the user asks to edit a card, add a dashcard, tweak a transform, or similar work that implies YAML edits. Do not extract it at session start or for tasks unrelated to representation YAML. Extract it once per session; it is long, so search it for the section you need rather than reading it whole.
 
 ## Validating
 

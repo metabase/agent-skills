@@ -1,6 +1,6 @@
 # metabase-rde
 
-A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`; a data app goes through `references/data-apps.md` to the `metabase-data-apps` skill.
+A skill for an agent working as a data engineer at a company whose stack is unknown, with Metabase at the center: explore and profile raw data, build clean tables as Metabase transforms with transform tests pinning their rules, define the semantic layer (models, measures, segments, metrics, metadata), build dashboards, answer questions, and reconcile a number against a reference. `SKILL.md` routes; each job runs one playbook, resumable from `./.scratch/STATE.md`; a data app goes through `references/data-apps.md` to the `mb` CLI's data-app skills.
 
 The skill owns judgment and method, matched to the conventions the company already has. Metabase mechanics come from the CLI's bundled skills, read one section at a time when a step names one.
 
@@ -22,7 +22,7 @@ The installer detects which agents are installed (Claude Code, Codex, OpenCode, 
 
 ## Where the work lands
 
-Two environment modes, detected with `mb git-sync status`: a single production instance, where the build lands directly, hidden until it passes its checks and drafted until reviewed; or a staging instance with remote sync, where the deliverable is an exported branch for review, never the main branch without confirmation. With remote sync, everything the job builds is filed under the synced top-level collection and the Library that `rde init` marks for sync, so it reaches git on export; nothing finished is left at the root of the instance.
+Two environment modes, detected with `mb git-sync status`: a single production instance, where the build lands directly, hidden until it passes its checks and drafted until reviewed; or a staging instance with remote sync, where the deliverable is an exported branch for review, never the main branch without confirmation. With remote sync, finished work is filed in the Library, which `rde init` marks for sync, and transforms and a data app's collection sync too; work in progress stays in `Drafts`, outside git.
 
 ## Playbooks
 
