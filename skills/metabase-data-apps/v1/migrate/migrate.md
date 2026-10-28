@@ -13,6 +13,10 @@ each described by a guide in `migrate/references/upgrades/`. Nothing is skipped 
 is remembered between sessions: the app's own files and git history carry all
 the state.
 
+React dependencies can also need an upgrade without a contract-version change.
+The current template uses React 19; follow _React 19 dependencies_ below for
+existing apps, even when their contract version already equals the target.
+
 ## Four invariants
 
 Every step below follows from these. Never break them.
@@ -61,17 +65,52 @@ Then decide:
 
 | HEAD version  | working tree                   | do                                                                                                                                                                                                                                |
 | ------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| equals target | clean                          | Nothing to migrate. Say so; run the final gates only if the user asked to verify.                                                                                                                                                 |
+| equals target | clean                          | Check _React 19 dependencies_. If those already match, nothing to migrate; run the final gates only if the user asked to verify.                                                                                                                                                 |
 | above target  | any                            | **Stop.** There is no downgrade. Either Metabase, the SDK, and the skills are older than the app, or a bump was committed against the wrong instance (`git log -- data_apps/<slug>/data_app.yaml` shows it). Wait for the answer. |
 | below target  | clean                          | Start at _Step 1_.                                                                                                                                                                                                                |
 | any           | dirty under `data_apps/<slug>` | A previous session was interrupted. Go to _Resuming_ first.                                                                                                                                                                       |
+
+## React 19 dependencies
+
+Read `package.json`. Align `react` and `react-dom` with `setup/template/package.json`
+(`^19.0.0`), and align `@types/react` and `@types/react-dom` (`^19.0.0`) when the app
+uses TypeScript. Use the app's existing package manager; for npm:
+
+```bash
+npm install react@^19.0.0 react-dom@^19.0.0
+npm install --save-dev @types/react@^19.0.0 @types/react-dom@^19.0.0
+```
+
+Update any overrides or resolutions that pin these packages to React 18. Commit
+`package.json` and the existing lockfile together. This dependency upgrade does
+not change `data_app.yaml`'s `version`.
+
+If the contract version already equals the target, run _Step 3_ after updating
+the dependencies, using the unchanged contract version in the commit message.
+If contract upgrades remain, continue with _Step 1_ and leave compiler and build
+checks until the target version.
+
+At the final typecheck, apply the React 19 type changes where needed:
+
+- Import the `JSX` type from `react` instead of using the removed global namespace.
+- Give `useRef` an initial value; use `null` for DOM refs and include it in ref types.
+- Use a block body for ref callbacks that assign a value, so they return nothing
+  rather than the assigned value.
+- Replace removed `React.VFC` with `React.FC`, and `ReactDOM.render` with
+  `createRoot` from `react-dom/client` if the app owns a standalone preview root.
+- Narrow `element.props` with `isValidElement<Props>` before reading properties.
+
+A React type error from these changes belongs to this dependency upgrade, not a
+missing contract upgrade guide. Run the final gates with the updated dependency
+tree; changing version ranges alone does not prove the app works on React 19.
 
 ## Step 1 - Preflight, once
 
 1. Install the SDK that matches the target Metabase release with the app's
    package manager (`npm install @metabase/embedding-sdk-react@<tag>` or its
    equivalent); each upgrade guide names the dist-tag it was written against.
-   The lockfile change is committed with the final upgrade.
+   Align the React dependencies as described in _React 19 dependencies_.
+   The package and lockfile changes are committed with the final upgrade.
 2. Confirm the app is template-shaped at its current version: `vite.config.ts`
    is the one-liner `export default dataAppConfig()` and `src/index.tsx`
    default-exports a `DataAppFactory`. If not, **Stop**: this is not a version
@@ -145,8 +184,10 @@ Do not batch steps across upgrades. Do not touch `version` before item 5.
 ## Resuming an interrupted migration
 
 A fresh session has no memory of the previous one and needs none. Read the
-three numbers from _Step 0_ and `git status --porcelain -- data_apps/<slug>`,
-then:
+three numbers from _Step 0_ and `git status --porcelain -- data_apps/<slug>`.
+If HEAD and the working-tree version both equal the target and the React
+dependency upgrade is unfinished, resume _React 19 dependencies_ and re-run
+_Step 3_; there is no contract upgrade guide to apply. Otherwise:
 
 | tree  | working-tree version              | meaning                                                                                                          | do                                                                                                                                                                       |
 | ----- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -161,6 +202,8 @@ Files dirty outside `data_apps/<slug>` are not yours: never `git add` them.
 
 One line per upgrade, in order: `v1 -> v2: done (commit abc1234)` or
 `v2 -> v3: blocked - <the exact Done-when command that fails and its output>`.
+For a dependency-only upgrade, report `React 19: done (commit abc1234)` or
+`React 19: blocked - <the failing command and its output>`.
 Never soften a failing check. Keep `tsc` output grouped by root cause with a
 few representative diagnostics rather than pasting it whole.
 
