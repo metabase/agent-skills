@@ -20,7 +20,7 @@ library: data=<id> metrics=<id>   # or: unavailable
 tag: <tag>=<id>  job: <id>
 autonomy: balanced            # owner of definitions: the user, unless they name someone
 environment: production       # or: staging, branch <name>
-remote_sync: none             # or: <branch>, read-write | read-only; from mb git-sync status; none means never raise syncing, except for a data app (data-apps.md, section 5)
+remote_sync: none             # or: <branch>, read-write | read-only; from mb git-sync status; none means never raise syncing, except for a data app (data-apps.md, section 1)
 apps: none                    # or, per data app now or planned: <slug> reads <table ids>, writes <table ids>
 domain: subscription-revenue  # or none, or two when a table genuinely straddles domains
 stage: build-clean-tables
