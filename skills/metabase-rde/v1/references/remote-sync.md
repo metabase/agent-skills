@@ -1,6 +1,6 @@
 # Remote sync
 
-Read before the first collection, card, dashboard, or transform of a job and before any sync step when STATE.md `remote_sync` is not `none`; with `none`, nothing here applies (`SKILL.md`, "Where the work lands"). In staging, a data app reaches production through remote sync together with the Library content it reads: `data-apps.md`, section 5. Mechanics: `mb skills path git-sync`.
+Read before the first collection, card, dashboard, or transform of a job and before any sync step when STATE.md `remote_sync` is not `none`; with `none`, nothing here applies (`SKILL.md`, "Where the work lands"). A data app always reaches Metabase through remote sync, in staging on one job branch with the Library content it reads: `data-apps.md`, section 5. Mechanics: `mb skills path git-sync`.
 
 ## What belongs in git
 

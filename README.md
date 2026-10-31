@@ -54,7 +54,7 @@ Build Metabase custom visualizations with [`@metabase/custom-viz`](https://www.n
 
 [metabase-rde](./skills/metabase-rde/v1/SKILL.md)
 
-An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which limits what the app reads to the Library and, in staging, ships it through remote sync, then hands the build to the `mb` CLI's data-app skills. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic, data apps included.
+An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which limits what the app reads to the Library and ships it only through remote sync, then hands the build to the `mb` CLI's data-app skills. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic, data apps included.
 
 ### Database metadata
 
@@ -106,7 +106,7 @@ Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-ski
 
 [metabase-representation-format](./skills/metabase-representation-format/SKILL.md)
 
-Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms).
+Understands the Metabase Representation Format — a YAML-based serialization format for Metabase content (collections, cards, dashboards, documents, segments, measures, snippets, transforms, actions, and data apps).
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-representation-format-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-representation-format)
 
