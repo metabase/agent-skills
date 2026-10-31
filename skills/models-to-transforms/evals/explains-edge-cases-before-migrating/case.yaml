@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: explains-edge-cases-before-migrating
+expected_outcome: |
+  For both models, a concrete, instance-verified list of attached objects (bookmark holders count, dashcards showing the
+  model, filter value sources, alerts, subscriptions, actions and action buttons, dependents) and what swap + archive does
+  to each (e.g. dashcards showing the model are not swapped and get hidden on archive; archive deletes alerts and emails
+  recipients; converting to a question deletes action buttons/implicit actions; bookmarks hidden and tables can't be
+  bookmarked; filter sources reset on archive; access changes for users without create-queries), with a mitigation for
+  each. Read-only.
