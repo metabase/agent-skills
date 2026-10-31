@@ -58,7 +58,7 @@ Every classification with business meaning is decided per [collaboration-contrac
 
 Emit the incomplete trailing period and mark it. Every model that materializes periods carries `is_complete_period` (boolean, `period <= last_complete_period`), read from the one named constant `last_complete_period` in `cfg_<domain>` ([layering-and-naming.md](layering-and-naming.md)); no model hardcodes the date.
 
-- Point-in-time state (a balance, an active count, an ending run rate) is valid in the partial row and is the source of every "current" headline.
+- Point-in-time state (a balance, an active count, an ending run rate) is valid in the partial row and is the source of every "current" headline outside a data app, whose metric questions read complete periods only ([data-apps.md](data-apps.md), section 2).
 - Rollups, rates, and period-over-period comparisons read complete periods only: filter `is_complete_period` before grouping.
 - Publish a `Complete periods` segment (`mb segment create`, filter `is_complete_period` is true) on every periodic table in the final layer, so a question excludes the partial period with one click; its description names the partial period.
 - Assert in the first model that materializes periods that exactly one period per entity has `is_complete_period = false` and that it is the newest: the `period_flag` check in [data-quality-checks.md](data-quality-checks.md), and the same query as an `empty` expectation on a fixture whose `cfg_<domain>` input sets `last_complete_period` one period before `cap_period` ([transform-tests.md](transform-tests.md)).

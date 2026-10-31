@@ -77,4 +77,4 @@ Done needs two things: a recap in the hand-back shape with a browser link, never
 
 ## Working files and credentials
 
-Working files go in `./.scratch` (`mkdir -p ./.scratch` first), never a system temp directory; they are not a deliverable. Never paste credentials, tokens, or warehouse passwords into chat; when one must be stored, the user runs the storing command.
+Working files go in `./.scratch` (`mkdir -p ./.scratch` first), never a system temp directory; they are not a deliverable. Never paste credentials, tokens, or warehouse passwords into chat; when one must be stored, the user runs the storing command, except the data-app preview key, created after the user's yes and never printed ([data-apps.md](data-apps.md), section 3).
