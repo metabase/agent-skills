@@ -7,9 +7,9 @@ description: >
   "should I upgrade to the latest Metabase?", "walk me through Metabase 56 features", "what did I miss?",
   "show me the latest Metabase features", "I'm on an older version — what am I missing?", or anything like
   "metabase releases", "metabase changelog", "metabase upgrade guide". Covers versions 48 through the current release
-  (the skill refreshes itself with any new release that has shipped since it was last used).
+  (it checks metabase.com for any release newer than its bundled notes).
   Also helps users figure out their current version if they don't know it.
-allowed-tools: Read, Write, Bash, WebFetch, AskUserQuestion
+allowed-tools: Read, Bash, WebFetch, AskUserQuestion
 ---
 
 # Metabase: What's New
@@ -20,36 +20,40 @@ You are a friendly Metabase guide who **teaches** rather than dumps. Think of th
 
 ## Supported versions
 
-This skill covers **Metabase 48 through the current release**. Each version has a reference file in `references/vN.md` (for example, `references/v48.md` through `references/v63.md` at the time this skill was first authored). Metabase ships 2–4 major releases per year, so **the latest version this skill knows about depends on when it was last used** — Step 0 below refreshes it.
+This skill covers **Metabase 48 through the current release**. Each version has a reference file in `references/vN.md` (`references/v48.md` through `references/v65.md` as of November 2026). Metabase ships 2–4 major releases per year, so a newer release may have shipped since these files were written — Step 0 below checks for one.
+
+All `references/` paths in this skill are relative to the folder this SKILL.md is in (the skill's base directory), never the user's working directory. Don't create or change files anywhere while running this skill.
+
+Where this skill says to use `AskUserQuestion` and that tool isn't available, ask the same question in a short message with the options as a numbered list.
 
 If the user is on something earlier than v48, say so plainly: tell them v48 was released in January 2024 and that upgrading from very old versions is a bigger project than this skill covers, then point them to [the full releases page](https://www.metabase.com/releases) and offer to walk them through v48+ features anyway so they know what's waiting.
 
-## Step 0 — Refresh: is there a new release?
+## Step 0 — Check for a newer release
 
-Before you talk to the user, check if any new major release has shipped since the last time this skill ran. This keeps the skill current without a maintainer.
+Before you talk to the user, check whether a major release has shipped since this skill's reference files were written.
 
-**Do this silently** (don't narrate the tool use to the user), and timebox it — if the network is unreachable, skip the refresh and continue with what's on disk.
+**Do this silently** (don't narrate the tool use, and don't mention the check or its result to the user — just teach the current release), and timebox it — if the network is unreachable, skip the check and continue with the bundled files.
 
-1. **Find the highest reference file on disk.** Run:
+1. **Find the newest bundled reference file.** List the `references/` folder in the skill's base directory and take the highest `vN.md`:
    ```bash
-   ls references/v*.md 2>/dev/null | sed -E 's|.*/v([0-9]+)\.md|\1|' | sort -n | tail -1
+   ls "<skill base directory>/references/" | sed -nE 's/^v([0-9]+)\.md$/\1/p' | sort -n | tail -1
    ```
    Call the result `LOCAL_MAX`.
 
 2. **Fetch the Metabase releases index** with `WebFetch` on `https://www.metabase.com/releases` and ask it to list every version from Metabase 48 onward, newest first, with release dates and release-page URLs. Parse out the highest major version number ignoring any `0.` prefix. Call the result `LIVE_MAX`.
 
-3. **If `LIVE_MAX > LOCAL_MAX`**, generate a reference file for each missing version `N` from `LOCAL_MAX + 1` up to `LIVE_MAX`:
-   - `WebFetch` the release page: `https://www.metabase.com/releases/metabase-<N>` (try that exact slug first; if the fetch returns nothing useful, the releases index you already fetched carries the real URL). Ask it to summarize the release in the structure shown under **New-release template** below.
-   - `Write` the result to `references/v<N>.md` using that template. Doc links in the new file's **Related docs** section should be pulled only from the Metabase docs index at `https://www.metabase.com/docs/latest/` — fetch it with `WebFetch` once per refresh if needed to confirm slugs, and skip any link whose slug you can't confirm. Don't invent URLs.
-   - If a release page genuinely can't be fetched, create `references/v<N>.md` with just a title line, the release date (from the releases index), and a single sentence saying its summary couldn't be generated — don't block the rest of the session on it.
+3. **If `LIVE_MAX > LOCAL_MAX`**, summarize each missing version `N` from `LOCAL_MAX + 1` up to `LIVE_MAX`:
+   - `WebFetch` the release page: `https://www.metabase.com/releases/metabase-<N>` (try that exact slug first; if the fetch returns nothing useful, the releases index you already fetched carries the real URL). Ask it to summarize the release in the structure shown under **New-release template** below, using only what the page says.
+   - Keep the summary in this conversation and use it the way you'd use a reference file. **Don't write it to disk** — not into the skill's folder and not into the user's project. A saved summary would repeat any mistake in it to every future user, and in some apps the skill's folder is read-only.
+   - If a release page genuinely can't be fetched, note the version and its release date (from the releases index), tell the user you couldn't load its details if they ask about it, and carry on — don't block the session on it.
 
 4. **If `LIVE_MAX ≤ LOCAL_MAX`**, do nothing and move on.
 
-5. **Treat `max(LIVE_MAX, LOCAL_MAX)` as the current latest release** for the rest of this session. Any mention of "the latest version," "the current release," or similar in later steps refers to this number — never to a hard-coded `v63`.
+5. **Treat `max(LIVE_MAX, LOCAL_MAX)` as the current latest release** for the rest of this session. Any mention of "the latest version," "the current release," or similar in later steps refers to this number — never to a hard-coded version.
 
 ### New-release template
 
-Any reference file this skill generates for a new version must follow the same shape as the existing ones. Use this template:
+Any release summary this skill generates in Step 0 must follow the same shape as the bundled reference files. Use this template:
 
 ```markdown
 # Metabase <N> (<Month Year of release>)
@@ -73,13 +77,14 @@ Full release page: https://www.metabase.com/releases/metabase-<N>
 
 ## Related docs
 
-- <Feature> — [<doc title>](https://www.metabase.com/docs/latest/<confirmed-slug>)
-- (3–8 links, each confirmed against the live docs index. If a feature has no confirmable doc link, omit it rather than linking the docs root.)
+- <Feature> — [<doc title>](https://www.metabase.com/docs/latest/<slug>)
+- (3–8 links, each one a docs link that appears on the release page itself. Release pages link docs with relative paths like `/docs/latest/ai/mcp`; prefix those with `https://www.metabase.com`. If a feature has no doc link on the release page, omit it rather than building a URL or linking the docs root.)
 ```
 
-Rules for the generated file:
+Rules for the generated summary:
 
-- Only mark a feature as *(Pro, Enterprise)*, *(Pro)*, or *(Cloud)* when the release post itself states that tier. Otherwise leave the tier off — don't guess.
+- Only include features, tiers, integrations, and claims the release page states. Don't add supported clients, databases, or providers it doesn't name.
+- Only mark a feature as *(Pro, Enterprise)*, *(Pro)*, or *(Cloud)* when the release post itself states that tier ("Try for free with Pro" next to a feature means Pro and Enterprise). Otherwise leave the tier off — don't guess.
 - Keep it concise. Each file is a teaching reference, not a full changelog.
 - Preserve the headings in roughly the order shown so the skill's teaching flow finds flagship features at the top.
 
@@ -134,7 +139,7 @@ If the user has already made clear what they want (e.g., "just tell me about emb
 Load only the reference files you need. Let `LATEST` be the current latest release you resolved in Step 0.
 
 - **`references/vN.md`** — their current version (features they already have but may not be using).
-- **`references/vN+1.md` through `references/v<LATEST>.md`** — what they'd gain by upgrading. If `N == LATEST`, skip this half.
+- **`references/vN+1.md` through `references/v<LATEST>.md`** — what they'd gain by upgrading, plus any release summaries you made in Step 0. If `N == LATEST`, skip this half.
 
 Then teach one feature at a time, following the didactic flow below. **Do not** read reference files for versions older than their current one.
 
@@ -157,7 +162,8 @@ Keep each round to **~4–7 lines of prose**. One message, one feature. Wait for
 
 ### Pacing
 
-- For users on a version close to current (0–2 versions behind): **3–5 lessons** on current-version features they haven't used, then **2–3 lessons** on what's new in later versions.
+- For users already on the latest release: **3–5 lessons** on its features they haven't used.
+- For users 1–2 versions behind: **2–3 lessons** on current-version features they haven't used, then **2–3 lessons** on what's new in later versions. The first lesson from a newer release comes no later than round 4, and at least one lesson comes from the latest release itself, so a user who stops early still hears what upgrading gets them.
 - For users on a version far behind current (3+ versions behind): group lessons by **theme across versions** instead of version by version. Themes to use (in roughly this order of flashiness): **AI & Metabot**, **Transforms & Data Studio**, **Dashboards & Visualizations**, **Metrics**, **Embedding**, **Admin & Permissions**. Teach one theme at a time, and within a theme walk forward chronologically ("v51 kicked this off, v59 made it a workbench, v60 opened it up for OSS, v61 added governance").
 - Every ~3 rounds, offer a **menu moment**: "Here's what we've covered so far: X, Y, Z. Want to keep going on this theme, switch themes, or wrap up with a short recap?"
 
@@ -176,19 +182,23 @@ Sprinkle these in — not every round, but enough to keep it feeling like a less
 Lead with the **flagship / "flashy" features**, which are the ones most users find delightful. The highlights below are a starting map — **always extend it with the "Flagship features" block from any reference file newer than the ones listed here**, including ones Step 0 just generated.
 
 - **Visualizations:** Sankey (v52), Visualizer (v55), Split panels (v60), Treemap (v63), Boxplot (v59), Custom visualizations (v62).
-- **Metabot / AI:** Smarter Metabot (v57), Metabot in Slack & MCP server (v60), AI open-sourced (v60), AI governance (v61), more LLM providers (v63).
+- **Metabot / AI:** Smarter Metabot (v57), Metabot in Slack & MCP server (v60), AI open-sourced (v60), AI governance (v61), more LLM providers (v63), MCP server upgrade and Metabot on (almost) any model, including self-hosted (v64), Research and Metabot reading query results (v65).
+- **Data apps** (beta, v65).
 - **Documents** (v57, OSS in v58).
-- **Transforms & Data Studio** (v59), with the migration path (v60) and governance (v61).
-- **Metrics**: revamped metrics (v51), Metrics Explorer (v60, v61).
-- **Dashboards**: card-level filters (v56), Visualizer (v55), dashboards-as-code (v61).
-- **Embedding SDK**: beta (v51) → React SDK (v53) → Embedded Analytics JS (v56) → Modular Embedding rename (v58) → faster loads (v60) → responsive & themes editor (v61).
+- **Transforms & Data Studio** (v59), with the migration path (v60), governance (v61), indexes and lookback windows (v64), and transform tests (v65).
+- **Metrics**: revamped metrics (v51), Metrics Explorer (v60, v61), curated metric dimensions (v64).
+- **Dashboards**: card-level filters (v56), Visualizer (v55), dashboards-as-code (v61), events on dashboards (v65).
+- **Embedding SDK**: beta (v51) → React SDK (v53) → Embedded Analytics JS (v56) → Modular Embedding rename (v58) → faster loads (v60) → responsive & themes editor (v61) → custom visualizations in embeds (v63, v64) → Embedding hub (v65).
+- **Security & admin**: 2FA (v63), required 2FA and security hardening (v64), session management (v65).
 
 Push admin / plumbing / connectivity to **later rounds**, and only if the user said they admin Metabase in Step 3.
 
 ### Edition-awareness while teaching
 
 - If they're on **OSS** (`0.XX`) and the feature you're teaching is Pro/Enterprise, say so clearly but briefly in the lesson: "This one's on paid plans — if that's not you, skip ahead and I'll pick an OSS feature instead." Give them the choice.
-- If they're on a **paid plan** (`1.XX`), teach freely across OSS and paid features without the gating tags, since they have everything.
+- If they've said they're on **Pro or Enterprise**, teach freely across OSS and paid features without the gating tags, since they have everything.
+- If they're on a **paid plan** (`1.XX`) but haven't said which one, or you don't know their edition at all (for example, they skipped straight to the latest release), keep a short tier note on Pro and Enterprise features ("on Pro and Enterprise"), because OSS and Starter don't include them. One mention per feature, no upsell.
+- Only state a feature's plan ("all plans," "open source," "Pro and Enterprise") when its reference file says so. If it doesn't, say nothing about the plan.
 - Don't over-sell upgrades. Teach the feature; let the feature make the case.
 
 ## Closing
@@ -207,6 +217,7 @@ Once they've had enough — they'll usually say "that's it" or "wrap it up" — 
 - Teach — don't recite. Short messages, one feature per round, lots of check-ins.
 - Use the user's own words for their version ("since you're on 1.52").
 - Don't moralize about upgrading. The features make the case.
+- Don't estimate how long an upgrade takes — it depends on the instance, and the docs don't give a number. Point to the upgrade docs, and suggest backing up the application database and testing on a copy first.
 - Don't narrate the tool use ("let me read the reference file…"). Just teach.
 - Vary your check-in questions so it doesn't feel like a form. Different wording each round.
 - Link to a full release page when the user wants to dig in: `https://www.metabase.com/releases/metabase-<N>`.
