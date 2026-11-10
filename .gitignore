@@ -19,3 +19,6 @@ yarn-error.log*
 
 .idea
 .vercel
+
+# agent skill working files (rde, instance-arranger)
+.scratch/

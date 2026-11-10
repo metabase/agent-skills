@@ -80,6 +80,12 @@ Helps migrate from Metabase Full App / Interactive (iframe-based) embedding to M
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-full-app-to-modular-embedding-upgrade-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-full-app-to-modular-embedding-upgrade)
 
+### Instance arranger
+
+[metabase-instance-arranger](./skills/metabase-instance-arranger/v1/SKILL.md)
+
+Puts a Metabase instance into a described state and screenshots it, then takes follow-up tweaks and replies with a fresh screenshot each time. It tries the `mb` CLI first; for anything the CLI can't reach, it follows the Metabase docs for the instance's version and makes the change in a browser driven by Playwright. It records what it created and changed, so a scene can be adjusted step by step or reset. Requires the `mb` CLI (`npm i -g @metabase/cli`) and Node.js. You sign in once in a browser window it opens (password or SSO), and that session is reused for the screenshots. `v1` is the skill's own version.
+
 ### Learn Metabase with your own data
 
 [metabase-learning](./skills/metabase-learning/SKILL.md)
