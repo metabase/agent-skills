@@ -1,6 +1,8 @@
 # Agent skills for Metabase
 
-A collection of agent skills for working with your Metabase. These skills are built for Claude Code but may also work with other AI coding agents (Cursor, Windsurf, etc.). They help perform complex Metabase embedding migrations and upgrades, explore data models, and create Metabase content automatically.
+A collection of agent skills for working with your Metabase. Some help you learn and adopt Metabase: learning the product, catching up on what's new in your version, getting your data ready for AI, and rolling AI out with the right controls. Others help you build with it: embedding migrations and upgrades, exploring data models, and creating Metabase content automatically.
+
+These skills are built for Claude Code but may also work with other AI coding agents (Cursor, Windsurf, etc.). The skills for learning and adopting Metabase also work in the Claude app; see each skill's README.
 
 ## Installation
 
@@ -18,9 +20,9 @@ npx skills add metabase/agent-skills --skill metabase-modular-embedding-version-
 
 ## Skills
 
-Always review and validate the changes made by a skill. Depending on your application's complexity, a skill may not work properly in all cases. Check that your application builds, tests pass, and the embedding works as expected before committing.
+### Learn and adopt Metabase
 
-### AI governance checklist
+#### AI governance checklist
 
 [ai-governance-checklist](./skills/ai-governance-checklist/SKILL.md)
 
@@ -28,7 +30,7 @@ A task-completion coach for rolling out AI analytics without giving up control �
 Metabot, what it can see, how much it costs, where the model runs, and the audit trail —
 adapted to whether you're an admin and what plan you're on.
 
-### AI readiness checklist
+#### AI readiness checklist
 
 [ai-readiness-checklist](./skills/ai-readiness-checklist/SKILL.md)
 
@@ -36,7 +38,23 @@ A task-completion coach for getting Metabase data ready for Metabot and the Meta
 server — modeling, context, metrics, canonical sources, verification, and turning AI on
 everywhere — adapted to whether you're an admin and what plan you're on.
 
-### CLI
+#### Learn Metabase with your own data
+
+[metabase-learning](./skills/metabase-learning/SKILL.md)
+
+Learn the ins and outs of Metabase, with quizzes and optionally your own data (through the Metabase MCP server).
+
+#### What's new in Metabase
+
+[metabase-whats-new](./skills/metabase-whats-new/SKILL.md)
+
+Finds out which Metabase version you're on, then teaches what's new one feature at a time: features in your release you might not be using yet, and what you'd get by upgrading. Bundles release notes from Metabase 48 onward and checks metabase.com for anything newer each time it runs. Knows which features are open source and which are Pro and Enterprise only.
+
+### Build with Metabase
+
+Always review and validate the changes made by a skill. Depending on your application's complexity, a skill may not work properly in all cases. Check that your application builds, tests pass, and the embedding works as expected before committing.
+
+#### CLI
 
 [metabase-cli](./skills/metabase-cli/SKILL.md)
 
@@ -44,19 +62,19 @@ Drives a Metabase instance from the terminal via the official `mb` CLI — every
 
 This skill is a thin discovery stub; the workflow content lives in [`@metabase/cli`](https://www.npmjs.com/package/@metabase/cli) and is served at runtime by `mb skills get`. Install the CLI (`npm i -g @metabase/cli`) and the skill resolves the rest. The same skill is also available as a Claude Code plugin direct from the CLI repo (`/plugin marketplace add metabase/mb-cli` + `/plugin install metabase-cli@metabase`); one install path is enough.
 
-### Custom visualizations
+#### Custom visualizations
 
 [metabase-custom-viz](./skills/metabase-custom-viz/v1/SKILL.md)
 
 Build Metabase custom visualizations with [`@metabase/custom-viz`](https://www.npmjs.com/package/@metabase/custom-viz): scaffold a project, turn a request into a working visualization, iterate on it against a local Metabase, debug sandbox and rendering issues, and package the `.tgz` for upload. The skill reads the sandbox rules, color names and column type predicates straight from the Metabase source on GitHub, at the tag the installed `@metabase/custom-viz` was released from. `v1` is the skill's own version, independent of the SDK's: a change that breaks how the skill is used gets a new folder (`v2`, ...) and the old one stays.
 
-### Data engineering router
+#### Data engineering router
 
 [metabase-rde](./skills/metabase-rde/v1/SKILL.md)
 
 An expert data-engineering workflow with Metabase at the center of whatever stack a company runs: explore and profile raw warehouse tables, build clean layered tables as Metabase transforms, build the semantic layer (models, metrics, measures, segments, metadata), design dashboards, answer questions with checked numbers, and reconcile results against a reference. A router loads one playbook and the few reference files a job needs; a data app goes through its `references/data-apps.md`, which limits what the app reads to the Library and ships it only through remote sync, then hands the build to the `mb` CLI's data-app skills. Requires the `mb` CLI (`npm i -g @metabase/cli`); it loads the CLI's bundled skills for every Metabase mechanic, data apps included.
 
-### Database metadata
+#### Database metadata
 
 [metabase-database-metadata](./skills/metabase-database-metadata/SKILL.md)
 
@@ -64,7 +82,7 @@ Retrieves and caches database metadata (databases, tables, fields, field values)
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-database-metadata-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-database-metadata)
 
-### Embedding SSO implementation
+#### Embedding SSO implementation
 
 [metabase-embedding-sso-implementation](./skills/metabase-embedding-sso-implementation/SKILL.md)
 
@@ -72,7 +90,7 @@ Helps implement JWT SSO authentication for Metabase embedding, including the sig
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-embedding-sso-implementation-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-embedding-sso-implementation)
 
-### Full app to modular embedding upgrade
+#### Full app to modular embedding upgrade
 
 [metabase-full-app-to-modular-embedding-upgrade](./skills/metabase-full-app-to-modular-embedding-upgrade/SKILL.md)
 
@@ -80,13 +98,7 @@ Helps migrate from Metabase Full App / Interactive (iframe-based) embedding to M
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-full-app-to-modular-embedding-upgrade-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-full-app-to-modular-embedding-upgrade)
 
-### Learn Metabase with your own data
-
-[metabase-learning](./skills/metabase-learning/SKILL.md)
-
-Learn the ins and outs of Metabase, with quizzes and optionally your own data (through the Metabase MCP server).
-
-### Modular embedding to modular embedding SDK upgrade
+#### Modular embedding to modular embedding SDK upgrade
 
 [metabase-modular-embedding-to-modular-embedding-sdk-upgrade](./skills/metabase-modular-embedding-to-modular-embedding-sdk-upgrade/SKILL.md)
 
@@ -94,7 +106,7 @@ Helps migrate from Metabase Modular embedding (web components via `embed.js`) to
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-modular-embedding-to-modular-embedding-sdk-upgrade-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-modular-embedding-to-modular-embedding-sdk-upgrade)
 
-### Modular embedding version upgrade
+#### Modular embedding version upgrade
 
 [metabase-modular-embedding-version-upgrade](./skills/metabase-modular-embedding-version-upgrade/SKILL.md)
 
@@ -102,7 +114,7 @@ Helps upgrade a project's Modular embedding SDK (`@metabase/embedding-sdk-react`
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-modular-embedding-version-upgrade-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-modular-embedding-version-upgrade)
 
-### Representation format
+#### Representation format
 
 [metabase-representation-format](./skills/metabase-representation-format/SKILL.md)
 
@@ -110,16 +122,10 @@ Understands the Metabase Representation Format — a YAML-based serialization fo
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-representation-format-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-representation-format)
 
-### Static embedding to guest embedding upgrade
+#### Static embedding to guest embedding upgrade
 
 [metabase-static-embedding-to-guest-embedding-upgrade](./skills/metabase-static-embedding-to-guest-embedding-upgrade/SKILL.md)
 
 Helps migrate from Metabase Static embedding (signed embed iframes) to Guest embeds (web components via `embed.js`).
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-static-embedding-to-guest-embedding-upgrade-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-static-embedding-to-guest-embedding-upgrade)
-
-### What's new in Metabase
-
-[metabase-whats-new](./skills/metabase-whats-new/SKILL.md)
-
-Finds out which Metabase version you're on, then teaches what's new one feature at a time: features in your release you might not be using yet, and what you'd get by upgrading. Bundles release notes from Metabase 48 onward and checks metabase.com for anything newer each time it runs. Knows which features are open source and which are Pro and Enterprise only.
