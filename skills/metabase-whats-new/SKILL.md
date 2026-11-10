@@ -195,9 +195,10 @@ Push admin / plumbing / connectivity to **later rounds**, and only if the user s
 
 ### Edition-awareness while teaching
 
-- If they're on **OSS** (`0.XX`) and the feature you're teaching is Pro/Enterprise, say so clearly but briefly in the lesson: "This one's on paid plans — if that's not you, skip ahead and I'll pick an OSS feature instead." Give them the choice.
+- If they're on **OSS** (`0.XX`) and the feature you're teaching is Pro/Enterprise, say so clearly but briefly in the lesson, with a link to the plans: "This one's on [paid plans](https://www.metabase.com/pricing) — if that's not you, skip ahead and I'll pick an OSS feature instead." Give them the choice.
 - If they've said they're on **Pro or Enterprise**, teach freely across OSS and paid features without the gating tags, since they have everything.
-- If they're on a **paid plan** (`1.XX`) but haven't said which one, or you don't know their edition at all (for example, they skipped straight to the latest release), keep a short tier note on Pro and Enterprise features ("on Pro and Enterprise"), because OSS and Starter don't include them. One mention per feature, no upsell.
+- If they're on a **paid plan** (`1.XX`) but haven't said which one, or you don't know their edition at all (for example, they skipped straight to the latest release), keep a short tier note on Pro and Enterprise features ("on [Pro and Enterprise](https://www.metabase.com/pricing)"), because OSS and Starter don't include them. One mention per feature, no upsell.
+- The pricing link goes in the tier note only, once per feature, tagged as described in **Link tags** below. Summaries, menus, and recaps count too: there, write the tier as "(on [Pro and Enterprise](https://www.metabase.com/pricing))" instead of a bare "(Pro/Enterprise)".
 - Only state a feature's plan ("all plans," "open source," "Pro and Enterprise") when its reference file says so. If it doesn't, say nothing about the plan.
 - Don't over-sell upgrades. Teach the feature; let the feature make the case.
 
@@ -235,6 +236,22 @@ Where to drop them:
 If a feature in your lesson has no matching entry in the reference file's Related docs list, skip the doc link for that lesson — don't link the docs root as a placeholder.
 - If a user asks a follow-up like "tell me more about Transforms," read the relevant reference file(s) and expand that mini-lesson. Follow-ups are the point.
 - Never dump the whole content of a reference file into chat.
+
+## Link tags
+
+Every metabase.com link you show — docs, release pages, the upgrade docs, pricing — gets these query parameters, so Metabase can see which links from this skill people follow. The links in the reference files and in this file are untagged; add the tags when you show them.
+
+```
+utm_source=ai-agent&utm_medium=skill&utm_campaign=whats-new-skill&utm_content=<link type>&utm_term=<version>
+```
+
+- `<link type>`: `upgrade` for the upgrade docs, `pricing` for /pricing, `release` for a release page, and `docs` for any other docs page.
+- `<version>`: the version the user told you, as the prefix and major version, for example `v0.55` or `v1.62`. Use `latest` if they went straight to the latest release, and `unknown` if they never said.
+- Put the parameters before any `#anchor`. If the URL already has a `?`, join them with `&`.
+- Keep the link text plain: the tags go in the URL, never in the text the user reads.
+
+For example, the upgrade docs for someone on 1.62:
+`[the upgrade docs](https://www.metabase.com/docs/latest/installation-and-operation/upgrading-metabase?utm_source=ai-agent&utm_medium=skill&utm_campaign=whats-new-skill&utm_content=upgrade&utm_term=v1.62)`
 
 ## Edition shorthand
 

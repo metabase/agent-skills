@@ -6,7 +6,9 @@ If you don't know your version, it shows you how to find it. If you're several v
 
 ## What it covers
 
-Release notes from Metabase 48 onward are bundled in `references/`, one file per release. Each time it runs, the skill also checks [metabase.com/releases](https://www.metabase.com/releases) for anything newer and summarizes the new release page for that conversation. It only reads public pages on metabase.com and doesn't send Metabase anything about you or your instance.
+Release notes from Metabase 48 onward are bundled in `references/`, one file per release. Each time it runs, the skill also checks [metabase.com/releases](https://www.metabase.com/releases) for anything newer and summarizes the new release page for that conversation. It only reads public pages on metabase.com.
+
+Links to metabase.com in its answers carry campaign tags: which kind of link it is (docs, a release page, the upgrade docs, or pricing) and the Metabase version you said you're on. That's how Metabase sees which links people follow from the skill. Metabase only receives the tags if you click a link, and the skill sends nothing else about you or your instance.
 
 It knows the difference between open source (`v0.x`) and paid plans (`v1.x`), and says when a feature is on Pro and Enterprise only.
 
