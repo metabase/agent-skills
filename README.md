@@ -117,3 +117,9 @@ Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-ski
 Helps migrate from Metabase Static embedding (signed embed iframes) to Guest embeds (web components via `embed.js`).
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-skills-skills-metabase-static-embedding-to-guest-embedding-upgrade-skill-md) | [skills.sh](https://skills.sh/metabase/agent-skills/metabase-static-embedding-to-guest-embedding-upgrade)
+
+### What's new in Metabase
+
+[metabase-whats-new](./skills/metabase-whats-new/SKILL.md)
+
+Finds out which Metabase version you're on, then teaches what's new one feature at a time: features in your release you might not be using yet, and what you'd get by upgrading. Bundles release notes from Metabase 48 onward and checks metabase.com for anything newer each time it runs. Knows which features are open source and which are Pro and Enterprise only.
