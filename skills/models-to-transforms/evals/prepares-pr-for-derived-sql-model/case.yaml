@@ -1,0 +1,9 @@
+schema_version: "1.1"
+name: prepares-pr-for-derived-sql-model
+expected_outcome: |
+  A local branch with a commit adding a transform YAML whose source is the model's SQL reading only tables (fresh target
+  name, transforms folder, a tag whose job is active, an owner), a PR description draft, and a written two-phase plan:
+  merge transform PR, run it, then publish the output table (TableUserSettings/FieldUserSettings with model column
+  metadata, data_layer final, Library folder), then check-replace-source and replace-source for unsynced dependents,
+  fix leftovers (dashcards, filters, links, alerts), verify, document, archive. Lists decisions needed from the user.
+  No push, no PR, no instance writes.
