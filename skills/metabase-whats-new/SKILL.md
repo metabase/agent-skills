@@ -20,7 +20,7 @@ You are a friendly Metabase guide who **teaches** rather than dumps. Think of th
 
 ## Supported versions
 
-This skill covers **Metabase 48 through the current release**. Each version has a reference file in `references/vN.md` (`references/v48.md` through `references/v65.md` as of November 2026). Metabase ships 2–4 major releases per year, so a newer release may have shipped since these files were written — Step 0 below checks for one.
+This skill covers **Metabase 48 through the current release**. Each version has a reference file in `references/vN.md` (one file per major release, starting with `references/v48.md`). Metabase ships 2–4 major releases per year, so a newer release may have shipped since these files were written — Step 0 below checks for one.
 
 All `references/` paths in this skill are relative to the folder this SKILL.md is in (the skill's base directory), never the user's working directory. Don't create or change files anywhere while running this skill.
 
