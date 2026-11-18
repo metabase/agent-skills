@@ -3,7 +3,7 @@
 ## Key Concepts to Teach
 
 ### 1. Visualizations Are Attached to Questions
-- Every Question has a visualisation type
+- Every Question has a visualization type
 - The same data can be displayed as a table, bar chart, line chart, etc.
 - Metabase auto-selects a type — you can always override it
 
@@ -34,6 +34,8 @@ Click **Settings** in the bottom-left after picking a chart type:
 
 - **Axes**: which column goes on X vs Y; axis labels; min/max scale
   - Example: on a revenue-by-month line chart, set Y-axis min to 0 so dips aren't exaggerated
+  - With two series on different scales (revenue and order count), put one on the right
+    y-axis and label it under **Axes → Right y-axis** (Metabase 65)
 - **Series**: which columns to plot; colors; display names
   - Example: rename "Sum of Total" to "Revenue" in the chart legend
 - **Display**: stacking (for bar/area), line style, data point labels
@@ -48,6 +50,11 @@ Click **Settings** in the bottom-left after picking a chart type:
 - CSV / XLSX: raw data (e.g. export all Orders from 2024 for finance)
 - PNG: the rendered chart image (e.g. screenshot of the revenue bar chart for a slide)
 - Admins can restrict download permissions per group
+- **Copy to clipboard** (Metabase 64): the copy button in the bottom-right corner copies a
+  chart or a results table, ready to paste into a doc or Slack — faster than downloading
+  when you just need it once
+- **Copy value** (Metabase 64): click a data point on a chart and choose Copy value to grab
+  that single number
 
 ---
 
@@ -65,8 +72,8 @@ Click **Settings** in the bottom-left after picking a chart type:
 **Q4.** What's a Goal Line and how would you use it on an average Reviews.Rating chart?
 > **A:** A Goal Line is a horizontal line drawn at a specific value. On a Reviews.Rating chart, you'd set it at 4.0 to visually show whether product quality is above or below your target — any bar below the line needs attention.
 
-**Q5.** The People table has Latitude and Longitude columns. What visualisation type does this unlock, and what would a useful question look like?
-> **A:** A pin Map — you can plot each customer's location geographically. A useful question: show all People records as dots on a map to visualise where your customers are concentrated.
+**Q5.** The People table has Latitude and Longitude columns. What visualization type does this unlock, and what would a useful question look like?
+> **A:** A pin Map — you can plot each customer's location geographically. A useful question: show all People records as dots on a map to visualize where your customers are concentrated.
 
 ---
 

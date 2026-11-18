@@ -44,7 +44,7 @@ WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'
 GROUP BY 1
 ORDER BY 1;
 
--- Accounts that converted from trial (not possible in Notebook without a Model)
+-- Accounts that converted from trial (not possible in the query builder without a Model)
 SELECT id, first_name, last_name, plan, trial_ends_at, created_at
 FROM accounts
 WHERE trial_converted = true
@@ -96,7 +96,7 @@ GROUP BY u.state;
 ```
 
 ### 7. Saving and Using SQL Questions
-- Saved exactly like Notebook questions — appear in search, add to dashboards
+- Saved exactly like query builder questions — appear in search, add to dashboards
 - SQL questions support template variables as dashboard filter inputs
 
 ---
@@ -132,7 +132,7 @@ GROUP BY u.state;
 > ```
 > Caveat: `Offset()` references the previous *row*, not the previous *calendar period* — if your data is missing a month, that gap shifts the comparison, so make sure every period has a row.
 
-**Q5.** Can a SQL question be added to a dashboard the same way as a Notebook question?
+**Q5.** Can a SQL question be added to a dashboard the same way as a query builder question?
 > **A:** Yes — once saved, SQL questions behave identically. They can be added to dashboards, used with dashboard filters (via template variables), and scheduled for alerts.
 
 ---
@@ -141,6 +141,8 @@ GROUP BY u.state;
 - The SQL dialect depends on your database. The sample DB is H2/PostgreSQL-like.
 - Text template variables pass raw strings — you may need quotes: `WHERE category = '{{category}}'`
 - Field filters only work well when Metabase knows the column's semantic type (set in Admin).
-- "View the SQL" on a Notebook question is read-only. Switching to SQL mode is one-way —
-  you lose the Notebook view.
+- "View the SQL" on a query builder question is read-only. Switching to SQL mode is
+  one-way — you lose the query builder view.
+- On Postgres, Metabase 65 compiles multi-stage query builder questions into CTEs (`WITH`
+  clauses), so "View the SQL" output looks different than on older versions.
 - `{{#question_id}}` references only work if you have permission to view that question.

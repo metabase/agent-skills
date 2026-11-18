@@ -84,7 +84,7 @@ Marketplace links: [skillsmp.com](https://skillsmp.com/skills/metabase-agent-ski
 
 [metabase-learning](./skills/metabase-learning/SKILL.md)
 
-Learn the ins and outs of Metabase, with quizzes and optionally your own data (through the Metabase MCP server).
+Learn the ins and outs of Metabase in ten lessons, with quizzes and exercises. It optionally uses your own data (if you have the Metabase MCP server connected), for more relevant and meaningful examples.
 
 ### Modular embedding to modular embedding SDK upgrade
 

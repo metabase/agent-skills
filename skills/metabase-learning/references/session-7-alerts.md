@@ -32,9 +32,12 @@ Simple rule: **Alerts = "notify me *if* something happens"**. **Subscriptions = 
 1. Open a saved Question
 2. Click the **three-dots (…) menu** (top-right) → **Create an alert**
 3. Choose alert type and condition
-4. Set check frequency: by-the-minute, hourly, daily, weekly, monthly, or a custom cron schedule
+4. Set check frequency: by-the-minute, hourly, daily, weekly, monthly, or a custom cron schedule. As of Metabase 64 you have to pick a time for daily and longer schedules — there's no default, so alerts don't all pile up at 8:00 AM
 5. Set delivery: email, Slack, or a webhook, and the recipients
 6. Save
+
+Admins manage everyone's alerts in **Monitor → Alert management** (moved there from Admin
+> Tools in Metabase 64).
 
 **Important**: Alerts only fire when a condition is *newly* met — not on every check.
 If daily orders stay below 50 for a week, you get one email, not seven.
@@ -56,7 +59,9 @@ If daily orders stay below 50 for a week, you get one email, not seven.
 3. Choose Email or Slack
 4. Set recipients and schedule
 5. Optionally bake in filter values (e.g. always send last 7 days)
-6. Save
+6. Optionally set a custom email subject (Metabase 65). Leave it blank to use the dashboard
+   name
+7. Save
 
 Email subscriptions send a screenshot of each card + optional data attachment.
 Slack subscriptions send chart images directly to a channel.

@@ -45,7 +45,7 @@ This is where raw column names get transformed into something usable.
 |--------|-------------------|--------|
 | People.Email | Email | Renders as a clickable mailto link |
 | Products.Rating | Score | Enables star-rating display |
-| People.Latitude + Longitude | Latitude / Longitude | Enables pin map visualisations |
+| People.Latitude + Longitude | Latitude / Longitude | Enables pin map visualizations |
 | Accounts.Country | Country | Enables filled map by country |
 | Orders.Total | Currency | Adds $ formatting throughout |
 | Accounts.Plan | Category | Generates a dropdown filter |
@@ -102,6 +102,50 @@ and **Transforms**.
 - Example: the "Revenue by Month" chart on the Sales Overview Dashboard changes slowly —
   caching it for 24 hours is fine. A "Live Orders Today" card should never be cached.
 
+### 7. Monitor (Metabase 64+)
+Monitor is a top-level area (grid icon → **Monitor**) that collects everything about the
+health of your instance in one place. Much of it moved here from Admin:
+
+| In Monitor | Was previously in |
+|---|---|
+| Erroring questions | Admin → Tools |
+| Alert management | Admin → Tools |
+| Background tasks, Scheduled jobs, Application logs | Admin → Tools (Tasks, Jobs, Logs) |
+| Model persistence log | Admin → Tools (Model cache logs) |
+| Dependency diagnostics | Data Studio |
+| AI usage auditing and Metabot conversations | Admin → AI |
+| MCP analytics and CLI analytics (new in 64) | — |
+| Content diagnostics: stale, duplicate, and slow content (new in 65, Pro) | — |
+| Logs and activity → Session management (new in 65, Pro) | — |
+| Logs and activity → API key usage (new in 65) | — |
+
+If a learner can't find something under Admin → Tools, it's almost certainly in Monitor.
+
+**Session management** lets admins search a user's sessions and revoke one, all of that
+user's sessions, or every active session — useful when a laptop goes missing. **API key
+usage** shows how each key is used, which keys are stale, and which calls are failing.
+
+### 8a. Other Admin Changes in Metabase 65
+- **Test connection**: the database connection form has a Test connection button, so you
+  can check credentials before saving.
+- **SSO setup** pages (JWT, SAML, LDAP, OIDC) share one layout: provider settings, then
+  user provisioning, then optional extras.
+- **Embedding hub**: all embedding settings moved to one place, opened from the grid icon in
+  the top right. Modular embedding and guest embeds now share a single toggle.
+- **Actions are admin-only**: only admins can create actions, and people restricted by
+  row- or column-level security can't run them.
+- **Metabot reads query results** by default. Admins can turn this off in Admin > AI >
+  Metabot settings (see Session 9).
+- **Per-group MCP tool access** (Pro/Enterprise) is under Admin > AI > Usage controls > MCP
+  tools access (see Session 9).
+
+### 8. Two-Factor Authentication
+- People can turn on 2FA for themselves under **Your account → Authentication**.
+- As of Metabase 64, admins can **require** 2FA, either immediately or by a set date, under
+  **Admin → Authentication → Overview → Two-factor authentication**. People without it get
+  prompted to set it up.
+- The same page lists who is and isn't enrolled.
+
 ---
 
 ## Active Recall Questions
@@ -121,13 +165,29 @@ and **Transforms**.
 **Q5.** The Account Health Dashboard has 6 cards, several involving JOINs across Accounts, Feedback, and Invoices. It's slow. What can you do, and what's the trade-off?
 > **A:** Enable caching for the dashboard or individual Questions. The trade-off: cards load instantly but may show data that's hours old depending on the cache duration. Acceptable for a daily review; not for a live ops screen.
 
+**Q6.** Your manager asks you to find every question in the instance that's currently
+throwing an error. Where do you look in Metabase 64?
+> **A:** Monitor → Erroring questions (grid icon → Monitor). It used to be under Admin →
+> Tools.
+
+**Q7.** Security wants everyone on 2FA by the end of the quarter. What can an admin do in
+Metabase 64?
+> **A:** Require 2FA enrollment by a set date under Admin → Authentication → Overview →
+> Two-factor authentication. People without it get prompted to set it up, and the same page
+> shows who has and hasn't enrolled.
+
+**Q8.** An employee's laptop was stolen. On Metabase 65 (Pro), how do you make sure
+nobody can keep using their logged-in Metabase session?
+> **A:** Monitor → Logs and activity → Session management. Find the user and revoke all of
+> their sessions.
+
 ---
 
 ## Common Gotchas
-- Always use a read-only database user for the Metabase connection — it can't modify data.
+- Use a read-only database user for the Metabase connection unless you need transforms (Session 8), which have to write tables. If you do, consider a separate writeable connection for transforms.
 - Hiding a column in Admin → Table Metadata only hides it from the UI, not from raw SQL queries.
 - Permissions are additive across groups, but All Users is the floor — you can't give a group
   *less* than All Users without restricting All Users first.
 - After connecting a new database, metadata is incomplete until the first sync and scan finish.
 - Setting People.Latitude and People.Longitude field types to Latitude/Longitude is what
-  unlocks the pin map visualisation — without this, the map option won't appear.
+  unlocks the pin map visualization — without this, the map option won't appear.
