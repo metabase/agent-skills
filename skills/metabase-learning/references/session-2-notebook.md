@@ -3,7 +3,7 @@
 ## Key Concepts to Teach
 
 ### 1. What a "Question" Is
-- A Question is a saved query + visualisation
+- A Question is a saved query + visualization
 - Every chart or table you see in Metabase started as a Question
 - Two ways to create one: **Query Builder** (visual) or **SQL Editor** (Session 4)
 
@@ -11,6 +11,8 @@
 - Click **New → Question**
 - Choose a data source: a Table, Model, or saved Question
 - Example: pick **Orders** as your starting table — you now have all 9 columns to work with
+- On wide tables (10 or more columns), the column picker has a search box (Metabase 65), so
+  you can type a column name instead of scrolling
 
 ### 3. The Query Builder Stages (in order)
 ```

@@ -3,7 +3,7 @@
 ## Key Concepts to Teach
 
 ### 1. Collections — Metabase's Folder System
-- Collections are folders for organising Questions, Dashboards, and Models
+- Collections are folders for organizing Questions, Dashboards, and Models
 - **Personal Collection**: private to you — like a drafts folder
 - **Shared Collections**: visible to others based on permissions
 - Collections can be nested (sub-collections)
@@ -29,7 +29,11 @@ Our Analytics/
 
 ### 2. Pinning Items
 - Pin important items to the top of a collection so they're visible immediately
-- Three-dot menu → Pin → appears as a large preview card
+- Three-dot menu → Pin → the item moves to the pinned area at the top of the collection
+- As of Metabase 64, pinned items show as compact cards, not chart previews, and metrics
+  and models are no longer pinned automatically — pin them yourself if you want them up top
+- Collections also have a filter/search box (Metabase 64), and you can shift-click to
+  select several items at once, then press Delete to move them to trash
 - Example: pin "Sales Overview Dashboard" in the Sales collection so it's the first
   thing the team sees when they open it
 
@@ -87,6 +91,16 @@ conditional aggregations like `CountIf` / `SumIf` rather than a separate baked-i
 Once defined, users pick "Total Revenue" from the Summarize menu instead of re-creating
 `Sum of Total` — and everyone gets the same number.
 
+**Metric dimensions (Metabase 64).** A metric's underlying table might have dozens of
+columns, but most people only need to break it out a few sensible ways. Open a metric and
+go to its **Dimensions** tab to curate the list:
+- Pick which columns people can break the metric out by (e.g. Total Revenue by Created_At,
+  Category, State, and Source — not all 9 Orders columns plus every joined column).
+- Choose a **default dimension**, which decides how the metric shows up on dashboards and
+  in the metrics explorer.
+- Rename and reorder dimensions so the list reads well ("Order date" instead of
+  "Created_At").
+
 ### 6. The Hierarchy of Trust
 ```
 Raw Tables (anyone queries anything)
@@ -115,6 +129,12 @@ Raw Tables (anyone queries anything)
 **Q5.** You want the Account Health Dashboard to be the first thing your customer success team sees when they open the Accounts collection. What do you do?
 > **A:** Pin the dashboard to the top of the Accounts & Billing collection (three-dot menu → Pin).
 
+**Q6.** Your Total Revenue metric is built on a table with 60 columns, and people keep
+breaking it out by internal ID columns that make no sense. What Metabase 64 feature fixes
+this, and where do you find it?
+> **A:** Metric dimensions. Open the metric and go to its Dimensions tab to choose which
+> columns people can break it out by, set a default, and rename them.
+
 ---
 
 ## Common Gotchas
@@ -123,3 +143,5 @@ Raw Tables (anyone queries anything)
 - Segments are managed in Admin → Table Metadata (or Data Studio); Metrics now live in collections, created via + New → Metric.
 - Collection permissions are inherited by sub-collections by default — plan your structure first.
 - Pinning doesn't change permissions — pinned items are still subject to the same access rules.
+- Metrics and models stopped auto-pinning in Metabase 64. If a learner expects a new metric to appear at the top of the collection, it won't until they pin it.
+- A metric with no curated dimensions still works — dimensions are a usability layer, not a requirement.

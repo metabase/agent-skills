@@ -66,9 +66,14 @@ A single filter widget that controls multiple cards simultaneously.
 Unwired cards show unfiltered data regardless of what the filter is set to.
 
 ### 7. Auto-refresh and Sharing
-- **Auto-refresh**: clock icon → 1, 5, 10, 15, 30, 60 min intervals — useful for live ops displays
+- **Auto-refresh**: dashboard's **three-dots (…) menu** → Auto-refresh → 1, 5, 10, 15, 30, 60 min intervals — useful for live ops displays. (Before Metabase 64 this was a clock icon in the header.)
 - **Public link**: anyone can view without logging in (admin must enable this feature)
-- **Embed**: iframe embed for internal tools or external websites
+- **Embed**: embed in internal tools or external websites. Admins set this up in the
+  Embedding hub (grid icon, top right) as of Metabase 65
+- **Timeline events** (Metabase 65): time series cards can show events (launches, outages,
+  campaigns) right on the chart. Turn them on per card from the card's three-dots menu →
+  **Events**, or for the whole tab from the dashboard header's three-dots menu. Events also
+  show on public and embedded dashboards
 - **Subscriptions**: covered in Session 7
 
 ---
@@ -88,7 +93,7 @@ Unwired cards show unfiltered data regardless of what the filter is set to.
 > **A:** A heading card is a simple bold title. A text card supports full Markdown — paragraphs, bullet points, links, and richer formatting for adding context around charts.
 
 **Q5.** Your ops team wants a dashboard showing live order volume on a TV screen in the office. What do you set up?
-> **A:** Enable Auto-refresh on the dashboard — set it to every 1–5 minutes so the displayed data stays current without anyone manually refreshing.
+> **A:** Enable Auto-refresh from the dashboard's three-dots menu — set it to every 1–5 minutes so the displayed data stays current without anyone manually refreshing.
 
 ---
 
