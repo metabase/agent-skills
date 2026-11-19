@@ -88,6 +88,12 @@ Learn the ins and outs of Metabase in ten lessons, with quizzes and exercises. I
 
 Marketplace links: [skillsmp.com](https://skillsmp.com/creators/metabase/agent-skills/skills-metabase-learning) | [skills.sh](https://www.skills.sh/metabase/agent-skills/metabase-learning)
 
+### Models to transforms
+
+[models-to-transforms](./skills/models-to-transforms/SKILL.md)
+
+Plans and runs the retirement of Metabase models: maps each model 1:1 onto an existing table or replaces it with a transform, publishes the tables in the Library, re-points every dependent with Metabase's source replacement, fixes what that leaves behind (dashcards, filter value sources, links, alerts, actions, metric dimensions), opens PRs for remote-synced content, writes migration docs for the rest, and finally archives the models. Requires the `mb` CLI (`npm i -g @metabase/cli`) and an admin profile.
+
 ### Modular embedding to modular embedding SDK upgrade
 
 [metabase-modular-embedding-to-modular-embedding-sdk-upgrade](./skills/metabase-modular-embedding-to-modular-embedding-sdk-upgrade/SKILL.md)
